@@ -1,7 +1,6 @@
-fastapi
-uvicorn
-pyjwt
-requests
-openai  
-google_genai
-python-multipart 
+fastapi==0.110.0
+uvicorn==0.29.0
+python-multipart==0.0.9
+pyjwt==2.8.0
+google-genai==0.3.0
+python-dotenv==0.21.0

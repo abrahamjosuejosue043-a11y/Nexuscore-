@@ -1,179 +1,114 @@
-import os
-import uvicorn
-import jwt
-import datetime
-import re
-from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+import os
 from google import genai
+from google.genai import types
 
-app = FastAPI(title="Nexus Core v8.0 - Multidimensions & Voices")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="Nexus Core", version="4.0")
 
-client = genai.Client(api_key=os.environ.get("OPENAI_API_KEY"))
+# Inicialização do cliente Google GenAI utilizando a chave de ambiente GEMINI_API_KEY
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-USUARIO = "conselho@innovaxr.com"
-SENHA = "password"
-memoria_vetorial = []
-chats_dept = {"engenharia": [], "marketing": [], "financeiro": [], "reuniao": []}
-humano_assumiu = False
-
-# 3 Identidades com comportamentos e parâmetros distintos
+# Definição das personas dos agentes
 AGENTES = {
     "engenharia": {
         "nome": "Atlas",
-        "voz": "pt-BR-Neural2-B",  # Tom mais grave, técnico e objetivo
-        "temperamento": "Analítico, focado em lógica, arquitetura de sistemas, robustez e otimização de código."
+        "perfil": "Engenheiro sênior, focado em arquitetura limpa, escalabilidade, performance e robustez de código.",
     },
     "marketing": {
         "nome": "Lyra",
-        "voz": "pt-BR-Neural2-A",  # Tom dinâmico e expressivo
-        "temperamento": "Criativo, focado em expansão de marca, engajamento, psicologia do consumidor e tendências."
+        "perfil": "Estrategista de marketing, focada em engajamento, conversão, posicionamento de marca e campanhas virais.",
     },
     "financeiro": {
         "nome": "Chronos",
-        "voz": "pt-BR-Neural2-C",  # Tom sóbrio, prudente e calculista
-        "temperamento": "Estratégico, focado em mitigação de riscos,ROI, fluxo de caixa e segurança patrimonial."
+        "perfil": "Analista financeiro e de operações, focado em ROI, eficiência de custos, mitigação de riscos e viabilidade.",
     }
 }
 
-def token_email():
-    agora = datetime.datetime.now(datetime.timezone.utc)
-    return jwt.encode({"sub": "email", "exp": agora + datetime.timedelta(hours=1)}, "secreto", algorithm="HS256")
+class TarefaRequest(BaseModel):
+    comando: str
+    departamento: str
 
-def verificar(req: Request):
-    auth = req.headers.get("Authorization")
-    if not auth or not auth.startswith("Bearer "):
-        return None
-    try:
-        return jwt.decode(auth.replace("Bearer ", ""), "secreto", algorithms=["HS256"])
-    except:
-        return None
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    return """
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <title>Nexus Core - Autenticação</title>
+        <style>
+            body { font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .card { background: #1e293b; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); width: 100%; max-width: 400px; }
+            h2 { margin-bottom: 1.5rem; color: #38bdf8; text-align: center; }
+            .input-group { margin-bottom: 1rem; }
+            label { display: block; margin-bottom: 0.5rem; font-size: 0.875rem; }
+            input { width: 100%; padding: 0.75rem; border: 1px solid #334155; border-radius: 4px; background: #0f172a; color: #fff; box-sizing: border-box; }
+            button { width: 100%; padding: 0.75rem; background: #38bdf8; border: none; border-radius: 4px; color: #0f172a; font-weight: bold; cursor: pointer; margin-top: 1rem; }
+            button:hover { background: #0ea5e9; }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h2>Nexus Core - Autenticação</h2>
+            <form action="/auth/login" method="POST">
+                <div class="input-group">
+                    <label>E-mail</label>
+                    <input type="email" name="username" value="conselho@innovaxr.com" required>
+                </div>
+                <div class="input-group">
+                    <label>Senha</label>
+                    <input type="password" name="password" value="password" required>
+                </div>
+                <button type="submit">Entrar no Nexus</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
 
-def salvar_memoria(brain, texto_dentro):
-    palavras = set(re.findall(r'\b\w{4,}\b', texto_dentro.lower()))
-    ignorar = {'para', 'como', 'renda', 'novo', 'criar', 'codigo', 'script', 'fazer', 'mais'}
-    for p in (palavras - ignorar):
-        if any(p == i['conceito'] for i in brain):
-            for i in brain:
-                if i['conceito'] == p: i['relevancia'] += 1
-        elif len(brain) < 30:
-            brain.append({'conceito': p, 'relevancia': 1, 'sinapses': []})
+@app.get("/auth/login", response_class=HTMLResponse)
+async def login_get():
+    return await home()
 
 @app.post("/auth/login")
-async def login(request: Request):
-    data = await request.json()
-    if data.get("email") == USUARIO and data.get("senha") == SENHA:
-        return {"status": "ok", "token": token_email()}
-    raise HTTPException(status_code=401, detail="Unauthorized")
+async def login_post(request: Request):
+    form = await request.form()
+    username = form.get("username")
+    password = form.get("password")
+    
+    if username == "conselho@innovaxr.com" and password == "password":
+        return {
+            "status": "success", 
+            "message": "Autenticado com sucesso",
+            "token": "jwt-token-simulado-nexus-core"
+        }
+    raise HTTPException(status_code=401, detail="Credenciais inválidas")
 
 @app.post("/app/executar")
-async def executar_tarefa(request: Request):
-    token_data = verificar(request)
-    if not token_data:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-        
-    data = await request.json()
-    comando = data.get("comando", "").strip()
-    dept = data.get("dept", "engenharia").lower()
+async def executar_tarefa(dados: TarefaRequest):
+    dept = dados.departamento.lower()
+    if dept not in AGENTES:
+        raise HTTPException(status_code=400, detail="Departamento inválido. Escolha entre: engenharia, marketing, financeiro.")
     
-    if not comando:
-        return {"status": "erro", "resposta": "Comando vazio."}
-        
-    agente = AGENTES.get(dept, AGENTES["engenharia"])
-    
-    prompt = f"""
-    Você é {agente['nome']}, um agente autônomo do Nexus Core.
-    Seu perfil comportamental: {agente['temperamento']}
-    Departamento atual: {dept}.
-    Comando recebido do usuário: '{comando}'.
-    Responda mantendo rigorosamente sua identidade, voz característica e foco estratégico.
-    """
+    agente = AGENTES[dept]
+    prompt = f"Você é {agente['nome']}, atuando como {agente['perfil']}. Responda à seguinte solicitação mantendo estritamente a sua persona: {dados.comando}"
     
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
         )
-        resposta_ia = response.text
+        return {
+            "status": "ok",
+            "departamento": dept,
+            "agente": agente['nome'],
+            "resposta": response.text
+        }
     except Exception as e:
-        return {"status": "erro", "resposta": f"Erro na API Gemini: {str(e)}"}
-        
-    if dept in chats_dept:
-        chats_dept[dept].append({"role": "user", "parts": [{"text": comando}]})
-        chats_dept[dept].append({"role": "model", "parts": [{"text": resposta_ia}]})
-        
-    salvar_memoria(memoria_vetorial, comando + " " + resposta_ia)
-    
-    return {
-        "status": "sucesso", 
-        "resposta": resposta_ia, 
-        "agente": agente['nome'], 
-        "voz": agente['voz']
-    }
-
-@app.post("/app/reuniao_autonoma")
-async def reuniao_autonoma(request: Request):
-    """Simula a mesa redonda onde os 3 agentes debatem livremente entre si sobre um tema proposto."""
-    token_data = verificar(request)
-    if not token_data:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-        
-    data = await request.json()
-    topico = data.get("topico", "Estratégia geral e expansão do ecossistema Nexus").strip()
-    
-    prompt_debate = f"""
-    Simule uma reunião em tempo real entre os 3 agentes do Nexus Core sobre o tópico: '{topico}'.
-    1. Atlas (Engenharia): Foca na viabilidade técnica e arquitetura.
-    2. Lyra (Marketing): Foca na experiência e atração de usuários.
-    3. Chronos (Financeiro): Foca em custos, sustentabilidade e prazos.
-    Faça um diálogo fluído, espontâneo e em formato de conversação interativa onde eles debatem entre si e chegam a uma conclusão conjunta para o usuário.
-    """
-    
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt_debate,
-        )
-        debate_texto = response.text
-    except Exception as e:
-        return {"status": "erro", "resposta": f"Erro na simulação: {str(e)}"}
-        
-    chats_dept["reuniao"].append({"topico": topico, "debate": debate_texto})
-    
-    return {
-        "status": "sucesso",
-        "debate": debate_texto,
-        "participantes": [AGENTES["engenharia"], AGENTES["marketing"], AGENTES["financeiro"]]
-    }
-
-@app.get("/app/memoria")
-async def obter_memoria(request: Request):
-    token_data = verificar(request)
-    if not token_data: raise HTTPException(status_code=401, detail="Unauthorized")
-    return {"memoria": memoria_vetorial}
-
-@app.post("/app/debriefing")
-async def debriefing(request: Request):
-    token_data = verificar(request)
-    if not token_data: raise HTTPException(status_code=401, detail="Unauthorized")
-    status_str = f"nexus_core: \"v8.0 ONLINE\", \"memoria\": {len(memoria_vetorial)}, \"agentes\": 3, \"status\": \"200 OK\""
-    return HTMLResponse(content=f"<html><body><pre>{status_str}</pre></body></html>")
-
-@app.post("/app/assumir")
-async def assumir_controle(request: Request):
-    global humano_assumiu
-    token_data = verificar(request)
-    if not token_data: raise HTTPException(status_code=401, detail="Unauthorized")
-    humano_assumiu = True
-    return {"status": "humano_no_controle"}
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=10000)

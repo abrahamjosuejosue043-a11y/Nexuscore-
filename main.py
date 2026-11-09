@@ -3,6 +3,8 @@ import uvicorn
 import jwt
 import time
 import datetime
+import random
+import re
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -55,8 +57,8 @@ ESTILOS = {
     "estrategista": "Priorize viabilidade de mercado, ROI e escalabilidade."
 }
 
-def gerar_resposta(brain, tema, contexto_ anterior=""):
-    base = random.choice(ESTILOS[brain])
+def gerar_resposta(brain, tema, contexto_anterior=""):
+    base = random.choice(list(ESTILOS.values()))
     texto = base + f" (Tema: {tema})"
     if contexto_anterior:
         texto += f" (Respondendo a: {contexto_anterior})"
@@ -239,19 +241,18 @@ async def debate(request: Request):
     data = await request.json()
     tema = data.get("tema", "Inovação")
     
-    # Gerando debate autônomo integrando com a API da OpenAI se disponível
     debate_res = []
     brains = ["moderador", "inovador", "estrategista"]
     contexto = ""
     for b in brains:
-        prompt = fAtue como {b}. Comente sobre o tema: {tema}. Contexto anterior: {contexto}"
+        prompt = f"Atue como {b}. Comente sobre o tema: {tema}. Contexto anterior: {contexto}"
         try:
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}]
             )
             texto = response.choices[0].message.content
-        except Exception:
+        except Exception as e:
             texto = gerar_resposta(b, tema, contexto)
             
         debate_res.append({"brain": b, "texto": texto})
@@ -280,7 +281,6 @@ async def executar_tarefa(request: Request):
     dept = data.get("dept", "engenharia")
     comando = data.get("comando", "Criar script básico")
     
-    # Chamada real para a API OpenAI gerar código/tarefa baseada na chave configurada
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -291,7 +291,7 @@ async def executar_tarefa(request: Request):
         )
         artefato = response.choices[0].message.content
     except Exception as e:
-        artefato = f"# Erro ao conectar com a API OpenAI: {str.lower(str(e))}"
+        artefato = f"# Erro ao conectar com a API OpenAI: {str(e).lower()}"
 
     chats_dept[dept].append({"autor": dept.upper(), "msg": artefato})
     return {"departamento": dept, "artefato": artefato}

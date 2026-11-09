@@ -289,4 +289,9 @@ function sair(){localStorage.clear(); location.reload()}
 try{var sb=localStorage.getItem("nexus_base"); if(sb){document.getElementById("baseUrl").value=sb; BASE=sb;} var tk=localStorage.getItem("nexus_token"); if(tk)TOKEN=tk;}catch(e){}
 log("Nexus v8.0 FINAL carregado - Render pronto");
 </script></body></html>
-"""
+"""# BLOCO OBRIGATORIO PRO RENDER NAO MATAR O APP
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    print(f"NEXUS CORE v8.0 SUBINDO NA PORTA {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

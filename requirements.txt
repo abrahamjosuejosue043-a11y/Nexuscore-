@@ -4,3 +4,4 @@ pyjwt
 requests
 openai  
 google_genai
+python-multipart 

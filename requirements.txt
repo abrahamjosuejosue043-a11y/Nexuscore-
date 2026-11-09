@@ -3,4 +3,4 @@ uvicorn
 pyjwt
 requests
 openai  
-
+google_genai

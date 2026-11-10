@@ -19,7 +19,7 @@ class OrquestradorNexusV4:
                 raise ValueError("GEMINI_API_KEY nao encontrada")
             import google.generativeai as genai
             genai.configure(api_key=self.gemini_key)
-            self._gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+            self._gemini_model = genai.GenerativeModel("gemini-2.0-flash")
         return self._gemini_model
     def _get_meta(self):
         if self._meta_client is None:

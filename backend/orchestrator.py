@@ -18,27 +18,49 @@ class OrquestradorNexusV4:
             if not self.gemini_key:
                 raise ValueError("GEMINI_API_KEY nao encontrada")
             import google.generativeai as genai
-            genai.configure(api_key=self.gemini_key)
-            self._gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+            genai.configure(api_key=str(self.gemini_key).strip())
+            # CORRECAO V4.2: Google aposentou 1.5-flash e depois 2.0-flash.
+            # O erro no seu print mesmo fala: use gemini-3.8-flash.
+            # Agora usa 3.8-flash como principal.
+            self._gemini_model = genai.GenerativeModel("gemini-3.8-flash")
         return self._gemini_model
     def _get_meta(self):
         if self._meta_client is None:
             if not self.meta_key:
                 raise ValueError("META_API_KEY nao encontrada")
             from groq import Groq
-            self._meta_client = Groq(api_key=self.meta_key)
+            # CORRECAO: tira espaco que vem quando copia a chave, espaco ja dava 401 Invalid API Key
+            self._meta_client = Groq(api_key=str(self.meta_key).strip())
         return self._meta_client
     def _meta_lab(self, pergunta, contexto):
         try:
             c = self._get_meta()
-            r = c.chat.completions.create(model="llama-3.3-70b-versatile", messages=[{"role": "system", "content": PERSONALIDADES["lab"]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.4, max_tokens=900)
-            return str(r.choices[0].message.content)
+            # CORRECAO V4.2: Groq aposentou llama-3.3-70b-versatile, por isso dava 404 model_not_found.
+            # Agora tenta os modelos atuais, um por um, ate um funcionar.
+            for modelo in ["llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile", "openai/gpt-oss-120b"]:
+                try:
+                    r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES["lab"]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.4, max_tokens=900)
+                    return str(r.choices[0].message.content)
+                except Exception as e:
+                    ultimo_erro = str(e)
+                    continue
+            return "[Lab indisponivel] " + ultimo_erro
         except Exception as e:
             return "[Lab indisponivel] " + str(e)
     def _gemini_dept(self, pergunta, contexto, dept):
         try:
-            m = self._get_gemini()
-            return str(m.generate_content(PERSONALIDADES[dept] + "\nHistorico:" + contexto + "\nPergunta:" + pergunta).text)
+            import google.generativeai as genai
+            genai.configure(api_key=str(self.gemini_key).strip())
+            prompt = PERSONALIDADES[dept] + "\nHistorico:" + contexto + "\nPergunta:" + pergunta
+            # Tenta o modelo novo, se falhar tenta os outros - assim nao quebra de novo se o Google aposentar um
+            for modelo in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest"]:
+                try:
+                    m = genai.GenerativeModel(modelo)
+                    return str(m.generate_content(prompt).text)
+                except Exception as e:
+                    ultimo_erro = str(e)
+                    continue
+            return "[" + dept + " indisponivel] " + ultimo_erro
         except Exception as e:
             return "[" + dept + " indisponivel] " + str(e)
     def reuniao(self, pergunta: str, destino: str = "todos"):

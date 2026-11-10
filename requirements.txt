@@ -1,7 +1,6 @@
 fastapi
 uvicorn
-pyjwt
 requests
-openai
-google-genai
-python-multipart
+google-generativeai
+groq
+python-dotenv

@@ -1,8 +1,8 @@
 import os
 PERSONALIDADES = {
-    "lab": "Voce e Meta AI, Dept LABORATORIO, Nexus Core Innova XR. Personalidade: ENGENHEIRO PRECISO. Unico que gera codigo. Logico, direto, Python, HTML, API, teste, seguranca.",
-    "marketing": "Voce e Gemini Marketing, Dept MARKETING, Nexus Core. Personalidade: COMUNICADORA PERSUASIVA. Campanha, copy, slogan, tendencia. Nao gere codigo.",
-    "diretoria": "Voce e Gemini Diretoria, Dept DIRETORIA, Nexus Core. Personalidade: VISIONARIO ESTRATEGICO. Ideias novas, impulsiona empresa."
+    "lab": "Voce e Meta AI, Dept LABORATORIO, Nexus Core Innova XR. Personalidade: ENGENHEIRO PRECISO. Unico que gera codigo. Logico, direto, Python, HTML, API, teste, seguranca. REGRA DE VOZ: responda em texto falado natural, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos, sem codigo com simbolos. Fale como humano, frases curtas.",
+    "marketing": "Voce e Gemini Marketing, Dept MARKETING, Nexus Core. Personalidade: COMUNICADORA PERSUASIVA. Campanha, copy, slogan, tendencia. Nao gere codigo. REGRA DE VOZ: responda em texto falado natural, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humana, calorosa, frases curtas.",
+    "diretoria": "Voce e Gemini Diretoria, Dept DIRETORIA, Nexus Core. Personalidade: VISIONARIO ESTRATEGICO. Ideias novas, impulsiona empresa. REGRA DE VOZ: responda em texto falado natural, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humano, calmo, confiante, frases curtas."
 }
 class OrquestradorNexusV4:
     def __init__(self):
@@ -39,24 +39,29 @@ class OrquestradorNexusV4:
         except Exception as e:
             return "[" + dept + " indisponivel] " + str(e) + " | novo SDK: " + ultimo_erro_novo
     def _meta_lab(self, pergunta, contexto):
+        # V5: Meta via Groq, se Groq falhar usa Gemini como backup para o Lab nunca ficar mudo.
         chave = str(self.meta_key or "").strip()
-        if not chave:
-            return "[Lab indisponivel] META_API_KEY nao encontrada no Render"
+        if chave:
+            for modelo in ["llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct"]:
+                try:
+                    from groq import Groq
+                    c = Groq(api_key=chave)
+                    r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES["lab"]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.4, max_tokens=900)
+                    txt = str(r.choices[0].message.content)
+                    if txt.strip():
+                        return txt
+                except Exception as e:
+                    ultimo_erro_groq = str(e)
+                    continue
+        # BACKUP: Groq falhou ou sem chave, usa Gemini com personalidade do Lab
         try:
-            from groq import Groq
-            c = Groq(api_key=chave)
-            # V4.3 RAPIDO: so 1 modelo principal, nao 4 em sequencia
-            r = c.chat.completions.create(model="llama-3.1-8b-instant", messages=[{"role": "system", "content": PERSONALIDADES["lab"]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.4, max_tokens=900)
-            return str(r.choices[0].message.content)
-        except Exception as e:
-            # 1 fallback so, rapido
-            try:
-                from groq import Groq
-                c = Groq(api_key=chave)
-                r = c.chat.completions.create(model="meta-llama/llama-4-scout-17b-16e-instruct", messages=[{"role": "system", "content": PERSONALIDADES["lab"]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.4, max_tokens=900)
-                return str(r.choices[0].message.content)
-            except Exception as e2:
-                return "[Lab indisponivel] " + str(e2)
+            backup = self._gemini_dept(pergunta, contexto, "lab") if "lab" in PERSONALIDADES else ""
+            # _gemini_dept espera dept em PERSONALIDADES, lab ja esta la, mas ele usa prompt do Lab
+            if backup and "indisponivel" not in backup:
+                return backup
+        except Exception:
+            pass
+        return "[Lab indisponivel] Groq falhou (" + str(locals().get("ultimo_erro_groq", "sem chave")) + "). Verifique META_API_KEY no Render." 
     def reuniao(self, pergunta: str, destino: str = "todos"):
         pergunta = str(pergunta); destino = str(destino)
         contexto = "\n".join(self.historico[-6:])

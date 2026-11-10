@@ -12,37 +12,47 @@ class OrquestradorNexusV4:
     def health(self):
         return {"nexus_core": "V4 ON", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key)}
     def _gemini_dept(self, pergunta, contexto, dept):
-        # V4.3 RAPIDO: tenta so 1 modelo principal, nao 4 em sequencia.
-        # Antes tentava 4 modelos, demorava tanto que o Render cortava e nao respondia nada.
+        # V5.1 ANTI-QUOTA: cada departamento usa um modelo diferente para nao estourar os 20/dia do grátis.
+        # Antes todos usavam gemini-3.8-flash, por isso 1 pergunta [todos] gastava 2-3 da mesma cota e estourou em poucas horas.
+        # Agora: Marketing usa 2.5-flash, Diretoria usa 3.8-flash, Lab backup usa 2.5-lite. Cada um tem sua cota de 20/dia.
+        # Se um der 429 (quota), tenta o proximo modelo automaticamente.
         prompt = PERSONALIDADES[dept] + "\nHistorico:" + contexto + "\nPergunta:" + pergunta
         chave = str(self.gemini_key or "").strip()
         if not chave:
             return "[" + dept + " indisponivel] GEMINI_API_KEY nao encontrada no Render"
-        # Tenta SDK novo primeiro (google-genai) que conhece gemini-3.8-flash
-        try:
-            from google import genai as genai_novo
-            client = genai_novo.Client(api_key=chave)
-            resp = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
-            txt = getattr(resp, "text", "") or ""
-            if txt.strip():
-                return str(txt)
-        except Exception as e:
-            ultimo_erro_novo = str(e)
-        else:
-            ultimo_erro_novo = "sem texto"
-        # Fallback SDK antigo
-        try:
-            import google.generativeai as genai_antigo
-            genai_antigo.configure(api_key=chave)
-            m = genai_antigo.GenerativeModel("gemini-3.8-flash")
-            return str(m.generate_content(prompt).text)
-        except Exception as e:
-            return "[" + dept + " indisponivel] " + str(e) + " | novo SDK: " + ultimo_erro_novo
+        if dept == "marketing":
+            modelos = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-2.5-flash-lite"]
+        elif dept == "diretoria":
+            modelos = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+        else:  # lab backup
+            modelos = ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-3.8-flash"]
+        ultimo_erro = ""
+        for modelo in modelos:
+            try:
+                from google import genai as genai_novo
+                client = genai_novo.Client(api_key=chave)
+                resp = client.models.generate_content(model=modelo, contents=prompt)
+                txt = getattr(resp, "text", "") or ""
+                if txt.strip():
+                    return str(txt)
+            except Exception as e:
+                ultimo_erro = str(e)
+                # Se for 429, tenta o proximo modelo, nao para
+                if "429" in ultimo_erro or "quota" in ultimo_erro.lower() or "exceeded" in ultimo_erro.lower():
+                    continue
+                # Se for outro erro, tenta proximo tambem
+                continue
+        # Se todos deram 429, avisa de forma humana, sem codigo gigante
+        if "429" in ultimo_erro or "quota" in ultimo_erro.lower() or "exceeded" in ultimo_erro.lower():
+            return "[Limite gratis do dia acabou] O Google gratis deixa so 20 respostas por dia por modelo. Espera um pouco ou usa so 1 departamento por vez para gastar menos. Volta em cerca de 4 horas, ou troca a chave. Detalhe tecnico: " + ultimo_erro[:200]
+        return "[" + dept + " indisponivel] " + ultimo_erro[:300]
     def _meta_lab(self, pergunta, contexto):
-        # V5: Meta via Groq, se Groq falhar usa Gemini como backup para o Lab nunca ficar mudo.
+        # V6: Groq APOSENTOU Llama em 16/08/2026 para conta gratis. Modelos antigos llama-3.1-8b-instant e llama-3.3-70b-versatile nao existem mais no gratis.
+        # O proprio Groq manda usar openai/gpt-oss-20b no lugar. Por isso a Meta dava erro. Agora usa gpt-oss.
+        # Se Groq falhar, usa Gemini como backup para o Lab nunca ficar mudo.
         chave = str(self.meta_key or "").strip()
         if chave:
-            for modelo in ["llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct"]:
+            for modelo in ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]:
                 try:
                     from groq import Groq
                     c = Groq(api_key=chave)

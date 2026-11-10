@@ -8,64 +8,58 @@ class OrquestradorNexusV4:
     def __init__(self):
         self.gemini_key = os.getenv("GEMINI_API_KEY")
         self.meta_key = os.getenv("META_API_KEY")
-        self._gemini_model = None
-        self._meta_client = None
         self.historico = []
     def health(self):
         return {"nexus_core": "V4 ON", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key)}
-    def _get_gemini(self):
-        if self._gemini_model is None:
-            if not self.gemini_key:
-                raise ValueError("GEMINI_API_KEY nao encontrada")
-            import google.generativeai as genai
-            genai.configure(api_key=str(self.gemini_key).strip())
-            # CORRECAO V4.2: Google aposentou 1.5-flash e depois 2.0-flash.
-            # O erro no seu print mesmo fala: use gemini-3.8-flash.
-            # Agora usa 3.8-flash como principal.
-            self._gemini_model = genai.GenerativeModel("gemini-3.8-flash")
-        return self._gemini_model
-    def _get_meta(self):
-        if self._meta_client is None:
-            if not self.meta_key:
-                raise ValueError("META_API_KEY nao encontrada")
-            from groq import Groq
-            # CORRECAO: tira espaco que vem quando copia a chave, espaco ja dava 401 Invalid API Key
-            self._meta_client = Groq(api_key=str(self.meta_key).strip())
-        return self._meta_client
-    def _meta_lab(self, pergunta, contexto):
-        try:
-            c = self._get_meta()
-            # CORRECAO V4.2: Groq aposentou llama-3.3-70b-versatile, por isso dava 404 model_not_found.
-            # Agora tenta os modelos atuais, um por um, ate um funcionar.
-            for modelo in ["llama-3.1-8b-instant", "meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile", "openai/gpt-oss-120b"]:
-                try:
-                    r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES["lab"]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.4, max_tokens=900)
-                    return str(r.choices[0].message.content)
-                except Exception as e:
-                    ultimo_erro = str(e)
-                    continue
-            return "[Lab indisponivel] " + ultimo_erro
-        except Exception as e:
-            return "[Lab indisponivel] " + str(e)
     def _gemini_dept(self, pergunta, contexto, dept):
+        # V4.3 RAPIDO: tenta so 1 modelo principal, nao 4 em sequencia.
+        # Antes tentava 4 modelos, demorava tanto que o Render cortava e nao respondia nada.
+        prompt = PERSONALIDADES[dept] + "\nHistorico:" + contexto + "\nPergunta:" + pergunta
+        chave = str(self.gemini_key or "").strip()
+        if not chave:
+            return "[" + dept + " indisponivel] GEMINI_API_KEY nao encontrada no Render"
+        # Tenta SDK novo primeiro (google-genai) que conhece gemini-3.8-flash
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=str(self.gemini_key).strip())
-            prompt = PERSONALIDADES[dept] + "\nHistorico:" + contexto + "\nPergunta:" + pergunta
-            # Tenta o modelo novo, se falhar tenta os outros - assim nao quebra de novo se o Google aposentar um
-            for modelo in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest"]:
-                try:
-                    m = genai.GenerativeModel(modelo)
-                    return str(m.generate_content(prompt).text)
-                except Exception as e:
-                    ultimo_erro = str(e)
-                    continue
-            return "[" + dept + " indisponivel] " + ultimo_erro
+            from google import genai as genai_novo
+            client = genai_novo.Client(api_key=chave)
+            resp = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
+            txt = getattr(resp, "text", "") or ""
+            if txt.strip():
+                return str(txt)
         except Exception as e:
-            return "[" + dept + " indisponivel] " + str(e)
+            ultimo_erro_novo = str(e)
+        else:
+            ultimo_erro_novo = "sem texto"
+        # Fallback SDK antigo
+        try:
+            import google.generativeai as genai_antigo
+            genai_antigo.configure(api_key=chave)
+            m = genai_antigo.GenerativeModel("gemini-3.8-flash")
+            return str(m.generate_content(prompt).text)
+        except Exception as e:
+            return "[" + dept + " indisponivel] " + str(e) + " | novo SDK: " + ultimo_erro_novo
+    def _meta_lab(self, pergunta, contexto):
+        chave = str(self.meta_key or "").strip()
+        if not chave:
+            return "[Lab indisponivel] META_API_KEY nao encontrada no Render"
+        try:
+            from groq import Groq
+            c = Groq(api_key=chave)
+            # V4.3 RAPIDO: so 1 modelo principal, nao 4 em sequencia
+            r = c.chat.completions.create(model="llama-3.1-8b-instant", messages=[{"role": "system", "content": PERSONALIDADES["lab"]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.4, max_tokens=900)
+            return str(r.choices[0].message.content)
+        except Exception as e:
+            # 1 fallback so, rapido
+            try:
+                from groq import Groq
+                c = Groq(api_key=chave)
+                r = c.chat.completions.create(model="meta-llama/llama-4-scout-17b-16e-instruct", messages=[{"role": "system", "content": PERSONALIDADES["lab"]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.4, max_tokens=900)
+                return str(r.choices[0].message.content)
+            except Exception as e2:
+                return "[Lab indisponivel] " + str(e2)
     def reuniao(self, pergunta: str, destino: str = "todos"):
         pergunta = str(pergunta); destino = str(destino)
-        contexto = "\n".join(self.historico[-10:])
+        contexto = "\n".join(self.historico[-6:])
         self.historico.append("CEO: " + pergunta + " [destino=" + destino + "]")
         lab_ai = ""; marketing_ai = ""; diretoria_ai = ""; codigo = ""
         if destino in ("todos", "lab", "opiniao"):

@@ -70,7 +70,7 @@ button{padding:12px 14px;border:0;border-radius:12px;cursor:pointer;font-weight:
 @media(max-width:900px){main{grid-template-columns:1fr}.avatares{grid-template-columns:1fr}}
 </style></head>
 <body>
-<header><div><div class="logo">NEXUS <b>CORE</b> <span>// FUTURE WORKSPACE</span></div><div style="font-size:11px;letter-spacing:2px;color:#94a3b8">BY INNOVA XR • V8.3 META COMANDA • GEMINI SO BACKUP</div></div><div style="display:flex;gap:10px;align-items:center"><div class="hud"><i></i> SYSTEM ONLINE</div><div class="badge off" id="badgeStatus">● SALA FECHADA • IAs OFFLINE</div></div></header>
+<header><div><div class="logo">NEXUS <b>CORE</b> <span>// FUTURE WORKSPACE</span></div><div style="font-size:11px;letter-spacing:2px;color:#94a3b8">BY INNOVA XR • V8.4 VOZ COM TRAVA + VOZES DIFERENTES</div></div><div style="display:flex;gap:10px;align-items:center"><div class="hud"><i></i> SYSTEM ONLINE</div><div class="badge off" id="badgeStatus">● SALA FECHADA • IAs OFFLINE</div></div></header>
 <main>
 <section class="panel">
 <div class="tabs"><button class="ativo" onclick="aba('reuniao',this)">◉ SALA DE REUNIÃO</button><button onclick="aba('email',this)">📧 E-MAIL</button><button onclick="aba('codigo',this)">🧪 CÓDIGO - LAB</button><button onclick="aba('github',this)">⌬ PLANO</button></div>
@@ -131,19 +131,47 @@ function limparTextoParaVoz(texto){
 }
 function escolherVozNatural(quem){
   if(!vozes.length) return null;
-  // Prefere voz do Google em portugues, que e mais natural que a voz padrao do celular
   const pt = vozes.filter(v=> (v.lang||'').toLowerCase().includes('pt'));
+  if(!pt.length) return vozes[0];
   const google = pt.filter(v=> v.name.toLowerCase().includes('google'));
-  if(google.length) return google[0];
-  if(pt.length){
-    // Marketing prefere voz feminina, Diretoria masculina, Lab neutra
-    if(quem==='marketing'){ const f = pt.find(v=> v.name.toLowerCase().includes('female')||v.name.toLowerCase().includes('luciana')||v.name.toLowerCase().includes('francisca')); if(f) return f; }
-    if(quem==='diretoria'){ const m = pt.find(v=> v.name.toLowerCase().includes('male')||v.name.toLowerCase().includes('daniel')||v.name.toLowerCase().includes('felipe')); if(m) return m; }
-    return pt[0];
-  }
-  return vozes[0];
+  const lista = google.length?google:pt;
+  // Vozes diferentes de verdade: FORJA grave masculina, LIA aguda feminina, ORION calmo masculino grave
+  // Tenta pegar vozes diferentes por nome, senao usa pitch para diferenciar
+  if(quem==='lab'){ const m = lista.find(v=> /daniel|felipe|male|masculino|brazil.*male/i.test(v.name)) || lista[0]; return m; }
+  if(quem==='marketing'){ const fem = lista.find(v=> /luciana|francisca|female|feminina|brazil.*female/i.test(v.name)) || lista[lista.length-1]; return fem; }
+  if(quem==='diretoria'){ const d = lista.find(v=> /daniel|felipe|male/i.test(v.name)) || lista[0]; return d; }
+  return lista[0];
 }
-function falar(texto,quem){ if(!document.getElementById('vozSempre').checked||!reuniaoAtiva) return; const textoLimpo = limparTextoParaVoz(texto); if(!textoLimpo) return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(textoLimpo); u.lang='pt-BR'; u.rate=0.95; u.volume=1; if(quem==='lab') u.pitch=0.95; if(quem==='marketing') u.pitch=1.05; if(quem==='diretoria') u.pitch=0.9; const voz = escolherVozNatural(quem); if(voz) u.voice=voz; setFalando(quem); u.onend=()=>setFalando(null); speechSynthesis.speak(u); }
+let filaVoz=[]; let falandoAgora=false;
+function falar(texto,quem,quandoTerminar){
+  // Entra na fila, nao corta o anterior. Cada um espera o outro terminar.
+  filaVoz.push({texto:limparTextoParaVoz(texto),quem:quem||'lab',quandoTerminar:quandoTerminar||null});
+  tocarProximaVoz();
+}
+function tocarProximaVoz(){
+  if(falandoAgora) return; if(!filaVoz.length) return; if(!reuniaoAtiva) { filaVoz=[]; return; }
+  const item = filaVoz.shift();
+  if(!item.texto){ tocarProximaVoz(); return; }
+  if(!document.getElementById('vozSempre').checked){ if(item.quandoTerminar) item.quandoTerminar(); tocarProximaVoz(); return; }
+  falandoAgora=true;
+  const u=new SpeechSynthesisUtterance(item.texto);
+  u.lang='pt-BR';
+  // Voz distinta por personagem
+  if(item.quem==='lab'){ u.pitch=0.65; u.rate=0.92; u.volume=1; }
+  else if(item.quem==='marketing'){ u.pitch=1.28; u.rate=1.05; u.volume=1; }
+  else if(item.quem==='diretoria'){ u.pitch=0.85; u.rate=0.90; u.volume=1; }
+  else { u.pitch=1; u.rate=0.95; }
+  const voz = escolherVozNatural(item.quem); if(voz) u.voice=voz;
+  setFalando(item.quem);
+  u.onend=()=>{ falandoAgora=false; setFalando(null); if(item.quandoTerminar) item.quandoTerminar(); setTimeout(tocarProximaVoz, 400); };
+  u.onerror=()=>{ falandoAgora=false; setFalando(null); if(item.quandoTerminar) item.quandoTerminar(); setTimeout(tocarProximaVoz, 400); };
+  speechSynthesis.speak(u);
+}
+function falarFilaOrdem(fila){
+  // Fala em ordem: 1 FORJA, 2 LIA, 3 ORION. Sem cortar. Cada um espera o outro terminar.
+  filaVoz=[]; try{speechSynthesis.cancel()}catch(e){} falandoAgora=false;
+  fila.forEach(f=>{ falar(String(f[2]).slice(0,550), f[0]); });
+}
 function abrirDept(dept){ deptAberto=dept; document.getElementById('janela-'+dept).classList.add('aberta'); addMsg('SISTEMA','ceo','Você abriu o Departamento '+dept.toUpperCase()+' - janela independente.'); }
 function fecharDept(){ if(deptAberto) document.getElementById('janela-'+deptAberto).classList.remove('aberta'); deptAberto=null; }
 function perguntarDept(dept){ fecharDept(); document.getElementById('destino').value=dept; document.getElementById('pergunta').focus(); addMsg('SISTEMA','ceo','Você está no departamento '+dept+'. Digite ou fale sua pergunta.'); }
@@ -153,18 +181,24 @@ function atualizarJanelas(d){
  if(d.diretoria_ai){ document.getElementById('dirConteudo').innerHTML='<div class="passo diretoria">'+String(d.diretoria_ai)+'</div>'; document.getElementById('dirDecisoes').innerText=String(d.diretoria_ai); }
 }
 let modoVozContinua=true; let ouvindoContinuo=false; let ultimoTextoVoz=''; let tempoUltimaFala=0;
-function comecarReuniao(){ reuniaoAtiva=true; document.getElementById('badgeStatus').innerText='● REUNIÃO AO VIVO • META COMANDA • VOZ CONTÍNUA'; document.getElementById('badgeStatus').classList.remove('off'); ['lab','marketing','diretoria'].forEach(k=>{ document.getElementById('av-'+k).classList.remove('offline'); document.getElementById('st-'+k).innerText='ONLINE - INNOVA XR'; }); addMsg('SISTEMA','ceo','Reunião iniciada. META comanda FORJA + LIA + ORION. Gemini so backup.. Voz contínua ligada: pode falar a qualquer momento, sem apertar botão. Para interromper, é só falar PARE.'); falar('Reunião iniciada. Eu sou ORION, comandado pela Meta, com FORJA e LIA. Gemini so entra se eu falhar. Pode falar quando quiser. Pode falar quando quiser.', 'diretoria'); iniciarVozContinua(); }
+function comecarReuniao(){ reuniaoAtiva=true; document.getElementById('badgeStatus').innerText='● REUNIÃO AO VIVO • META COMANDA • VOZ CONTÍNUA'; document.getElementById('badgeStatus').classList.remove('off'); ['lab','marketing','diretoria'].forEach(k=>{ document.getElementById('av-'+k).classList.remove('offline'); document.getElementById('st-'+k).innerText='ONLINE - INNOVA XR'; }); addMsg('SISTEMA','ceo','Reunião iniciada. META comanda FORJA + LIA + ORION. Gemini so backup.. Voz com trava anti-barulho ligada. Fale NEXUS + sua pergunta. Para interromper, fale PARE.'); falar('Reunião iniciada. Eu sou ORION, comandado pela Meta, com FORJA e LIA. Gemini so entra se eu falhar. Pode falar quando quiser. Pode falar quando quiser.', 'diretoria'); iniciarVozContinua(); }
 function encerrar(){ reuniaoAtiva=false; modoVozContinua=false; ouvindoContinuo=false; if(recognition){ try{recognition.stop()}catch(e){} recognition=null; } try{speechSynthesis.cancel()}catch(e){} document.querySelectorAll('.avatar').forEach(e=>{e.classList.remove('falando'); e.classList.add('offline')}); ['lab','marketing','diretoria'].forEach(k=>document.getElementById('st-'+k).innerText='OFFLINE'); document.getElementById('badgeStatus').innerText='● SALA FECHADA • IAs OFFLINE'; document.getElementById('badgeStatus').classList.add('off'); fecharDept(); addMsg('SISTEMA','ceo','✅ Reunião encerrada. IAs DESLIGADAS (OFFLINE). Voz contínua desligada.'); }
 async function salvarEmail(){ const email=document.getElementById('meuEmail').value.trim(); const nome=document.getElementById('meuNome').value.trim(); if(!email||!email.includes('@')) return alert('Digite um e-mail válido'); try{ localStorage.setItem('nexus_email',email); localStorage.setItem('nexus_nome',nome); }catch(e){} try{ const r=await fetch('/config/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:String(email),nome:String(nome||'CEO')})}); const d=await r.json(); document.getElementById('emailStatus').innerText='✅ E-mail cadastrado: '+email; addMsg('SISTEMA','ceo','E-mail cadastrado: '+email); }catch(e){ document.getElementById('emailStatus').innerText='⚠️ E-mail salvo localmente: '+email; } }
 async function enviarRelatorio(){ const email=(localStorage.getItem('nexus_email')||document.getElementById('meuEmail').value||'').trim(); if(!email) return alert('Cadastre seu e-mail primeiro na aba E-mail'); addMsg('SISTEMA','ceo','Enviando relatório para '+email+'...'); try{ const textoRelatorio=String(ultimoConsolidado||'')||String(document.getElementById('chat').innerText||'Sem conteúdo'); const r=await fetch('/relatorio/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:String(email),conteudo:textoRelatorio})}); const d=await r.json(); addMsg('NEXUS CORE','ceo','📧 '+String(d.mensagem||'Relatório enviado')); }catch(e){ addMsg('ERRO','ceo','Falha: '+String(e)); } }
 function limparErroTecnico(txt){ let s=String(txt||''); if(s.includes('404')||s.includes('v1beta')||s.includes('ListModels')||s.includes('generateContent')||s.includes('gemini-1.5')){ return 'Estou sem conexao agora. Tenta de novo em 1 minuto. O modelo antigo foi aposentado, ja estou usando o novo.'; } return s; }
-async function enviar(){ if(!reuniaoAtiva){ addMsg('SISTEMA','ceo','⚠️ Reunião encerrada. Clique em Começar Reunião.'); return; } let p=document.getElementById('pergunta').value.trim(); if(!p) return alert('Digite ou fale o comando'); let destino=document.getElementById('destino').value; const low=p.toLowerCase(); if(low.includes('@lab')||low.includes('laboratorio')) destino='lab'; if(low.includes('@marketing')) destino='marketing'; if(low.includes('@diretoria')) destino='diretoria'; if(low.includes('opinião')||low.includes('opiniao')) destino='opiniao'; addMsg('VOCÊ (CEO)','ceo',p+' → ['+destino+']'); document.getElementById('pergunta').value=''; try{ const r=await fetch('/perguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pergunta:String(p),destino:String(destino)})}); const d=await r.json(); ultimoConsolidado=String(d.consolidado||''); const fila=[]; if(d.lab_ai) fila.push(['lab','FORJA • Lab',limparErroTecnico(d.lab_ai)]); if(d.marketing_ai) fila.push(['marketing','LIA • Marketing',limparErroTecnico(d.marketing_ai)]); if(d.diretoria_ai) fila.push(['diretoria','ORION • Diretoria',limparErroTecnico(d.diretoria_ai)]); fila.forEach(f=>addMsg(f[1],f[0],String(f[2]))); document.getElementById('planoOut').innerText=ultimoConsolidado; if(d.codigo) document.getElementById('codigoOut').innerText=String(d.codigo); atualizarJanelas(d); let i=0; function proximo(){ if(i>=fila.length||!reuniaoAtiva){setFalando(null);return;} const f=fila[i]; i++; falar(String(f[2]).slice(0,600), f[0]); setTimeout(proximo,7500); } proximo(); }catch(e){ addMsg('ERRO','ceo','Falha ao conectar. Verifique GEMINI_API_KEY e META_API_KEY no Render. '+String(e)); } }
-function iniciarVozContinua(){ if(!reuniaoAtiva) return; const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ addMsg('SISTEMA','ceo','Use Chrome para voz contínua.'); return; } if(ouvindoContinuo) return; ouvindoContinuo=true; recognition=new SR(); recognition.lang='pt-BR'; recognition.continuous=true; recognition.interimResults=true; recognition.maxAlternatives=1; recognition.onresult=(e)=>{ let final=''; let interim=''; for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) final+=e.results[i][0].transcript; else interim+=e.results[i][0].transcript; } const texto = (final||interim).trim(); const low = texto.toLowerCase(); // INTERRUPCAO: se voce falar PARE / PARA / CALMA / ESPERA enquanto a IA fala, ela cala na hora
- if(low.includes('pare')||low.includes('para')||low.includes('calma')||low.includes('espera')||low.includes('interrompe')||low.includes('chega')){ try{speechSynthesis.cancel()}catch(err){} setFalando(null); addMsg('SISTEMA','ceo','⏸️ Você interrompeu. Pode falar.'); return; } if(final && final.length>2){ // Evita repetir a mesma frase duas vezes
-   const agora=Date.now(); if(final===ultimoTextoVoz && agora-tempoUltimaFala<3000) return; ultimoTextoVoz=final; tempoUltimaFala=agora; document.getElementById('pergunta').value=final; const l=final.toLowerCase(); if(l.includes('encerrar')||l.includes('encerrar reunião')){encerrar();return;} if(l.includes('relatório')||l.includes('relatorio')){enviarRelatorio();return;} // Pausa a escuta enquanto a IA responde, depois volta sozinha
-   enviar(); } }; recognition.onend=()=>{ ouvindoContinuo=false; if(reuniaoAtiva && modoVozContinua){ setTimeout(()=>iniciarVozContinua(), 600); } }; recognition.onerror=()=>{ ouvindoContinuo=false; if(reuniaoAtiva && modoVozContinua){ setTimeout(()=>iniciarVozContinua(), 1000); } }; try{ recognition.start(); addMsg('SISTEMA','ceo','🎤 Voz contínua ligada. Fale quando quiser, sem apertar botão.'); }catch(err){ ouvindoContinuo=false; } }
+async function enviar(){ if(!reuniaoAtiva){ addMsg('SISTEMA','ceo','⚠️ Reunião encerrada. Clique em Começar Reunião.'); return; } let p=document.getElementById('pergunta').value.trim(); if(!p) return alert('Digite ou fale o comando'); let destino=document.getElementById('destino').value; const low=p.toLowerCase(); if(low.includes('@lab')||low.includes('laboratorio')) destino='lab'; if(low.includes('@marketing')) destino='marketing'; if(low.includes('@diretoria')) destino='diretoria'; if(low.includes('opinião')||low.includes('opiniao')) destino='opiniao'; addMsg('VOCÊ (CEO)','ceo',p+' → ['+destino+']'); document.getElementById('pergunta').value=''; try{ const r=await fetch('/perguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pergunta:String(p),destino:String(destino)})}); const d=await r.json(); ultimoConsolidado=String(d.consolidado||''); const fila=[]; if(d.lab_ai) fila.push(['lab','FORJA • Lab',limparErroTecnico(d.lab_ai)]); if(d.marketing_ai) fila.push(['marketing','LIA • Marketing',limparErroTecnico(d.marketing_ai)]); if(d.diretoria_ai) fila.push(['diretoria','ORION • Diretoria',limparErroTecnico(d.diretoria_ai)]); fila.forEach(f=>addMsg(f[1],f[0],String(f[2]))); document.getElementById('planoOut').innerText=ultimoConsolidado; if(d.codigo) document.getElementById('codigoOut').innerText=String(d.codigo); atualizarJanelas(d); falarFilaOrdem(fila); }catch(e){ addMsg('ERRO','ceo','Falha ao conectar. Verifique GEMINI_API_KEY e META_API_KEY no Render. '+String(e)); } }
+let conversaLiberadaAte=0; let ultimoBarulhoIgnorado=0;
+function temPalavraChave(txt){
+  const l = txt.toLowerCase();
+  // Palavra de acordar: so envia se ouvir Nexus, Meta, Forja, Lia, Orion, ou pergunta clara
+  return l.includes('nexus')||l.includes('meta')||l.includes('forja')||l.includes('lia')||l.includes('orion')||l.includes('laboratorio')||l.includes('marketing')||l.includes('diretoria')||l.includes('boa tarde')||l.includes('bom dia')||l.includes('boa noite')||l.includes('cria')||l.includes('pergunta')||l.includes('faz')||l.includes('quero');
+}
+function iniciarVozContinua(){ if(!reuniaoAtiva) return; const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ addMsg('SISTEMA','ceo','Use Chrome para voz.'); return; } if(ouvindoContinuo) return; ouvindoContinuo=true; recognition=new SR(); recognition.lang='pt-BR'; recognition.continuous=true; recognition.interimResults=false; recognition.maxAlternatives=1; recognition.onresult=(e)=>{ let final=''; for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) final+=e.results[i][0].transcript; } final=final.trim(); if(!final) return; const low=final.toLowerCase(); // INTERRUPCAO: PARE corta a fala na hora
+ if(low.includes('pare')||low.includes('calma')||low.includes('espera')||low.includes('interrompe')||low.includes('chega')){ filaVoz=[]; try{speechSynthesis.cancel()}catch(err){} falandoAgora=false; setFalando(null); addMsg('SISTEMA','ceo','⏸️ Você interrompeu. Pode falar.'); conversaLiberadaAte=Date.now()+30000; return; } // TRAVA CONTRA BARULHO: ignora frase curta, sem palavra-chave, que e barulho de ambiente
+ const palavras = final.split(/\s+/).filter(w=>w.length>1);
+ if(palavras.length<3){ return; } const agora=Date.now(); const liberado = agora < conversaLiberadaAte; if(!liberado && !temPalavraChave(final)){ if(agora-ultimoBarulhoIgnorado>8000){ addMsg('SISTEMA','ceo','🔇 Barulho de ambiente ignorado. Fale NEXUS + sua pergunta para eu responder.'); ultimoBarulhoIgnorado=agora; } return; } if(final===ultimoTextoVoz && agora-tempoUltimaFala<3000) return; ultimoTextoVoz=final; tempoUltimaFala=agora; conversaLiberadaAte=Date.now()+30000; document.getElementById('pergunta').value=final; const l=final.toLowerCase(); if(l.includes('encerrar')){encerrar();return;} if(l.includes('relatório')||l.includes('relatorio')){enviarRelatorio();return;} enviar(); }; recognition.onend=()=>{ ouvindoContinuo=false; if(reuniaoAtiva && modoVozContinua){ setTimeout(()=>iniciarVozContinua(), 600); } }; recognition.onerror=()=>{ ouvindoContinuo=false; if(reuniaoAtiva && modoVozContinua){ setTimeout(()=>iniciarVozContinua(), 1000); } }; try{ recognition.start(); addMsg('SISTEMA','ceo','🎤 Voz com trava anti-barulho ligada. Fale NEXUS + sua pergunta. Ex: NEXUS, boa tarde a todos. Barulho de fundo sera ignorado.'); }catch(err){ ouvindoContinuo=false; } }
 function ouvirVoz(){ iniciarVozContinua(); }
-function pararVoz(){ modoVozContinua=false; if(recognition){ try{recognition.stop()}catch(e){} } try{speechSynthesis.cancel()}catch(e){} setFalando(null); addMsg('SISTEMA','ceo','Voz contínua pausada. Clique em Falar para ligar de novo.'); }
+function pararVoz(){ modoVozContinua=false; filaVoz=[]; falandoAgora=false; if(recognition){ try{recognition.stop()}catch(e){} } try{speechSynthesis.cancel()}catch(e){} setFalando(null); addMsg('SISTEMA','ceo','Voz contínua pausada. Clique em Falar para ligar de novo.'); }
 function interromperAgora(){ try{speechSynthesis.cancel()}catch(e){} setFalando(null); addMsg('SISTEMA','ceo','⏸️ Interrompido. Pode falar.'); }
 document.getElementById('pergunta').addEventListener('keydown',e=>{if(e.key==='Enter') enviar()});
 window.addEventListener('load',()=>{ const em=localStorage.getItem('nexus_email'); if(em){ document.getElementById('meuEmail').value=em; document.getElementById('emailStatus').innerText='E-mail já cadastrado: '+em; }});

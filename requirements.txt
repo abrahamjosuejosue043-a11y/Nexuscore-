@@ -1,7 +1,6 @@
 fastapi
 uvicorn
-requests
 google-generativeai
 groq
+requests
 python-dotenv
-google-genai

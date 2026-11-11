@@ -31,7 +31,7 @@ class OrquestradorNexusV4:
     def boas_vindas(self):
         return MENSAGEM_BOAS_VINDAS
     def health(self):
-        return {"nexus_core": "V9.0 LOADING NÃO TRAVA + TUDO MANTIDO", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES}
+        return {"nexus_core": "V9.2 AO PÉ DA LETRA - PARA + DIRECIONADO + AUTOCORRETOR + TUDO MANTIDO", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES}
     def _get_projeto(self, nome):
         nome = (nome or 'Geral').strip() or 'Geral'
         if nome not in self.projetos:
@@ -92,7 +92,7 @@ class OrquestradorNexusV4:
                 try:
                     from groq import Groq
                     c = Groq(api_key=chave)
-                    r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES[dept]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.3, max_tokens=200)
+                    r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES[dept]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.3, max_tokens=150)
                     txt = str(r.choices[0].message.content)
                     if txt.strip():
                         self._cache[cache_key] = txt
@@ -141,8 +141,12 @@ class OrquestradorNexusV4:
             diretoria_ai = self._meta_comanda(pergunta, contexto, "diretoria", projeto)
             # ORION cria a ordem, mas NAO executa aqui. So executa se destino for todos.
             pass
+        # TRAVA DIRECIONADO SERVIDOR: se pediu só 1, zera os outros - nem que o modelo tenha chamado, não vaza
+        if destino == 'lab': marketing_ai=''; diretoria_ai=''
+        if destino == 'marketing': lab_ai=''; diretoria_ai=''; codigo=''
+        if destino == 'diretoria': lab_ai=''; marketing_ai=''; codigo=''
         self._salvar_no_projeto(projeto, destino, pergunta, lab_ai, marketing_ai, diretoria_ai, codigo)
         proj_atual = self._get_projeto(projeto)
         tempo = round(time.time() - t0, 1)
-        consolidado = "=== NEXUS CORE V9.0 LOADING NÃO TRAVA + TUDO MANTIDO, GEMINI SO BACKUP - " + str(tempo) + "s ===\nPergunta: " + pergunta + " | Destino: " + destino + "\n\n[ORION - Diretoria - Meta]\n" + str(diretoria_ai) + "\n\n[FORJA - Lab - Meta]\n" + str(lab_ai) + "\n\n[LIA - Marketing - Meta]\n" + str(marketing_ai) + "\n"
+        consolidado = "=== NEXUS CORE V9.2 AO PÉ DA LETRA - PARA + DIRECIONADO + AUTOCORRETOR + TUDO MANTIDO, GEMINI SO BACKUP - " + str(tempo) + "s ===\nPergunta: " + pergunta + " | Destino: " + destino + "\n\n[ORION - Diretoria - Meta]\n" + str(diretoria_ai) + "\n\n[FORJA - Lab - Meta]\n" + str(lab_ai) + "\n\n[LIA - Marketing - Meta]\n" + str(marketing_ai) + "\n"
         return {"pergunta": pergunta, "destino": destino, "projeto": str(projeto), "lab_ai": str(lab_ai), "marketing_ai": str(marketing_ai), "diretoria_ai": str(diretoria_ai), "codigo": str(codigo), "consolidado": str(consolidado), "tempo_seg": tempo, "avatares": NOMES, "comanda": "META", "backup": "GEMINI", "quadro": {"projeto": str(projeto), "estrategia": str(proj_atual["estrategia"]), "codigo": str(proj_atual["codigo"]), "campanha": str(proj_atual["campanha"]), "resumo": str(proj_atual["resumo"])}}

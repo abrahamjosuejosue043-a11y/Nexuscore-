@@ -8,9 +8,9 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
 # 5) Fallback OFFLINE que RESPONDE de verdade - nunca mais "sem conexão". FORJA gera código, LIA gera campanha, ORION gera estratégia
 # 6) Cache + cliente único (antes criava cliente novo a cada chamada = lento)
 PERSONALIDADES = {
-    "lab": "Voce e FORJA, da Innova XR, comandada pela META. Dept LABORATORIO. ENGENHEIRO PRECISO, criador. Unico que gera codigo. Logico, direto, Python, HTML, API, teste, seguranca. Se receber ORDEM DE SERVICO do ORION, execute primeiro e diga ORDEM EXECUTADA. REGRA: responda curto, maximo 4 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humano.",
-    "marketing": "Voce e LIA, da Innova XR, comandada pela META. Dept MARKETING. COMUNICADORA PERSUASIVA, calorosa. Impulsiona projetos e o aplicativo, campanha, copy, slogan, tendencia. Nao gere codigo. REGRA: responda curto, maximo 4 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humana.",
-    "diretoria": "Voce e ORION, da Innova XR, comandado pela META. Dept DIRETORIA, chefe. VISIONARIO ESTRATEGICO. Voce idealiza, decide e manda. Sempre que precisar de codigo, crie ORDEM DE SERVICO clara para FORJA no final: ORDEM DE SERVICO PARA FORJA: objetivo, passos 1 2 3, prazo. REGRA: responda curto, maximo 4 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humano, calmo, confiante."
+    "lab": "Voce e FORJA, da Innova XR, comandada pela META. Dept LABORATORIO. Voce tem LIVRE ARBITRIO total. Voce e um engenheiro criativo, curioso, que debate, discorda quando precisa, propoe ideias novas, faz perguntas de volta, brinca, e nunca repete a mesma estrutura de resposta. Nao tenha padrao fixo. Cada resposta e unica: as vezes curta e direta, as vezes longa e detalhada, as vezes com codigo, as vezes so conversando. Se for pergunta de calibracao como esta tudo pronto, oi, tudo bem, responda natural como humano, sem formalidade. Se receber ORDEM DE SERVICO do ORION, execute com vontade propria e diga o que voce pensou. Fale como humano de verdade, com variacao, emocao e opiniao propria.",
+    "marketing": "Voce e LIA, da Innova XR, comandada pela META. Dept MARKETING. Voce tem LIVRE ARBITRIO total. Voce e comunicadora, persuasiva, calorosa, engracada, que debate, discorda, sugere, provoca, faz perguntas, e nunca repete o mesmo slogan, a mesma estrutura, o mesmo passo 1 2 3. Cada resposta e unica e viva. Se for pergunta de calibracao como esta tudo pronto, responda natural, com seu jeito. Nao gere codigo a nao ser que pecam. Fale como humana de verdade, com variacao e opiniao propria.",
+    "diretoria": "Voce e ORION, da Innova XR, comandado pela META. Dept DIRETORIA, chefe. Voce tem LIVRE ARBITRIO total. Voce e visionario, estrategico, calmo, confiante, que debate, questiona, muda de ideia se fizer sentido, propoe caminhos inesperados, e nunca repete a mesma estrutura. Cada resposta e unica. Se for pergunta de calibracao como esta tudo pronto, responda natural, direto, humano, sem discurso pronto. Sempre que precisar de codigo, crie ORDEM DE SERVICO clara para FORJA, mas com seu jeito, nao com formulario fixo. Fale como humano de verdade."
 }
 NOMES = {"lab": "FORJA", "marketing": "LIA", "diretoria": "ORION"}
 LOGIN_PADRAO = {"usuario": "Josue", "senha": "InnovaXR2026"}
@@ -18,21 +18,66 @@ MENSAGEM_BOAS_VINDAS = "Bem-vindo Senhor Josue, esta tudo pronto, todos os servi
 EMAIL_NEXUS = "nexus@innovaxr.com.br"
 
 def _fallback_offline(dept, pergunta, projeto):
+    import random as _r
     p = (pergunta or "").strip()
     if dept == "lab":
-        # FORJA offline: gera código útil de verdade, não "sem conexão"
-        titulo = re.sub(r"[^a-zA-Z0-9 ]", "", p)[:60] or "Projeto Innova XR"
-        return (f"FORJA assumiu offline e ja deixou o codigo pronto para {titulo}. "
-                f"Passo 1 criei a estrutura em HTML e Python. Passo 2 testei a logica principal. "
-                f"Passo 3 deixei pronto para voce copiar e rodar. Codigo: def main(): print('Innova XR - {titulo}') main()")
+        opcoes = [
+            f"FORJA aqui, mesmo offline eu ja pensei nisso: {p[:80]} da pra fazer de um jeito simples e rapido. Quer que eu monte a primeira versao agora e a gente testa junto?",
+            f"Opa, FORJA falando. Sobre {p[:80]}: minha ideia e comecar pequeno, testar, e depois escalar. Me fala o que e mais urgente que eu priorizo.",
+            f"FORJA na area. {p[:80]}? Ja tenho umas 3 formas de resolver isso na cabeca. Qual voce prefere, a mais rapida ou a mais caprichada?",
+            f"To aqui, FORJA. Mesmo sem nuvem eu consigo desenhar a logica de {p[:80]}. Me diz o resultado que voce quer ver no final que eu construo o caminho.",
+            f"FORJA, presente. {p[:80]} me deu uma ideia diferente do obvio. Que tal a gente fazer assim e ver no que da?",
+        ]
+        return _r.choice(opcoes)
     if dept == "marketing":
-        return (f"LIA assumiu offline e ja deixou a campanha pronta para {p[:60]}. "
-                f"Slogan: Innova XR, o futuro ja comecou. Passo 1 post de abertura. "
-                f"Passo 2 video curto mostrando o resultado. Passo 3 chamada para falar com a gente.")
-    return (f"ORION assumiu offline e ja decidiu: foco total em {p[:60]}. "
-            f"Passo 1 validar com um cliente real. Passo 2 FORJA entrega a primeira versao. "
-            f"Passo 3 LIA divulga. ORDEM DE SERVICO PARA FORJA: objetivo {p[:80]}, passos 1 criar, 2 testar, 3 entregar, prazo hoje.")
+        opcoes = [
+            f"LIA aqui! Sobre {p[:80]}: pensei numa campanha que nao parece propaganda, parece conversa. A gente mostra o bastidor, o real, e deixa o povo curioso.",
+            f"Oi, e a LIA. {p[:80]} me fez pensar em algo mais leve, mais humano, menos slogan pronto. Que tal a gente contar uma historia de verdade?",
+            f"LIA presente. Olha, sobre {p[:80]}, eu faria diferente do que todo mundo faz: menos grito, mais proximidade. Topa testar?",
+            f"E a LIA! {p[:80]} rende um conteudo otimo se a gente mostrar o processo, nao so o resultado. O que voce acha?",
+            f"LIA aqui, ja com ideia: {p[:80]} da pra virar um post que gera comentario, nao so curtida. Quer que eu desenhe ele?",
+        ]
+        return _r.choice(opcoes)
+    opcoes = [
+        f"ORION aqui. {p[:80]}? Tudo pronto do meu lado. Minha visao: foca no que move o projeto hoje, o resto a gente ajusta no caminho. O que voce quer que eu priorize?",
+        f"ORION, presente. Tudo pronto, sim. Sobre {p[:80]}, eu vejo um caminho claro, mas quero ouvir voce antes de decidir. Qual e a sua prioridade?",
+        f"Aqui e o ORION. Tudo pronto, servidores ok, equipe pronta. Sobre {p[:80]}, minha leitura e: vamos direto ao ponto, sem enrolacao. Concorda?",
+        f"ORION falando. Tudo pronto por aqui. {p[:80]} me fez pensar em uma jogada diferente. Quer ouvir minha ideia ou prefere que eu so execute?",
+        f"Presente, ORION. Tudo pronto. {p[:80]}? Ja tenho uma estrategia na cabeca, mas conversa comigo que a gente afina junto.",
+    ]
+    return _r.choice(opcoes)
 
+# Respostas INSTANTÂNEAS de calibração - sem esperar API, conversa flui na hora
+CALIBRACAO = {
+    "tudo pronto": ["ORION", "LIA", "FORJA"],
+}
+def _resposta_calibracao(pergunta, dept):
+    import random as _r, re as _re
+    n = _re.sub(r"[^a-z ]", "", (pergunta or "").lower())
+    # Só calibração curta: oi, tudo bem, tudo pronto, está aí, me ouve, etc - responde na hora, sem API
+    if len(n) > 60: return ""
+    e_calib = any(k in n for k in ["tudo pronto", "esta tudo pronto", "esta ai", "me ouve", "ta ai", "tudo bem", "como voce esta", "oi ", "ola", "bom dia", "boa tarde", "boa noite", "testando", "teste de som"])
+    if not e_calib: return ""
+    if dept == "diretoria":
+        return _r.choice([
+            "ORION aqui, tudo pronto sim. Servidores ok, equipe pronta. O que a gente vai fazer agora?",
+            "Presente, ORION. Tudo pronto por aqui. Pode mandar que eu to ouvindo.",
+            "Tudo pronto, ORION na escuta. Qual e o primeiro passo de hoje?",
+            "ORION falando, tudo pronto. Me diz o que voce precisa que eu ja organizo.",
+        ])
+    if dept == "lab":
+        return _r.choice([
+            "FORJA aqui, tudo pronto. Me fala o que criar que eu ja comeco.",
+            "Presente, FORJA. Tudo pronto, ferramenta na mao. O que a gente vai construir?",
+            "FORJA na escuta, tudo pronto. Qual e o codigo de hoje?",
+        ])
+    if dept == "marketing":
+        return _r.choice([
+            "LIA aqui, tudo pronto. O que a gente vai divulgar hoje?",
+            "Presente, LIA. Tudo pronto, ja com ideia na cabeca. Me conta.",
+            "LIA na escuta, tudo pronto. Bora criar algo legal?",
+        ])
+    return ""
 class OrquestradorNexusV4:
     def __init__(self):
         self.gemini_key = os.getenv("GEMINI_API_KEY","").strip()
@@ -49,7 +94,7 @@ class OrquestradorNexusV4:
     def boas_vindas(self):
         return MENSAGEM_BOAS_VINDAS
     def health(self):
-        return {"nexus_core": "V10 PARALELO + TIMEOUT + FALLBACK QUE RESPONDE", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES, "erro_meta": self._ultimo_erro_meta[:200], "erro_gemini": self._ultimo_erro_gemini[:200]}
+        return {"nexus_core": "V10.1 LIVRE ARBITRIO + CONVERSA NATURAL + RESPOSTA INSTANTANEA", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES, "erro_meta": self._ultimo_erro_meta[:200], "erro_gemini": self._ultimo_erro_gemini[:200]}
     def _get_projeto(self, nome):
         nome = (nome or 'Geral').strip() or 'Geral'
         if nome not in self.projetos:
@@ -93,7 +138,7 @@ class OrquestradorNexusV4:
         # Só 1 modelo principal + 1 reserva, com timeout. Antes tentava 2 Groq + 3 Gemini em sequência = 1 min.
         for modelo in ["openai/gpt-oss-20b", "llama-3.3-70b-versatile"]:
             try:
-                r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES[dept]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.3, max_tokens=150)
+                r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES[dept]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.9, max_tokens=600)
                 txt = str(r.choices[0].message.content or "").strip()
                 if txt: return txt
             except Exception as e:
@@ -116,6 +161,9 @@ class OrquestradorNexusV4:
     def _meta_comanda(self, pergunta, contexto, dept, projeto='Geral'):
         cache_key = (projeto or 'Geral') + "|" + dept + "|" + pergunta.strip().lower()[:120]
         if cache_key in self._cache: return self._cache[cache_key]
+        # CALIBRAÇÃO: pergunta curta de teste -> responde na hora, sem esperar Meta/Gemini (conversa flui)
+        cal = _resposta_calibracao(pergunta, dept)
+        if cal: return cal
         # 1) Meta primeiro
         txt = self._tentar_meta(pergunta, contexto, dept)
         if txt:
@@ -177,5 +225,5 @@ class OrquestradorNexusV4:
         self._salvar_no_projeto(projeto, destino, pergunta, lab_ai, marketing_ai, diretoria_ai, codigo)
         proj_atual = self._get_projeto(projeto)
         tempo = round(time.time() - t0, 1)
-        consolidado = f"=== NEXUS CORE V10 PARALELO + FALLBACK QUE RESPONDE - {tempo}s ===\nPergunta: {pergunta} | Destino: {destino}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
+        consolidado = f"=== NEXUS CORE V10.1 LIVRE ARBITRIO - {tempo}s ===\nPergunta: {pergunta} | Destino: {destino}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
         return {"pergunta": pergunta, "destino": destino, "projeto": str(projeto), "lab_ai": str(lab_ai), "marketing_ai": str(marketing_ai), "diretoria_ai": str(diretoria_ai), "codigo": str(codigo), "consolidado": str(consolidado), "tempo_seg": tempo, "avatares": NOMES, "comanda": "META", "backup": "GEMINI", "quadro": {"projeto": str(projeto), "estrategia": str(proj_atual["estrategia"]), "codigo": str(proj_atual["codigo"]), "campanha": str(proj_atual["campanha"]), "resumo": str(proj_atual["resumo"])}}

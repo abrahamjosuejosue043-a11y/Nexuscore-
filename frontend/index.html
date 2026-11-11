@@ -73,7 +73,7 @@ button{padding:12px 14px;border:0;border-radius:12px;cursor:pointer;font-weight:
 <div id="telaLoading" onclick="destravarLoading()" style="position:fixed;inset:0;background:#030712;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;cursor:pointer"><div style="font-family:Orbitron;font-size:32px;letter-spacing:4px">NEXUS <b style="color:#00f0ff">CORE</b></div><div style="color:#a78bfa;letter-spacing:3px;font-size:12px;margin-top:6px">BY INNOVA XR • FORJA • LIA • ORION</div><div style="margin-top:22px;width:200px;height:6px;background:#1e293b;border-radius:10px;overflow:hidden"><div id="barraLoading" style="height:100%;width:0;background:#00f0ff;transition:width .3s"></div></div><div style="margin-top:10px;font-size:13px;color:#94a3b8">Carregando Nexus Core...</div><div style="margin-top:14px;font-size:12px;color:#64748b">Se travar, toque na tela para entrar</div><button onclick="destravarLoading()" style="margin-top:12px;background:#00f0ff;color:#000;border:0;border-radius:12px;padding:12px 20px;font-weight:900">ENTRAR AGORA</button></div>
 <div id="telaLogin" style="position:fixed;inset:0;background:#030712;z-index:9998;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px"><div style="font-family:Orbitron;font-size:28px;letter-spacing:3px">NEXUS <b style="color:#00f0ff">CORE</b></div><div style="color:#94a3b8;font-size:12px;letter-spacing:2px;margin:8px 0 18px">USO EXCLUSIVO INNOVA XR • FAÇA LOGIN</div><div style="background:rgba(15,23,42,.9);border:1px solid rgba(0,240,255,.3);border-radius:18px;padding:18px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px"><label style="font-size:12px;color:#94a3b8">LOGIN</label><input id="loginUsuario" placeholder="Ex: Josue"><label style="font-size:12px;color:#94a3b8">SENHA</label><input id="loginSenha" type="password" placeholder="Senha"><button class="primario" onclick="entrar()">ENTRAR NO NEXUS CORE</button><div id="loginErro" style="color:#fca5a5;font-size:13px;min-height:16px"></div><div style="font-size:11px;color:#64748b">Login: Josue / Senha: InnovaXR2026</div></div></div>
 <button id="btnPararFixo" onclick="pararTudoImediato()" style="position:fixed;bottom:18px;right:18px;z-index:999;background:#ef4444;color:#fff;border:0;border-radius:50px;padding:16px 20px;font-weight:900;font-size:15px;box-shadow:0 0 25px rgba(239,68,68,.7);display:none">⏹ PARA</button>
-<header><div><div class="logo">NEXUS <b>CORE</b> <span>// FUTURE WORKSPACE</span></div><div style="font-size:11px;letter-spacing:2px;color:#94a3b8">BY INNOVA XR • V10 PARALELO + LAB STUDIO IGUAL META • META COMANDA</div></div><div style="display:flex;gap:10px;align-items:center"><div class="hud"><i></i> SYSTEM ONLINE</div><div class="badge off" id="badgeStatus">● SALA FECHADA • IAs OFFLINE</div></div></header>
+<header><div><div class="logo">NEXUS <b>CORE</b> <span>// FUTURE WORKSPACE</span></div><div style="font-size:11px;letter-spacing:2px;color:#94a3b8">BY INNOVA XR • V10.1 LIVRE ARBITRIO + CONVERSA NATURAL • META COMANDA</div></div><div style="display:flex;gap:10px;align-items:center"><div class="hud"><i></i> SYSTEM ONLINE</div><div class="badge off" id="badgeStatus">● SALA FECHADA • IAs OFFLINE</div></div></header>
 <main>
 <section class="panel">
 <div id="barraProjetos" style="background:#020617;border:1px solid #00f0ff;border-radius:14px;padding:12px;margin-bottom:12px"><div style="font-family:Orbitron;font-size:12px;letter-spacing:2px;color:#00f0ff">📁 PROJETO ATUAL: <span id="projetoAtualLabel" style="color:#ffd400">Geral</span> — os 3 estão cientes deste projeto e cruzam dados</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><input id="novoProjeto" placeholder="Nome do projeto - Ex: App de Escola" style="flex:1;min-width:180px"><button class="primario" onclick="criarProjeto()">+ NOVO PROJETO</button><select id="seletorProjeto" onchange="trocarProjeto(this.value)" style="min-width:160px"><option value="Geral">Geral</option></select><button class="sec" onclick="verQuadro()">👁 QUADRO</button></div><div id="quadroBox" style="display:none;margin-top:10px;background:rgba(15,23,42,.9);border-radius:10px;padding:10px;font-size:13px;line-height:1.5"></div></div>
@@ -166,7 +166,7 @@ function atualizarJanelas(d){
  if(d.diretoria_ai){ document.getElementById('dirConteudo').innerHTML='<div class="passo diretoria">'+String(d.diretoria_ai)+'</div>'; document.getElementById('dirDecisoes').innerText=String(d.diretoria_ai); }
 }
 function comecarReuniao(){ reuniaoAtiva=true; document.getElementById('badgeStatus').innerText='● REUNIÃO AO VIVO • IAs ONLINE'; document.getElementById('badgeStatus').classList.remove('off'); ['lab','marketing','diretoria'].forEach(k=>{ document.getElementById('av-'+k).classList.remove('offline'); document.getElementById('st-'+k).innerText='ONLINE'; }); addMsg('SISTEMA','ceo','Reunião iniciada. FORJA + LIA + ORION ONLINE. Fale PARA para parar na hora.'); falarBoasVindas(); iniciarEscutaPara(); iniciarVozContinua(); keepAliveMic(); }
-function limparTextoParaVoz(s){ let t=String(s||'').replace(/\[[^\]]*\]/g,'').replace(/[*#\/]/g,' '); if(t.length>350) t=t.slice(0,350); return t.trim(); }
+function limparTextoParaVoz(s){ let t=String(s||'').replace(/\[[^\]]*\]/g,'').replace(/[*#\/]/g,' '); if(t.length>900) t=t.slice(0,900); return t.trim(); }
 // CORTE IMEDIATO - PARA TUDO NA HORA
 
 // ESCUTA DE PARA SEMPRE LIGADA - só ouve PARA, fica ligada mesmo enquanto FORJA/LIA/ORION falam
@@ -215,7 +215,18 @@ function detectarDestino(textoOriginal, destinoAtual){
   if(destinoAtual==='lab'||destinoAtual==='marketing'||destinoAtual==='diretoria') return destinoAtual;
   return 'todos';
 }
-function ehOrdemParar(txt){ const n = corrigirFala(txt||''); return /\b(pare|para|parar|silencio|quieto|stop|calma|espera|interrompe|chega|cala|basta)\b/.test(n); }
+function ehOrdemParar(txt){
+  const n = ' ' + corrigirFala(txt||'').trim() + ' ';
+  const curto = n.trim().split(/\s+/).length <= 3;
+  // Comando de parar de verdade: "para", "pare", "para tudo", "para de falar", "para agora", "silencio", etc - SOZINHO ou no começo
+  // NÃO é "para lia", "para fazer", "para o projeto" - isso é preposição, não é comando
+  if(/\b(para tudo|pare tudo|para de falar|pare de falar|para agora|pare agora|para por favor|silencio|quieto|stop|cala boca|chega)\b/.test(n)) return true;
+  if(curto && /^\s*(para|pare|parar|silencio|quieto|stop|calma|espera|chega|cala|basta)\s*$/.test(n.trim())) return true;
+  if(/^\s*(para|pare)\s+(tudo|agora|ai|por favor)/.test(n.trim())) return true;
+  // "calma", "espera" sozinhos e curtos também param
+  if(curto && /\b(calma|espera|chega)\b/.test(n)) return true;
+  return false;
+}
 function falar(texto,quem,quandoTerminar){
   filaVoz.push({texto:limparTextoParaVoz(texto),quem:quem||'lab',quandoTerminar:quandoTerminar||null});
   tocarProximaVoz();
@@ -225,7 +236,7 @@ function tocarProximaVoz(){
   const item = filaVoz.shift();
   if(!item.texto){ tocarProximaVoz(); return; }
   // Se acabou de dar PARA, não volta a falar
-  if(Date.now()-ultimoParar<500){ filaVoz=[]; return; }
+  if(Date.now()-ultimoParar<300){ filaVoz=[]; return; }
   falandoAgora=true;
   const btn=document.getElementById('btnPararFixo'); if(btn) btn.style.display='block';
   const u=new SpeechSynthesisUtterance(item.texto);
@@ -243,7 +254,7 @@ function tocarProximaVoz(){
 }
 function falarFilaOrdem(fila){
   filaVoz=[]; try{ speechSynthesis.cancel(); }catch(e){} falandoAgora=false;
-  fila.forEach(f=>{ falar(String(f[2]).slice(0,350), f[0]); });
+  fila.forEach(f=>{ falar(String(f[2]).slice(0,900), f[0]); });
 }
 // LOGIN
 function entrar(){ const u=document.getElementById('loginUsuario').value.trim(); const s=document.getElementById('loginSenha').value.trim(); if(u.toLowerCase()==='josue' && s==='InnovaXR2026'){ try{ localStorage.setItem('nexus_logado','1'); }catch(e){} document.getElementById('telaLogin').style.display='none'; document.getElementById('loginErro').innerText=''; iniciarEscutaAcordar(); iniciarEscutaPara(); addMsg('SISTEMA','ceo','✅ Bem-vindo, Senhor Josué. Fale VAMOS INICIAR REUNIÃO para começar.'); } else { document.getElementById('loginErro').innerText='Login ou senha errados. Uso exclusivo Innova XR.'; } }
@@ -307,7 +318,7 @@ async function enviarLab(){
     if(d.codigo){ document.getElementById('labCodigo').innerText=String(d.codigo); document.getElementById('labPassos').innerHTML=(d.passos||[]).map((l,i)=>'<div class="passo">Passo '+(i+1)+': '+l+'</div>').join('')||'<div class="passo">Pronto.</div>'; document.getElementById('labStatus').innerText='FORJA ONLINE - Criado agora'; document.getElementById('codigoOut').innerText=String(d.codigo); }
     if(tipo==='imagem' && d.imagem_prompt){ document.getElementById('labImagemBox').innerHTML='<div style="background:linear-gradient(135deg,#00f0ff,#a78bfa,#ff2d95);padding:22px;border-radius:14px;color:#000;font-weight:800">🎨 '+String(d.imagem_prompt).slice(0,500)+'</div><p style="color:#94a3b8;margin-top:8px">Prompt visual pronto. Peça outra variação se quiser.</p>'; }
     // Fala a resposta
-    try{ falar(String(d.resposta||'').slice(0,350), 'lab'); }catch(e){}
+    try{ falar(String(d.resposta||'').slice(0,900), 'lab'); }catch(e){}
   }catch(e){
     addMsgLab('FORJA', '⚠️ Demorou, tenta de novo em 5 segundos. Erro: '+String(e).slice(0,120));
   }

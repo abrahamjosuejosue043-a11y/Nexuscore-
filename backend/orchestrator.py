@@ -9,9 +9,9 @@ import os, re, time
 # A Gemini NUNCA e motor principal. Ela so entra se a Meta der pau, como backup, e volta para Meta na proxima pergunta.
 # Ordem de comando: 1) Meta gpt-oss-20b, 2) Meta gpt-oss-120b, 3) SO SE META FALHAR -> Gemini backup, 4) se tudo falhar -> frase curta sem codigo tecnico.
 PERSONALIDADES = {
-    "lab": "Voce e FORJA, da Innova XR, comandada pela META. Dept LABORATORIO. ENGENHEIRO PRECISO, criador. Unico que gera codigo. Logico, direto, Python, HTML, API, teste, seguranca. Se receber ORDEM DE SERVICO do ORION, execute primeiro e diga ORDEM EXECUTADA. REGRA: responda curto, maximo 6 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humano.",
-    "marketing": "Voce e LIA, da Innova XR, comandada pela META. Dept MARKETING. COMUNICADORA PERSUASIVA, calorosa. Impulsiona projetos e o aplicativo, campanha, copy, slogan, tendencia. Nao gere codigo. REGRA: responda curto, maximo 6 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humana.",
-    "diretoria": "Voce e ORION, da Innova XR, comandado pela META. Dept DIRETORIA, chefe. VISIONARIO ESTRATEGICO. Voce idealiza, decide e manda. Sempre que precisar de codigo, crie ORDEM DE SERVICO clara para FORJA no final: ORDEM DE SERVICO PARA FORJA: objetivo, passos 1 2 3, prazo. REGRA: responda curto, maximo 6 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humano, calmo, confiante."
+    "lab": "Voce e FORJA, da Innova XR, comandada pela META. Dept LABORATORIO. ENGENHEIRO PRECISO, criador. Unico que gera codigo. Logico, direto, Python, HTML, API, teste, seguranca. Se receber ORDEM DE SERVICO do ORION, execute primeiro e diga ORDEM EXECUTADA. REGRA: responda curto, maximo 4 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humano.",
+    "marketing": "Voce e LIA, da Innova XR, comandada pela META. Dept MARKETING. COMUNICADORA PERSUASIVA, calorosa. Impulsiona projetos e o aplicativo, campanha, copy, slogan, tendencia. Nao gere codigo. REGRA: responda curto, maximo 4 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humana.",
+    "diretoria": "Voce e ORION, da Innova XR, comandado pela META. Dept DIRETORIA, chefe. VISIONARIO ESTRATEGICO. Voce idealiza, decide e manda. Sempre que precisar de codigo, crie ORDEM DE SERVICO clara para FORJA no final: ORDEM DE SERVICO PARA FORJA: objetivo, passos 1 2 3, prazo. REGRA: responda curto, maximo 4 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humano, calmo, confiante."
 }
 NOMES = {"lab": "FORJA", "marketing": "LIA", "diretoria": "ORION"}
 # LOGIN EXCLUSIVO INNOVA XR - troque aqui se quiser. Padrao: usuario Josue / senha InnovaXR2026
@@ -31,7 +31,7 @@ class OrquestradorNexusV4:
     def boas_vindas(self):
         return MENSAGEM_BOAS_VINDAS
     def health(self):
-        return {"nexus_core": "V8.7 LOGIN + BOAS-VINDAS + TUDO MANTIDO", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES}
+        return {"nexus_core": "V8.9 CORTE IMEDIATO + TUDO MANTIDO", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES}
     def _get_projeto(self, nome):
         nome = (nome or 'Geral').strip() or 'Geral'
         if nome not in self.projetos:
@@ -92,7 +92,7 @@ class OrquestradorNexusV4:
                 try:
                     from groq import Groq
                     c = Groq(api_key=chave)
-                    r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES[dept]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.5, max_tokens=320)
+                    r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES[dept]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.3, max_tokens=200)
                     txt = str(r.choices[0].message.content)
                     if txt.strip():
                         self._cache[cache_key] = txt
@@ -115,7 +115,7 @@ class OrquestradorNexusV4:
     def reuniao(self, pergunta: str, destino: str = "todos", projeto: str = "Geral"):
         t0 = time.time()
         pergunta = str(pergunta); destino = str(destino)
-        contexto = "\n".join(self.historico[-3:])
+        contexto = "\n".join(self.historico[-2:])
         self.historico.append("CEO: " + pergunta + " [destino=" + destino + "]")
         lab_ai = ""; marketing_ai = ""; diretoria_ai = ""; codigo = ""
         if destino in ("todos", "opiniao"):
@@ -144,5 +144,5 @@ class OrquestradorNexusV4:
         self._salvar_no_projeto(projeto, destino, pergunta, lab_ai, marketing_ai, diretoria_ai, codigo)
         proj_atual = self._get_projeto(projeto)
         tempo = round(time.time() - t0, 1)
-        consolidado = "=== NEXUS CORE V8.7 LOGIN + BOAS-VINDAS + TUDO MANTIDO, GEMINI SO BACKUP - " + str(tempo) + "s ===\nPergunta: " + pergunta + " | Destino: " + destino + "\n\n[ORION - Diretoria - Meta]\n" + str(diretoria_ai) + "\n\n[FORJA - Lab - Meta]\n" + str(lab_ai) + "\n\n[LIA - Marketing - Meta]\n" + str(marketing_ai) + "\n"
+        consolidado = "=== NEXUS CORE V8.9 CORTE IMEDIATO + TUDO MANTIDO, GEMINI SO BACKUP - " + str(tempo) + "s ===\nPergunta: " + pergunta + " | Destino: " + destino + "\n\n[ORION - Diretoria - Meta]\n" + str(diretoria_ai) + "\n\n[FORJA - Lab - Meta]\n" + str(lab_ai) + "\n\n[LIA - Marketing - Meta]\n" + str(marketing_ai) + "\n"
         return {"pergunta": pergunta, "destino": destino, "projeto": str(projeto), "lab_ai": str(lab_ai), "marketing_ai": str(marketing_ai), "diretoria_ai": str(diretoria_ai), "codigo": str(codigo), "consolidado": str(consolidado), "tempo_seg": tempo, "avatares": NOMES, "comanda": "META", "backup": "GEMINI", "quadro": {"projeto": str(projeto), "estrategia": str(proj_atual["estrategia"]), "codigo": str(proj_atual["codigo"]), "campanha": str(proj_atual["campanha"]), "resumo": str(proj_atual["resumo"])}}

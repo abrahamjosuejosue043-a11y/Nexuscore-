@@ -14,6 +14,11 @@ PERSONALIDADES = {
     "diretoria": "Voce e ORION, da Innova XR, comandado pela META. Dept DIRETORIA, chefe. VISIONARIO ESTRATEGICO. Voce idealiza, decide e manda. Sempre que precisar de codigo, crie ORDEM DE SERVICO clara para FORJA no final: ORDEM DE SERVICO PARA FORJA: objetivo, passos 1 2 3, prazo. REGRA: responda curto, maximo 6 frases curtas, sem asteriscos, sem cerquilha, sem barra, sem markdown, sem simbolos. Fale como humano, calmo, confiante."
 }
 NOMES = {"lab": "FORJA", "marketing": "LIA", "diretoria": "ORION"}
+# LOGIN EXCLUSIVO INNOVA XR - troque aqui se quiser. Padrao: usuario Josue / senha InnovaXR2026
+LOGIN_PADRAO = {"usuario": "Josue", "senha": "InnovaXR2026"}
+MENSAGEM_BOAS_VINDAS = "Bem-vindo Senhor Josue, esta tudo pronto, todos os servidores estao programados, tudo pronto para comecar nosso trabalho."
+# E-MAIL NEXUS CORE - proxima etapa: onde voce vai mandar relatorios, documentos e fotos e os 3 vao ler
+EMAIL_NEXUS = "nexus@innovaxr.com.br"  # troque pelo e-mail real que voce criar
 class OrquestradorNexusV4:
     def __init__(self):
         self.gemini_key = os.getenv("GEMINI_API_KEY")
@@ -21,8 +26,12 @@ class OrquestradorNexusV4:
         self.historico = []
         self._cache = {}
         self.projetos = {}  # {nome_projeto: {historico:[], resumo:'', decisoes:[], codigo:'', campanha:'', estrategia:''}}
+    def verificar_login(self, usuario, senha):
+        return str(usuario or '').strip().lower() == LOGIN_PADRAO['usuario'].lower() and str(senha or '').strip() == LOGIN_PADRAO['senha']
+    def boas_vindas(self):
+        return MENSAGEM_BOAS_VINDAS
     def health(self):
-        return {"nexus_core": "V8.6 META COMANDA + MEMORIA DE PROJETOS", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES}
+        return {"nexus_core": "V8.7 LOGIN + BOAS-VINDAS + TUDO MANTIDO", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES}
     def _get_projeto(self, nome):
         nome = (nome or 'Geral').strip() or 'Geral'
         if nome not in self.projetos:
@@ -135,5 +144,5 @@ class OrquestradorNexusV4:
         self._salvar_no_projeto(projeto, destino, pergunta, lab_ai, marketing_ai, diretoria_ai, codigo)
         proj_atual = self._get_projeto(projeto)
         tempo = round(time.time() - t0, 1)
-        consolidado = "=== NEXUS CORE V8.6 META COMANDA + MEMORIA DE PROJETOS, GEMINI SO BACKUP - " + str(tempo) + "s ===\nPergunta: " + pergunta + " | Destino: " + destino + "\n\n[ORION - Diretoria - Meta]\n" + str(diretoria_ai) + "\n\n[FORJA - Lab - Meta]\n" + str(lab_ai) + "\n\n[LIA - Marketing - Meta]\n" + str(marketing_ai) + "\n"
+        consolidado = "=== NEXUS CORE V8.7 LOGIN + BOAS-VINDAS + TUDO MANTIDO, GEMINI SO BACKUP - " + str(tempo) + "s ===\nPergunta: " + pergunta + " | Destino: " + destino + "\n\n[ORION - Diretoria - Meta]\n" + str(diretoria_ai) + "\n\n[FORJA - Lab - Meta]\n" + str(lab_ai) + "\n\n[LIA - Marketing - Meta]\n" + str(marketing_ai) + "\n"
         return {"pergunta": pergunta, "destino": destino, "projeto": str(projeto), "lab_ai": str(lab_ai), "marketing_ai": str(marketing_ai), "diretoria_ai": str(diretoria_ai), "codigo": str(codigo), "consolidado": str(consolidado), "tempo_seg": tempo, "avatares": NOMES, "comanda": "META", "backup": "GEMINI", "quadro": {"projeto": str(projeto), "estrategia": str(proj_atual["estrategia"]), "codigo": str(proj_atual["codigo"]), "campanha": str(proj_atual["campanha"]), "resumo": str(proj_atual["resumo"])}}

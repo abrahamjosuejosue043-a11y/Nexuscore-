@@ -1,275 +1,184 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head><style>
-@font-face {
-  font-family: "Optimistic";
-  font-style: normal;
-  font-weight: 400 600;
-  font-display: swap;
-  src: url("/fonts/OptimisticAI_VF_Optimized.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Optimistic Mono";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/OptimisticMono_W_TextRegular.woff2") format("woff2");
-}
-:where(html) {
-  font-family: "Optimistic", system-ui, sans-serif;
-}
-:where(code, pre, kbd, samp) {
-  font-family: "Optimistic Mono", ui-monospace, monospace;
-}
-</style>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NEXUS CORE • Innova XR</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#05070d;--glass:rgba(255,255,255,.045);--line:rgba(255,255,255,.08);--text:#f8fafc;--muted:#94a3b8;--cyan:#22d3ee;--cyan2:#38bdf8;--violet:#a78bfa}
-body{background:radial-gradient(900px 500px at 50% -10%,rgba(56,189,248,.16),transparent 60%),radial-gradient(700px 400px at 90% 20%,rgba(167,139,250,.12),transparent 60%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
-.app{max-width:430px;margin:0 auto;padding:18px 18px 120px;position:relative}
-.topbar{display:flex;justify-content:space-between;align-items:center;padding:6px 2px 18px}
-.logo{font-family:Sora,sans-serif;font-weight:800;letter-spacing:.18em;font-size:12px}
-.logo b{color:#fff}.logo span{color:var(--cyan)}
-.pill-top{font-size:10px;letter-spacing:.12em;font-weight:600;color:#cbd5e1;background:rgba(255,255,255,.06);border:1px solid var(--line);padding:7px 10px;border-radius:999px}
-.center{text-align:center}
-.eyebrow{font-size:11px;letter-spacing:.28em;font-weight:700;color:var(--cyan);margin:18px 0 14px}
-h1{font-family:Sora,sans-serif;font-size:56px;line-height:.92;letter-spacing:-2px;font-weight:800}
-h1 span{background:linear-gradient(90deg,#22d3ee,#38bdf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.orb{width:84px;height:84px;margin:28px auto 6px;border-radius:50%;background:conic-gradient(from 0deg,#22d3ee,#a78bfa,#22d3ee);padding:1.5px;box-shadow:0 0 40px rgba(34,211,238,.28)}
-.orb-in{width:100%;height:100%;border-radius:50%;background:#070b14;display:flex;align-items:center;justify-content:center}
-.sub{font-size:12px;letter-spacing:.16em;color:var(--muted);font-weight:600;margin-top:16px}
-.sub b{color:#e2e8f0}
-.progress{height:4px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;margin:30px 0 10px}
-.progress i{display:block;height:100%;background:linear-gradient(90deg,#22d3ee,#a78bfa);width:0;border-radius:999px;transition:width .2s}
-.row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
-.row b{color:#fff}
-.btn{width:100%;background:linear-gradient(90deg,#0ea5e9,#22d3ee);color:#020617;border:0;border-radius:999px;padding:15px;font-weight:800;letter-spacing:.06em;font-size:13px;cursor:pointer;margin-top:22px;box-shadow:0 10px 28px rgba(34,211,238,.28);transition:.2s}
-.btn:active{transform:scale(.98)}
-.hint{font-size:12px;color:#64748b;margin-top:12px}
-.lock-wrap{width:64px;height:64px;margin:22px auto 0;border-radius:20px;background:linear-gradient(135deg,#0ea5e9,#22d3ee,#a78bfa);padding:1px;box-shadow:0 12px 30px rgba(34,211,238,.25)}
-.lock-in{width:100%;height:100%;border-radius:19px;background:linear-gradient(180deg,#0b1220,#0f172a);display:flex;align-items:center;justify-content:center}
-.card{background:var(--glass);border:1px solid var(--line);border-radius:24px;padding:22px;margin-top:22px;backdrop-filter:blur(16px);box-shadow:0 20px 50px rgba(0,0,0,.35)}
-label{font-size:11px;letter-spacing:.16em;font-weight:700;color:#cbd5e1;display:block;margin:14px 0 8px}
-input{width:100%;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:14px;padding:14px 14px;color:#fff;font-size:15px;outline:none;transition:.2s}
-input:focus{border-color:#22d3ee;box-shadow:0 0 0 3px rgba(34,211,238,.18)}
-.erro{background:rgba(244,63,94,.1);color:#fda4af;border:1px solid rgba(251,113,133,.2);border-radius:12px;padding:11px;font-size:13px;margin-top:12px;display:none}
-.link{font-size:12px;color:#64748b;background:none;border:0;cursor:pointer;text-decoration:underline;margin:16px auto 0;display:block}
-.status{display:inline-flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.18em;font-weight:700;color:#34d399}
-.dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18)}
-.room h2{font-family:Sora,sans-serif;font-size:38px;line-height:1.02;letter-spacing:-1px;margin:16px 0 4px}
-.room h2 span{background:linear-gradient(90deg,#22d3ee,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.voice{display:flex;gap:14px;background:linear-gradient(180deg,rgba(34,211,238,.12),rgba(255,255,255,.03));border:1px solid rgba(34,211,238,.18);border-radius:20px;padding:16px;margin-top:20px}
-.voice .ico{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#22d3ee);color:#020617;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 20px rgba(34,211,238,.3)}
-.voice b{font-size:14px;line-height:1.4}
-.voice b span{color:var(--cyan)}
-.voice p{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
-.opt{border:1px solid var(--line);background:rgba(255,255,255,.035);border-radius:18px;padding:14px;display:flex;gap:11px;align-items:center;cursor:pointer;text-align:left;transition:.2s}
-.opt.sel{border-color:rgba(34,211,238,.6);background:rgba(34,211,238,.08);box-shadow:0 0 0 1px rgba(34,211,238,.3),0 10px 30px rgba(34,211,238,.12)}
-.opt .ic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.07);color:#67e8f9;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.opt.sel .ic{background:linear-gradient(135deg,#0ea5e9,#22d3ee);color:#020617}
-.opt b{font-size:12.5px;display:block;line-height:1.2}
-.opt span{font-size:11px;color:var(--muted);line-height:1.3;display:block;margin-top:2px}
-.sel-box{display:flex;gap:10px;align-items:center;background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.18);border-radius:14px;padding:12px 14px;font-size:13px;margin-top:16px;color:#d1fae5}
-.mic{position:fixed;right:16px;bottom:78px;background:linear-gradient(90deg,#0ea5e9,#22d3ee);color:#020617;border:0;border-radius:999px;padding:12px 16px;font-weight:800;font-size:11px;letter-spacing:.08em;cursor:pointer;display:flex;gap:8px;align-items:center;box-shadow:0 12px 30px rgba(34,211,238,.35);z-index:20}
-.foot{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;width:calc(100% - 32px);max-width:398px;background:rgba(10,15,26,.88);border:1px solid var(--line);border-radius:999px;padding:11px 14px;font-size:11px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;backdrop-filter:blur(16px);z-index:20}
-.foot span:first-child{color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.foot b{color:#fff;background:#22d3ee;color:#020617;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;padding:0;z-index:30;backdrop-filter:blur(4px)}
-.modal.open{display:flex}
-.sheet{background:#0b1220;border-radius:28px 28px 0 0;padding:10px 22px 26px;width:100%;max-width:430px;border-top:1px solid var(--line)}
-.handle{width:36px;height:4px;background:rgba(255,255,255,.2);border-radius:999px;margin:0 auto 16px}
-.sheet li{margin:10px 0 10px 18px;font-size:13.5px;color:#cbd5e1;line-height:1.55}
-.testes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
-.testes button{background:rgba(255,255,255,.07);color:#fff;border:1px solid var(--line);border-radius:999px;padding:11px;font-size:11px;font-weight:700;cursor:pointer}
-.hidden{display:none}
-.fade{animation:fade .4s ease both}
-@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-@media(max-width:380px){h1{font-size:48px}.room h2{font-size:34px}}
-</style>
-</head>
-<body>
-<div class="app">
-<div class="topbar"><div class="logo">NEXUS <span>CORE</span></div><div class="pill-top">INNOVA XR • V11.3</div></div>
-
-<!-- LOADING -->
-<div id="tela-loading" class="center fade" style="padding-top:22px">
-<div class="orb"><div class="orb-in"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="1.8"><path d="M12 3l1.8 4.6 4.7 1.4-3.4 3.5 1 4.8L12 14.6 7.9 17.3l1-4.8L5.5 9l4.7-1.4z"/></svg></div></div>
-<p class="eyebrow">INNOVA XR • TESTE V11.3</p>
-<h1>NEXUS <span>CORE</span></h1>
-<p class="sub">BY INNOVA XR <b>•</b> FORJA <b>•</b> LIA <b>•</b> ORION</p>
-<div class="progress"><i id="barra"></i></div>
-<div class="row"><span>Carregando Nexus Core...</span><b id="pct">0%</b></div>
-<button class="btn" onclick="irLogin()">ENTRAR AGORA →</button>
-<p class="hint">A tela de login abre automaticamente.</p>
+<!-- Atualize a linha dos botões de teste dentro do modal para: -->
+<div class="testes">
+  <button onclick="NEXUS.falar('FORJA','Teste de áudio concluído. Forja operacional, Senhor Josué.')">TESTAR FORJA</button>
+  <button onclick="NEXUS.falar('LIA','Teste de áudio concluído. Lia pronta para divulgar, Senhor Josué.')">TESTAR LIA</button>
+  <button onclick="NEXUS.falar('ORION','Teste de áudio concluído. Orion no comando, Senhor Josué.')">TESTAR ORION</button>
 </div>
 
-<!-- LOGIN -->
-<div id="tela-login" class="hidden fade" style="text-align:center;padding-top:8px">
-<div class="lock-wrap"><div class="lock-in"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.2" fill="#38bdf8"/></svg></div></div>
-<h1 style="font-size:38px;margin-top:16px">NEXUS <span>CORE</span></h1>
-<p style="font-size:11px;letter-spacing:.22em;color:#94a3b8;font-weight:700;margin-top:10px">USO EXCLUSIVO INNOVA XR • FAÇA LOGIN</p>
-<div class="card" style="text-align:left">
-<label>LOGIN</label><input id="login" placeholder="Ex: Josue" autocomplete="username">
-<label>SENHA</label><input id="senha" type="password" placeholder="Senha" autocomplete="current-password">
-<div class="erro" id="erro">Login ou senha errados. Tente novamente.</div>
-<button class="btn" onclick="entrar()">ENTRAR NO NEXUS CORE →</button>
-<p style="font-size:11px;color:#64748b;text-align:center;margin-top:12px">Uso exclusivo Innova XR • Acesso restrito</p>
-</div>
-<button class="link" onclick="voltarLoading()">Voltar para a tela de carregamento</button>
-</div>
-
-<!-- ROOM -->
-<div id="tela-room" class="hidden fade">
-<div class="status"><span class="dot"></span> SALA ATIVA • V11.3</div>
-<div class="room"><h2>Bem-vindo,<br><span>Senhor Josué.</span></h2></div>
-<div class="voice"><div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg></div><div><b>Fale <span>VAMOS INICIAR REUNIÃO</span> para começar.</b><p>Escolha abaixo quem participa da conversa.</p></div></div>
-<div class="grid">
-<button class="opt" onclick="escolher(this,'COLETIVA • TODOS')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0M16 20a5 5 0 0 1 7 0"/></svg></span><span><b>COLETIVA • TODOS</b><span>Forja + Lia + Orion juntos</span></span></button>
-<button class="opt" onclick="escolher(this,'SOLO • FORJA')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.6 4.7 1.4-3.4 3.5 1 4.8L12 14.6 7.9 17.3l1-4.8L5.5 9l4.7-1.4z"/></svg></span><span><b>SOLO • FORJA</b><span>Conversa individual</span></span></button>
-<button class="opt" onclick="escolher(this,'SOLO • LIA')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg></span><span><b>SOLO • LIA</b><span>Conversa individual</span></span></button>
-<button class="opt sel" onclick="escolher(this,'SOLO • ORION')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 4.6 4.7 1.4-3.4 3.5 1 4.8L12 14.6 7.9 17.3l1-4.8L5.5 9l4.7-1.4z"/></svg></span><span><b>SOLO • ORION</b><span>Conversa individual</span></span></button>
-</div>
-<div class="sel-box" id="selTxt"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l3 3 5-6"/></svg><span><b>SOLO • ORION</b> selecionado — pronto para iniciar.</span></div>
-</div>
-</div>
-
-<button class="mic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> MIC LIGADO</button>
-<div class="foot" onclick="document.getElementById('modal').classList.add('open')"><span>NEXUS CORE • V11.3 • Innova XR • clique p/ ver o que mudou</span><b>›</b></div>
-
-<div class="modal" id="modal" onclick="if(event.target===this) this.classList.remove('open')">
-<div class="sheet"><div class="handle"></div>
-<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><p style="font-size:11px;letter-spacing:.22em;color:#22d3ee;font-weight:700">REGISTRO DE MUDANÇAS</p><h3 style="font-family:Sora;font-size:22px;margin-top:8px">O que mudou na V11.3</h3></div><button onclick="document.getElementById('modal').classList.remove('open')" style="background:rgba(255,255,255,.08);border:0;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer">✕</button></div>
-<ul><li>Nova tela de loading com entrada rápida e abertura automática.</li><li>Login redesenhado, com mensagem de erro genérica e sem exibir dados digitados.</li><li>Nova sala de boas-vindas com seleção de coletiva ou solo.</li><li>Atalho de Enter no campo de senha para entrar mais rápido.</li><li>Botão flutuante animado ATIVAR MICROFONE, sempre visível acima do rodapé.</li></ul>
-<p style="font-size:11px;letter-spacing:.16em;color:#94a3b8;margin-top:14px;font-weight:700">TESTE DE VOZ POR TRÁS DA INTERFACE</p>
-<div class="testes"><button>TESTAR FORJA</button><button>TESTAR LIA</button><button>TESTAR ORION</button></div>
-<button class="btn" onclick="document.getElementById('modal').classList.remove('open')">ENTENDI</button>
-</div>
-</div>
-
+<!-- E substitua o bloco <script> do CEREBRO EMBUTIDO por este: -->
 <script>
-let p=12; const barra=document.getElementById('barra'), pct=document.getElementById('pct');
-let iv=setInterval(()=>{p=Math.min(100,p+Math.random()*9+3); barra.style.width=Math.floor(p)+'%'; pct.innerText=Math.floor(p)+'%'; if(p>=100) clearInterval(iv);},120);
-setTimeout(()=>{irLogin()},2500);
-function irLogin(){document.getElementById('tela-loading').classList.add('hidden');document.getElementById('tela-login').classList.remove('hidden');document.getElementById('tela-room').classList.add('hidden');}
-function voltarLoading(){document.getElementById('tela-login').classList.add('hidden');document.getElementById('tela-loading').classList.remove('hidden');}
-function entrar(){
-  const l=document.getElementById('login').value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const s=document.getElementById('senha').value.trim().toLowerCase();
-  if(l==='josue' && s==='innovaxr2026'){
-    document.getElementById('erro').style.display='none';
-    document.getElementById('tela-login').classList.add('hidden');
-    document.getElementById('tela-room').classList.remove('hidden');
-  } else {
-    document.getElementById('erro').style.display='block';
-    document.getElementById('senha').value='';
-  }
-}
-document.getElementById('senha').addEventListener('keydown',e=>{if(e.key==='Enter') entrar();});
-function escolher(el,nome){
-  document.querySelectorAll('.opt').forEach(o=>o.classList.remove('sel'));
-  el.classList.add('sel');
-  document.getElementById('selTxt').innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l3 3 5-6"/></svg><span><b>'+nome+'</b> selecionado — pronto para iniciar.</span>';
-}
-</script>
-
-<script>
-// CEREBRO EMBUTIDO NO INDEX - para não depender de arquivo separado
-// Se cerebro.js existir, ele usa ele. Se não, esse aqui já faz funcionar.
 (function(){
-  if(window.NEXUS && window.NEXUS._embutido) return;
   const N = {
-    modo:"SOLO", quem:"ORION", micLigado:false, rec:null, audio:null,
-    pararPalavras:["para","pare","parar","silencio","silêncio","quieto","calma","espera","chega"],
-    ligarMic:function(){
+    modo: "SOLO",
+    quem: "ORION",
+    micLigado: false,
+    rec: null,
+    audio: null,
+    pararPalavras: ["para", "pare", "parar", "silencio", "silêncio", "quieto", "calma", "espera", "chega"],
+
+    ligarMic: function() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if(!SR){ alert("Use Chrome no celular para o mic."); return; }
-      if(this.micLigado) return;
-      this.rec = new SR(); this.rec.lang="pt-BR"; this.rec.continuous=true; this.rec.interimResults=true;
-      this.rec.onresult=(e)=>{
-        for(let i=e.resultIndex;i<e.results.length;i++){
-          if(e.results[i].isFinal) this.ouvir(e.results[i][0].transcript);
-        }
-      };
-      this.rec.onend=()=>{ if(this.micLigado){ try{this.rec.start();}catch(_){} } };
-      this.rec.start(); this.micLigado=true;
-      const b=document.querySelector(".mic"); if(b) b.textContent="● MIC LIGADO";
-      this.falar("ORION","Mic ligado, Senhor Josué. Fale Vamos Iniciar Reunião.");
-    },
-    ouvir:function(fala){
-      const t=fala.toLowerCase();
-      for(let p of this.pararPalavras){ if(t.includes(p)){ this.pararAgora(); return; } }
-      if(t.includes("vamos iniciar reuniao")||t.includes("vamos iniciar reunião")||t.includes("iniciar reuniao")){
-        this.falar("ORION","Bem-vindo Senhor Josué, está tudo pronto, todos os servidores estão programados, tudo pronto para começar nosso trabalho.");
-        setTimeout(()=>this.falar("FORJA","FORJA pronta, Senhor Josué. Posso criar código, imagem e texto."),1200);
-        setTimeout(()=>this.falar("LIA","LIA pronta, Senhor Josué. Posso divulgar e criar textos."),2400);
+      if (!SR) {
+        alert("Use o navegador Google Chrome no celular para ativar o microfone.");
         return;
       }
-      if(t.includes("forja")) this.quem="FORJA";
-      else if(t.includes("lia")) this.quem="LIA";
-      else if(t.includes("orion")) this.quem="ORION";
+      if (this.micLigado) return;
+      this.rec = new SR();
+      this.rec.lang = "pt-BR";
+      this.rec.continuous = true;
+      this.rec.interimResults = false;
+
+      this.rec.onresult = (e) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            const textoOuvido = e.results[i][0].transcript.trim();
+            if (textoOuvido) this.ouvir(textoOuvido);
+          }
+        }
+      };
+
+      this.rec.onend = () => {
+        if (this.micLigado) {
+          try { this.rec.start(); } catch (_) {}
+        }
+      };
+
+      this.rec.start();
+      this.micLigado = true;
+      const b = document.querySelector(".mic");
+      if (b) b.innerHTML = "● MIC OUVINDO";
+      this.falar("ORION", "Microfone ativo, Senhor Josué. Fale Vamos Iniciar Reunião ou faça sua pergunta.");
+    },
+
+    desligarMic: function() {
+      this.micLigado = false;
+      if (this.rec) { try { this.rec.stop(); } catch (_) {} }
+      const b = document.querySelector(".mic");
+      if (b) b.innerHTML = "ATIVAR MICROFONE";
+    },
+
+    ouvir: function(fala) {
+      const t = fala.toLowerCase();
+      this.mostrar("SENHOR JOSUÉ", fala, true);
+
+      for (let p of this.pararPalavras) {
+        if (t === p || t.startsWith(p + " ")) {
+          this.pararAgora();
+          return;
+        }
+      }
+
+      if (t.includes("vamos iniciar reuniao") || t.includes("vamos iniciar reunião") || t.includes("iniciar reuniao")) {
+        this.falar("ORION", "Bem-vindo Senhor Josué. Todos os servidores estão online e prontos para o trabalho.");
+        setTimeout(() => this.falar("FORJA", "Forja pronta, Senhor Josué. Código, sistemas e laboratório à disposição."), 3500);
+        setTimeout(() => this.falar("LIA", "Lia pronta, Senhor Josué. Estratégia e comunicação ativadas."), 7000);
+        return;
+      }
+
+      if (t.includes("forja")) this.quem = "FORJA";
+      else if (t.includes("lia")) this.quem = "LIA";
+      else if (t.includes("orion")) this.quem = "ORION";
+
       this.perguntarIA(this.quem, fala);
     },
-    pararAgora:function(){
-      this.falando=false;
-      if(this.audio){ try{this.audio.pause();}catch(_){} this.audio=null; }
-      if("speechSynthesis" in window) window.speechSynthesis.cancel();
-      this.falarLocal("ORION","Parei. Estou ouvindo, Senhor Josué.");
+
+    pararAgora: function() {
+      if (this.audio) { try { this.audio.pause(); } catch (_) {} this.audio = null; }
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      this.falarLocal("ORION", "Áudio interrompido. Estou ouvindo, Senhor Josué.");
     },
-    falar:function(quem, texto){
-      this.mostrar(quem, texto);
-      // Tenta ElevenLabs via servidor
-      fetch("/api/voice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:quem,texto:texto})})
-      .then(r=>{ if(!r.ok) throw new Error("sem eleven"); return r.blob(); })
-      .then(blob=>{
-        if(this.audio) try{this.audio.pause();}catch(_){}
-        this.audio=new Audio(URL.createObjectURL(blob)); this.audio.play();
-      }).catch(()=> this.falarLocal(quem, texto));
+
+    falar: function(quem, texto, motorTag) {
+      this.mostrar(quem, texto, false, motorTag);
+      fetch("/api/voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quem: quem, texto: texto })
+      })
+      .then(r => {
+        if (!r.ok) throw new Error("Fallback voz local");
+        return r.blob();
+      })
+      .then(blob => {
+        if (this.audio) { try { this.audio.pause(); } catch (_) {} }
+        this.audio = new Audio(URL.createObjectURL(blob));
+        this.audio.play();
+      })
+      .catch(() => this.falarLocal(quem, texto, true));
     },
-    falarLocal:function(quem, texto){
-      this.mostrar(quem, texto);
-      if(!("speechSynthesis" in window)) return;
+
+    falarLocal: function(quem, texto, jaMostrou) {
+      if (!jaMostrou) this.mostrar(quem, texto, false, "VOZ-LOCAL");
+      if (!("speechSynthesis" in window)) return;
       window.speechSynthesis.cancel();
-      const u=new SpeechSynthesisUtterance(texto); u.lang="pt-BR"; u.rate=1.0;
-      if(quem==="LIA") u.pitch=0.85; else if(quem==="FORJA") u.pitch=0.9; else u.pitch=0.8;
+      const u = new SpeechSynthesisUtterance(texto);
+      u.lang = "pt-BR";
+      u.rate = 1.05;
+      u.pitch = quem === "LIA" ? 1.1 : (quem === "FORJA" ? 0.9 : 0.8);
       window.speechSynthesis.speak(u);
     },
-    perguntarIA:function(quem, pergunta){
-      fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:quem,pergunta:pergunta})})
-      .then(r=>r.json()).then(d=>{
-        if(d.parar) return;
-        const resp=d.resposta||d.texto||"Entendi, Senhor Josué.";
-        this.falar(d.quem||quem, resp);
-      }).catch(()=> this.falar(quem,"Entendi, Senhor Josué. Estou aqui. Pode continuar."));
+
+    perguntarIA: function(quem, pergunta) {
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quem: quem, modo: this.modo, pergunta: pergunta })
+      })
+      .then(r => r.json())
+      .then(d => {
+        const resp = d.resposta || "Entendi, Senhor Josué.";
+        this.falar(d.quem || quem, resp, d.motor);
+      })
+      .catch(() => this.falar(quem, "Não consegui alcançar o servidor agora, Senhor Josué.", "ERRO-REDE"));
     },
-    mostrar:function(quem, texto){
-      let box=document.getElementById("nexus-chat");
-      if(!box){ box=document.createElement("div"); box.id="nexus-chat"; box.style.cssText="margin-top:16px;display:flex;flex-direction:column;gap:10px"; const room=document.getElementById("tela-room"); if(room) room.appendChild(box); }
-      const div=document.createElement("div"); div.style.cssText="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.5";
-      div.innerHTML="<b style='color:#22d3ee;font-size:11px;letter-spacing:.15em'>"+quem+"</b><br>"+texto;
+
+    mostrar: function(quem, texto, isUser, motorTag) {
+      let box = document.getElementById("nexus-chat");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "nexus-chat";
+        box.style.cssText = "margin-top:16px;display:flex;flex-direction:column;gap:10px";
+        const room = document.getElementById("tela-room");
+        if (room) room.appendChild(box);
+      }
+      const div = document.createElement("div");
+      const corBorda = isUser ? "rgba(167,139,250,.35)" : "rgba(34,211,238,.25)";
+      const corNome = isUser ? "#a78bfa" : "#22d3ee";
+      const badge = motorTag ? ` <span style="opacity:.6;font-size:9px">[${motorTag}]</span>` : "";
+      div.style.cssText = `background:rgba(255,255,255,.06);border:1px solid ${corBorda};border-radius:16px;padding:12px 14px;font-size:14px;line-height:1.5`;
+      div.innerHTML = `<b style="color:${corNome};font-size:11px;letter-spacing:.15em">${quem}${badge}</b><br>${texto}`;
       box.appendChild(div);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     }
   };
-  window.NEXUS=N; N._embutido=true;
-  document.addEventListener("DOMContentLoaded",()=>{
-    const mic=document.querySelector(".mic");
-    if(mic) mic.onclick=()=>{ if(N.micLigado){ N.micLigado=false; if(N.rec) try{N.rec.stop();}catch(_){} mic.textContent="MIC LIGADO"; } else N.ligarMic(); };
-    document.querySelectorAll(".opt").forEach(btn=>{
-      btn.addEventListener("click",()=>{
-        const txt=btn.innerText||"";
-        if(txt.includes("COLETIVA")){ N.modo="COLETIVA"; N.falar("ORION","Coletiva ativada, Senhor Josué. Forja, Lia e eu estamos juntos."); }
-        else if(txt.includes("FORJA")){ N.modo="SOLO"; N.quem="FORJA"; N.falar("FORJA","Forja aqui, Senhor Josué. Sou o Lab. O que o senhor quer que eu execute?"); }
-        else if(txt.includes("LIA")){ N.modo="SOLO"; N.quem="LIA"; N.falar("LIA","Lia aqui, Senhor Josué. Sou o Marketing. O que vamos promover hoje?"); }
-        else if(txt.includes("ORION")){ N.modo="SOLO"; N.quem="ORION"; N.falar("ORION","Orion aqui, Senhor Josué. Sou a Diretoria. Qual a ordem?"); }
+
+  window.NEXUS = N;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const mic = document.querySelector(".mic");
+    if (mic) {
+      mic.textContent = "ATIVAR MICROFONE";
+      mic.onclick = () => N.micLigado ? N.desligarMic() : N.ligarMic();
+    }
+
+    document.querySelectorAll(".opt").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const txt = btn.innerText || "";
+        if (txt.includes("COLETIVA")) {
+          N.modo = "COLETIVA";
+          N.falar("ORION", "Modo coletiva ativado, Senhor Josué. Forja, Lia e eu estamos na escuta.");
+        } else if (txt.includes("FORJA")) {
+          N.modo = "SOLO"; N.quem = "FORJA";
+          N.falar("FORJA", "Forja na linha, Senhor Josué. Qual sistema vamos construir?");
+        } else if (txt.includes("LIA")) {
+          N.modo = "SOLO"; N.quem = "LIA";
+          N.falar("LIA", "Lia na linha, Senhor Josué. Qual campanha vamos lançar?");
+        } else if (txt.includes("ORION")) {
+          N.modo = "SOLO"; N.quem = "ORION";
+          N.falar("ORION", "Orion na linha, Senhor Josué. Qual a diretriz?");
+        }
       });
     });
   });
 })();
 </script>
-<script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}function isInlineMediaSlotElement(node){return !!(node&&node.getAttribute&&node.getAttribute("data-clippy-inline-media-slot")!==null)}function findInlineMediaSlot(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(isInlineMediaSlotElement(node))return node}return null}function readInlineMediaUrl(node){if(!node)return null;return node.getAttribute&&((node.getAttribute("data-clippy-inline-media-url")||node.getAttribute("data-url")||node.getAttribute("data_url")))||node.href||null}function stripHash(url){return String(url).replace(/#.*$/,"")}function urlsMatch(a,b){if(!a||!b)return false;try{return stripHash(new URL(a,loc).href)===stripHash(new URL(b,loc).href)}catch(_){return stripHash(a)===stripHash(b)}}function isFirstPartyReelUrl(value){try{var url=new URL(value,loc);if(url.protocol!=="https:")return false;var host=url.hostname.toLowerCase();var supported=host==="instagram.com"||host.endsWith(".instagram.com")||host==="facebook.com"||host.endsWith(".facebook.com");return supported&&/\/reels?\//i.test(url.pathname)}catch(_){return false}}function isInlineMediaUrlClick(node,href){var slot=findInlineMediaSlot(node);if(!slot)return false;var slotUrl=readInlineMediaUrl(slot);if(slotUrl)return urlsMatch(href,slotUrl);return isFirstPartyReelUrl(href)}function findDataHref(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(node.getAttribute){var href=node.getAttribute("data-href")||node.getAttribute("data-url");if(href)return{href:href,node:node}}}return null}var nativeOpen=window.open;window.open=function(url){if(parent!==window&&typeof url==="string"&&/^https?:\/\//.test(url)){parent.postMessage({type:"ecto:usercontent-link-click",href:url},"*");return null}return nativeOpen?nativeOpen.apply(window,arguments):null};document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;if(parent===window)return;var a=target.closest?target.closest("a[href]"):null;if(a&&a.href&&/^https?:\/\//.test(a.href)&&a.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(a,a.href))return;var productId=extractProductId(target)||extractProductId(a);if(productId){e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*");return}e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:a.href},"*");return}var dataHref=findDataHref(target);if(dataHref&&/^https?:\/\//.test(dataHref.href)&&dataHref.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(dataHref.node,dataHref.href))return;e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:dataHref.href},"*")}},true)})();</script><script>(function(){var FOCUS_TYPE="ecto:artifact-focus-request";var CLOSE_TYPE="ecto:artifact-close-request";function focusArtifactDocument(){var body=document.body;if(!body)return;try{window.focus();}catch(e){}if(!body.hasAttribute("tabindex"))body.setAttribute("tabindex","-1");try{body.focus({preventScroll:true});}catch(e){try{body.focus();}catch(e2){}}}window.addEventListener("message",function(event){if(event.source!==window.parent)return;var data=event.data;if(!data||typeof data!=="object"||data.type!==FOCUS_TYPE)return;if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",focusArtifactDocument,{once:true});return;}focusArtifactDocument();});window.addEventListener("keydown",function(event){if(event.key!=="Escape")return;window.setTimeout(function(){if(event.defaultPrevented)return;window.parent.postMessage({type:CLOSE_TYPE},"*");},0);});})();</script></body>
-
-</html>

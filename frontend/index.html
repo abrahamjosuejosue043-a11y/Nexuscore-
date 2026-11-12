@@ -1,3 +1,4 @@
+<!-- NEXUS CORE V11 - ELEVENLABS GATEWAY + NEBULOSA + DIRECIONADO TRAVADO - SE VOCE VE V4 / GEMINI, ESTA NO ARQUIVO ANTIGO -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head><style>
@@ -85,7 +86,7 @@ button{padding:12px 14px;border:0;border-radius:12px;cursor:pointer;font-weight:
 <div id="telaLoading" onclick="destravarLoading()" style="position:fixed;inset:0;background:#030712;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;cursor:pointer"><div style="font-family:Orbitron;font-size:32px;letter-spacing:4px">NEXUS <b style="color:#00f0ff">CORE</b></div><div style="color:#a78bfa;letter-spacing:3px;font-size:12px;margin-top:6px">BY INNOVA XR • FORJA • LIA • ORION</div><div style="margin-top:22px;width:200px;height:6px;background:#1e293b;border-radius:10px;overflow:hidden"><div id="barraLoading" style="height:100%;width:0;background:#00f0ff;transition:width .3s"></div></div><div style="margin-top:10px;font-size:13px;color:#94a3b8">Carregando Nexus Core...</div><div style="margin-top:14px;font-size:12px;color:#64748b">Se travar, toque na tela para entrar</div><button onclick="destravarLoading()" style="margin-top:12px;background:#00f0ff;color:#000;border:0;border-radius:12px;padding:12px 20px;font-weight:900">ENTRAR AGORA</button></div>
 <div id="telaLogin" style="position:fixed;inset:0;background:#030712;z-index:9998;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px"><div style="font-family:Orbitron;font-size:28px;letter-spacing:3px">NEXUS <b style="color:#00f0ff">CORE</b></div><div style="color:#94a3b8;font-size:12px;letter-spacing:2px;margin:8px 0 18px">USO EXCLUSIVO INNOVA XR • FAÇA LOGIN</div><div style="background:rgba(15,23,42,.9);border:1px solid rgba(0,240,255,.3);border-radius:18px;padding:18px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px"><label style="font-size:12px;color:#94a3b8">LOGIN</label><input id="loginUsuario" placeholder="Ex: Josue"><label style="font-size:12px;color:#94a3b8">SENHA</label><input id="loginSenha" type="password" placeholder="Senha"><button class="primario" onclick="entrar()">ENTRAR NO NEXUS CORE</button><div id="loginErro" style="color:#fca5a5;font-size:13px;min-height:16px"></div><div style="font-size:11px;color:#64748b">Login: Josue / Senha: InnovaXR2026</div></div></div>
 <button id="btnPararFixo" onclick="pararTudoImediato()" style="position:fixed;bottom:18px;right:18px;z-index:999;background:#ef4444;color:#fff;border:0;border-radius:50px;padding:16px 20px;font-weight:900;font-size:15px;box-shadow:0 0 25px rgba(239,68,68,.7);display:none">⏹ PARA</button>
-<header><div><div class="logo">NEXUS <b>CORE</b> <span>// FUTURE WORKSPACE</span></div><div style="font-size:11px;letter-spacing:2px;color:#94a3b8">BY INNOVA XR • V11 ELEVENLABS GATEWAY + TUDO ANTERIOR • META COMANDA</div></div><div style="display:flex;gap:10px;align-items:center"><div class="hud"><i></i> SYSTEM ONLINE</div><div class="badge off" id="badgeStatus">● SALA FECHADA • IAs OFFLINE</div></div></header>
+<header><div><div class="logo">NEXUS <b>CORE</b> <span>// FUTURE WORKSPACE</span></div><div style="font-size:11px;letter-spacing:2px;color:#94a3b8">BY INNOVA XR • V11.1 ELEVENLABS DIAGNÓSTICO + TUDO ANTERIOR • META COMANDA</div></div><div style="display:flex;gap:10px;align-items:center"><div class="hud"><i></i> SYSTEM ONLINE</div><div class="badge off" id="badgeStatus">● SALA FECHADA • IAs OFFLINE</div></div></header>
 <main>
 <section class="panel">
 <div id="barraProjetos" style="background:#020617;border:1px solid #00f0ff;border-radius:14px;padding:12px;margin-bottom:12px"><div style="font-family:Orbitron;font-size:12px;letter-spacing:2px;color:#00f0ff">📁 PROJETO ATUAL: <span id="projetoAtualLabel" style="color:#ffd400">Geral</span> — os 3 estão cientes deste projeto e cruzam dados</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><input id="novoProjeto" placeholder="Nome do projeto - Ex: App de Escola" style="flex:1;min-width:180px"><button class="primario" onclick="criarProjeto()">+ NOVO PROJETO</button><select id="seletorProjeto" onchange="trocarProjeto(this.value)" style="min-width:160px"><option value="Geral">Geral</option></select><button class="sec" onclick="verQuadro()">👁 QUADRO</button></div><div id="quadroBox" style="display:none;margin-top:10px;background:rgba(15,23,42,.9);border-radius:10px;padding:10px;font-size:13px;line-height:1.5"></div></div>
@@ -99,7 +100,7 @@ button{padding:12px 14px;border:0;border-radius:12px;cursor:pointer;font-weight:
 </div>
 <div class="controles">
 <button class="primario" onclick="comecarReuniao()">▶ COMEÇAR REUNIÃO</button>
-<button class="sec" onclick="ouvirVoz()">🎤 FALAR POR VOZ</button><button class="sec" onclick="testarElevenLabs()">🎙️ TESTAR ELEVENLABS</button>
+<button class="sec" onclick="ouvirVoz()">🎤 FALAR POR VOZ</button><button class="sec" onclick="testarElevenLabs()">🎙️ TESTAR ELEVENLABS</button><button class="sec" onclick="diagnosticoElevenLabs()">🔍 DIAGNÓSTICO ELEVENLABS</button>
 <button class="sec" onclick="pararVoz()">🔇 PARAR VOZ</button>
 <button class="verde" onclick="enviarRelatorio()">📧 ENVIAR RELATÓRIO</button>
 <button class="perigo" onclick="encerrar()">■ ENCERRAR • DESLIGAR IAs</button>
@@ -282,19 +283,40 @@ function ehOrdemParar(txt){
 // ===== GATEWAY ELEVENLABS - frontend nunca vê a chave =====
 let elevenLabsAtivo = true;
 async function checarElevenLabs(){
+  // DIAGNÓSTICO EXATO - não só ON/OFF. Assume que a chave pode estar certa e o problema é outro.
+  const el = document.getElementById('elevenStatus');
   try{
-    const r = await fetch('/voz/config'); const d = await r.json();
+    const r = await fetch('/voz/diagnostico');
+    if(!r.ok){
+      // 404 = backend ANTIGO V4, que nem tem /voz/diagnostico. Não é problema de chave.
+      elevenLabsAtivo = false;
+      if(el){ el.innerText = '⚠️ Backend ANTIGO (V4) - faça Deploy do backend + main.py novos no Render. Não é problema de chave.'; el.style.color = '#fca5a5'; }
+      return;
+    }
+    const d = await r.json();
     elevenLabsAtivo = !!d.ativo;
-    const el = document.getElementById('elevenStatus');
-    if(el) el.innerText = d.ativo ? '● ElevenLabs ON - ' + d.modelo : '○ ElevenLabs OFF - usando voz do navegador (coloque a chave no Render)';
-    if(el) el.style.color = d.ativo ? '#00f0ff' : '#fca5a5';
-  }catch(e){}
+    if(el){
+      if(d.ativo){
+        el.innerText = '● ElevenLabs ON - ' + (d.modelo||'') + ' - chave presente (' + (d.chave_tamanho||0) + ' caracteres)';
+        el.style.color = '#00f0ff';
+      } else {
+        // Chave não chegou no backend, mesmo que você tenha colocado no Render -> falta Deploy / nome errado
+        el.innerText = '○ ElevenLabs OFF - ' + (d.motivo||'chave não chegou no backend. Confira Environment + Manual Deploy.');
+        el.style.color = '#fca5a5';
+      }
+    }
+  }catch(e){
+    // Sem conexão com backend - não é chave, é backend fora do ar ou sem Deploy
+    elevenLabsAtivo = false;
+    if(el){ el.innerText = '○ ElevenLabs OFF - sem conexão com backend. Faça Manual Deploy e espere Live.'; el.style.color = '#fca5a5'; }
+  }
 }
 async function falarViaElevenLabs(texto, quem){
   // Retorna true se tocou via ElevenLabs, false se deve cair para navegador
   try{
     if(!document.getElementById('vozElevenLabs')?.checked) return false;
-    if(!elevenLabsAtivo) return false;
+    // CORREÇÃO: tenta mesmo se a flag estiver OFF (flag pode estar desatualizada). Se o backend responder com áudio, vale. Se não, cai para navegador.
+    // Não bloqueia por flag desatualizada - bloqueia só se o usuário desmarcou o checkbox.
     const ctrl = new AbortController(); const to = setTimeout(()=>ctrl.abort(), 12000);
     const r = await fetch('/voz/falar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:String(texto).slice(0,900),quem:String(quem||'lab')}),signal:ctrl.signal});
     clearTimeout(to);
@@ -312,6 +334,15 @@ async function falarViaElevenLabs(texto, quem){
       a.play().catch(()=>resolve(false));
     });
   }catch(e){ return false; }
+}
+async function diagnosticoElevenLabs(){
+  addMsg('SISTEMA','ceo','🔍 Diagnóstico ElevenLabs...');
+  try{
+    const r = await fetch('/voz/diagnostico');
+    if(!r.ok){ addMsg('SISTEMA','ceo','⚠️ Backend ANTIGO (V4) - não tem /voz/diagnostico. Faça Deploy do backend + main.py novos. Não é problema de chave.'); return; }
+    const d = await r.json();
+    addMsg('SISTEMA','ceo','Diagnóstico: ativo=' + d.ativo + ' | chave_presente=' + d.chave_presente + ' | tamanho=' + d.chave_tamanho + ' | modelo=' + d.modelo + ' | motivo: ' + d.motivo);
+  }catch(e){ addMsg('SISTEMA','ceo','⚠️ Sem conexão com backend. Faça Manual Deploy e espere Live.'); }
 }
 async function testarElevenLabs(){
   addMsg('SISTEMA','ceo','🎙️ Testando ElevenLabs - voz do ORION...');

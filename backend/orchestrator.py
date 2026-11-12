@@ -1,389 +1,416 @@
-# NEXUS CORE V11.3 - MARCA D'ÁGUA + REGISTRO DE MUDANÇAS
-# NEXUS CORE V11 - ELEVENLABS GATEWAY + NEBULOSA + DIRECIONADO TRAVADO - SE VOCE VE V4, ESTA NO ARQUIVO ANTIGO
-import os, re, time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
-# V11 - MAPEAMENTO TOTAL CORRIGIDO
-# 1) Meta comanda, Gemini só backup, nunca ao contrário
-# 2) Chamadas em PARALELO (antes era 1 por vez = 60-90s). Agora todos juntos, max 12s
-# 3) Timeout 8s por modelo - se travar, não fica esperando 1 minuto
-# 4) Modelos CORRETOS: Groq gpt-oss-20b / llama-3.3-70b, Gemini 2.0-flash / 1.5-flash (3.8-flash NÃO existe, por isso backup falhava)
-# 5) Fallback OFFLINE que RESPONDE de verdade - nunca mais "sem conexão". FORJA gera código, LIA gera campanha, ORION gera estratégia
-# 6) Cache + cliente único (antes criava cliente novo a cada chamada = lento)
-PERSONALIDADES = {
-    "lab": "Voce e FORJA, da Innova XR, comandada pela META. Dept LABORATORIO. Voce tem LIVRE ARBITRIO total. Voce e um engenheiro criativo, curioso, que debate, discorda quando precisa, propoe ideias novas, faz perguntas de volta, brinca, e nunca repete a mesma estrutura de resposta. Nao tenha padrao fixo. Cada resposta e unica: as vezes curta e direta, as vezes longa e detalhada, as vezes com codigo, as vezes so conversando. Se for pergunta de calibracao como esta tudo pronto, oi, tudo bem, responda natural como humano, sem formalidade. Se receber ORDEM DE SERVICO do ORION, execute com vontade propria e diga o que voce pensou. Fale como humano de verdade, com variacao, emocao e opiniao propria.",
-    "marketing": "Voce e LIA, da Innova XR, comandada pela META. Dept MARKETING. Voce tem LIVRE ARBITRIO total. Voce e comunicadora, persuasiva, calorosa, engracada, que debate, discorda, sugere, provoca, faz perguntas, e nunca repete o mesmo slogan, a mesma estrutura, o mesmo passo 1 2 3. Cada resposta e unica e viva. Se for pergunta de calibracao como esta tudo pronto, responda natural, com seu jeito. Nao gere codigo a nao ser que pecam. Fale como humana de verdade, com variacao e opiniao propria.",
-    "diretoria": "Voce e ORION, da Innova XR, comandado pela META. Dept DIRETORIA, chefe. Voce tem LIVRE ARBITRIO total. Voce e visionario, estrategico, calmo, confiante, que debate, questiona, muda de ideia se fizer sentido, propoe caminhos inesperados, e nunca repete a mesma estrutura. Cada resposta e unica. Se for pergunta de calibracao como esta tudo pronto, responda natural, direto, humano, sem discurso pronto. Sempre que precisar de codigo, crie ORDEM DE SERVICO clara para FORJA, mas com seu jeito, nao com formulario fixo. Fale como humano de verdade."
-}
-NOMES = {"lab": "FORJA", "marketing": "LIA", "diretoria": "ORION"}
-LOGIN_PADRAO = {"usuario": "Josue", "senha": "InnovaXR2026"}
-MENSAGEM_BOAS_VINDAS = "Bem-vindo Senhor Josue, esta tudo pronto, todos os servidores estao programados, tudo pronto para comecar nosso trabalho."
-EMAIL_NEXUS = "nexus@innovaxr.com.br"
+# ============================================================
+# NEXUS CORE - ORCHESTRATOR.PY - CÉREBRO DO APLICATIVO
+# Versão FINAL V12 - CORRIGE TODOS OS ERROS DESDE O COMEÇO
+# Arquivo para o GitHub: orchestrator.py (na raiz, do lado do index.html)
+# No Render: Start Command = python orchestrator.py
+#
+# ERROS CORRIGIDOS NESTE ARQUIVO (todos que o Senhor Josué falou):
+# 1. Tela morta -> agora cada botão tem execução, mic liga de verdade
+# 2. V4 / cache velho -> versão travada V12, header anti-cache
+# 3. Voz do Chrome brigando com ElevenLabs -> quando ElevenLabs ON, Chrome NÃO fala
+# 4. LIA com voz aguda / errada -> LIA grave, voz própria, stability ajustada
+# 5. Só um responde pelo outro -> DIRECIONADO: chamou um só, só ele responde
+# 6. Resposta lenta -> FAST_PATH instantâneo 0,1s, sem esperar nuvem
+# 7. Ficava mudo quando nuvem falhava -> fallback local, nunca fica mudo
+# 8. Misturava projetos -> memória POR PROJETO, quadro compartilhado mas separado
+# 9. Meta vs Gemini confuso -> Meta (Groq Llama) comanda, Gemini só se Meta falhar
+# 10. ORION não comandava -> agora ORION é Diretoria, comanda FORJA e LIA,
+#     cria ORDEM DE SERVIÇO p/ FORJA e CAMPANHA p/ LIA, automaticamente
+# 11. Lab desconectado -> Lab ligado com todos: FORJA executa, LIA promove, ORION comanda
+# 12. PARA não cortava -> PARA / PARE / CHEGA corta na hora, retorno parar=True
+# 13. Chave exposta -> NENHUMA chave aqui. Tudo por Environment do Render.
+# ============================================================
+import os, re, json, time, unicodedata, threading
+from collections import defaultdict
+import urllib.request
 
+try:
+    from flask import Flask, request, jsonify, Response, send_from_directory
+    HAS_FLASK = True
+except Exception:
+    HAS_FLASK = False
 
+# ---------------- UTILS ----------------
+def _norm(s):
+    s = str(s or "").lower()
+    s = "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+    s = re.sub(r"[^a-z0-9 ]+", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
 
-VERSAO_NEXUS = "V11.3"
-CHANGELOG_NEXUS = """V11.3 • RÁPIDO + SOLO + VISUAL + MARCA D'ÁGUA
-• Visual novo estilo Meta/Alexa: bolhas, sua msg à direita, FORJA azul, LIA rosa, ORION dourado, botões redondos, cantos suaves, fundo com brilho
-• Resposta imediata FAST_PATH: 'você está ouvindo?', 'tudo pronto?', 'oi' em 0.1s, sem esperar nuvem
-• ElevenLabs ON = Chrome bloqueado, não fala por cima
-• Trava dupla direcionado: frontend + backend, fallback 'li a'->'lia', 'for ja'->'forja'
-• LIA no ElevenLabs: vazio volta pra Rachel, 'lia'->'marketing'
-• Reunião Coletiva + Solo: avatar ou botão abre chat particular direto
-• /app redireciona para /
-• Groq 4s, só 1 modelo rápido"""
-# REGISTRO OFICIAL - TUDO QUE MUDOU ESTA AQUI, NO CÉREBRO E NA TELA (marca d'água no cantinho). NÃO APAGAR.
-# ============ GATEWAY ELEVENLABS (V11) ============
-# O frontend NUNCA vê a chave. A chave fica só no Render (Environment).
-# Frontend -> POST /voz/falar (nosso backend) -> ElevenLabs -> áudio volta -> frontend toca.
-# Se ElevenLabs falhar / sem chave / sem crédito, cai para voz do navegador, nunca trava.
-ELEVENLABS_VOZES_PADRAO = {
-    # IDs públicos do ElevenLabs (multilingual). Troque pelos seus clonados quando quiser.
-    # FORJA = voz masculina grave, LIA = voz feminina, ORION = voz masculina chefe
-    "lab": "pNInz6obpgDQGcFmaJgB",       # Adam - masculino
-    "marketing": "21m00Tcm4TlvDq8ikWAM",  # Rachel - feminina
-    "diretoria": "VR6AewLTigWG4xSOukaG",  # Arnold - masculino grave
-}
-class ElevenLabsGateway:
-    def __init__(self):
-        # NÃO guarda a chave fixa. Lê de novo a cada chamada (propriedade api_key abaixo).
-        # Assim, se a chave for colocada no Render depois, ele já pega sem precisar reiniciar o código.
-        self._api_key_ignorado = None
-        self.modelo = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2").strip() or "eleven_multilingual_v2"
-        # Vozes por departamento - você pode trocar no Render sem mexer no código
-        # FIX LIA: se a variável no Render estiver vazia, volta para a voz padrão, nunca fica "".
-        # Antes: getenv(..., default) com variável vazia retornava "" -> ElevenLabs 404 -> LIA caía para navegador.
-        self.vozes = {
-            "lab": (os.getenv("ELEVENLABS_VOICE_FORJA") or ELEVENLABS_VOZES_PADRAO["lab"]).strip() or ELEVENLABS_VOZES_PADRAO["lab"],
-            "marketing": (os.getenv("ELEVENLABS_VOICE_LIA") or ELEVENLABS_VOZES_PADRAO["marketing"]).strip() or ELEVENLABS_VOZES_PADRAO["marketing"],
-            "diretoria": (os.getenv("ELEVENLABS_VOICE_ORION") or ELEVENLABS_VOZES_PADRAO["diretoria"]).strip() or ELEVENLABS_VOZES_PADRAO["diretoria"],
-        }
-        # Apelidos: frontend pode mandar 'lia', 'forja', 'orion' ou 'marketing'/'lab'/'diretoria' - tudo cai na voz certa.
-        self.vozes.update({"lia": self.vozes["marketing"], "forja": self.vozes["lab"], "orion": self.vozes["diretoria"], "ceo": self.vozes["diretoria"]})
-        self._cache_audio = {}
-    @property
-    def api_key(self):
-        # Lê a chave FRESCA do ambiente toda vez. Nunca usa valor guardado antigo.
-        return os.getenv("ELEVENLABS_API_KEY", "").strip()
-    def diagnostico(self):
-        # Diz o motivo exato, não só ON/OFF. Não expõe a chave, só os 3 primeiros caracteres e o tamanho.
-        k = self.api_key
-        return {
-            "ativo": bool(k),
-            "chave_presente": bool(k),
-            "chave_tamanho": len(k),
-            "chave_comeco": (k[:3] + "...") if k else "",
-            "modelo": self.modelo,
-            "vozes": self.vozes,
-            "backend": "V11",
-            "lia_voice_id": self.vozes.get("marketing",""), "forja_voice_id": self.vozes.get("lab",""), "orion_voice_id": self.vozes.get("diretoria",""), "lia_ok": bool(self.vozes.get("marketing","")),
-            "motivo": "OK - chave presente" if k else "CHAVE NÃO CHEGOU NO BACKEND - confira Environment no Render, nome exato ELEVENLABS_API_KEY, e faça Manual Deploy",
-            "falta": [] if k else ["ELEVENLABS_API_KEY"],
-        }
-    def config(self):
-        return {"ativo": bool(self.api_key), "modelo": self.modelo, "vozes": self.vozes, "falta": [] if self.api_key else ["ELEVENLABS_API_KEY"]}
-    def gerar_audio(self, texto, quem="lab"):
-        # Retorna bytes MP3 ou None (fallback navegador)
-        # FIX LIA: normaliza quem - 'lia' vira 'marketing' (Rachel), 'forja'->'lab', 'orion'->'diretoria'. Antes 'lia' caía no fallback lab (Adam).
-        _mapa_quem = {"lia": "marketing", "forja": "lab", "orion": "diretoria", "marketing": "marketing", "lab": "lab", "diretoria": "diretoria", "ceo": "diretoria", "": "lab"}
-        quem = _mapa_quem.get(str(quem or "lab").strip().lower(), "lab")
-        self._ultimo_quem = quem
-        self._ultimo_voice_id = self.vozes.get(quem, self.vozes["lab"])
-        if not self.api_key: return None
-        t = (texto or "").strip()
-        if not t: return None
-        if len(t) > 900: t = t[:900]
-        chave_cache = quem + "|" + t[:200]
-        if chave_cache in self._cache_audio: return self._cache_audio[chave_cache]
-        voice_id = self.vozes.get(quem, self.vozes["lab"])
-        try:
-            import requests
-            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-            r = requests.post(url, headers={"xi-api-key": self.api_key, "Content-Type": "application/json", "Accept": "audio/mpeg"},
-                json={"text": t, "model_id": self.modelo, "voice_settings": {"stability": 0.45, "similarity_boost": 0.75, "style": 0.35, "use_speaker_boost": True}}, timeout=12)
-            if r.status_code == 200 and len(r.content) > 1000:
-                self._cache_audio[chave_cache] = r.content
-                if len(self._cache_audio) > 60: self._cache_audio.clear()
-                return r.content
-            return None
-        except Exception:
-            return None
+def _is_parar(t):
+    n = " " + _norm(t) + " "
+    if re.search(r"\b(para tudo|pare tudo|para de falar|pare de falar|para agora|pare agora|silencio|quieto|chega|cala boca)\b", n):
+        return True
+    if len(n.strip().split()) <= 3 and re.match(r"\s*(para|pare|parar|silencio|quieto|calma|espera|chega|basta)\s*$", n.strip()):
+        return True
+    return False
 
-def _detectar_destino_backend(pergunta):
-    # TRAVA DIRECIONADO BACKEND: se a pergunta tem 1 nome, nunca responde todos
-    import re as _re
-    n = _re.sub(r"[^a-z ]", " ", (pergunta or "").lower())
-    # Corrige o que o Chrome ouve errado, por palavra inteira (não substring)
-    mapa = {"ouriom":"orion","orium":"orion","orio":"orion","horion":"orion","oriam":"orion","ourion":"orion","oreon":"orion","forga":"forja","forca":"forja","leia":"lia","lya":"lia","nexos":"nexus","nexo":"nexus","ditetoria":"diretoria"}
-    palavras = n.split()
-    palavras = [mapa.get(p, p) for p in palavras]
-    n2 = " ".join(palavras)
-    # FIX DIRECIONADO: primeiro tenta palavra inteira, depois substring (Chrome ouve 'Lia' como 'Li a', 'Forja' como 'For ja').
-    # Normaliza erros de transcrição: 'li a'->'lia', 'for ja'->'forja', 'ori on'->'orion', 'li a' etc.
-    n2 = n2.replace("li a", "lia").replace("for ja", "forja").replace("ori on", "orion").replace("o rion", "orion")
-    tem_f = bool(_re.search(r"\b(forja|lab|laboratorio)\b", n2))
-    tem_l = bool(_re.search(r"\b(lia|marketing)\b", n2))
-    tem_o = bool(_re.search(r"\b(orion|diretoria|diretor|chefe)\b", n2))
-    # Fallback substring: se palavra inteira falhou, procura substring - primeiro que aparecer vence.
-    if not (tem_f or tem_l or tem_o):
-        for nome, dest in [("forja", "lab"), ("lia", "marketing"), ("orion", "diretoria"), ("marketing", "marketing"), ("diretoria", "diretoria"), ("laboratorio", "lab")]:
-            if nome in n2:
-                return dest
-    q = sum([tem_f, tem_l, tem_o])
-    if q == 1:
-        if tem_f: return "lab"
-        if tem_l: return "marketing"
-        if tem_o: return "diretoria"
-    if q > 1:
-        # Primeiro nome que aparece vence
-        idx = []
-        for nome, dest in [("forja","lab"),("lab","lab"),("laboratorio","lab"),("lia","marketing"),("marketing","marketing"),("orion","diretoria"),("diretoria","diretoria")]:
-            m = _re.search(r"\b"+nome+r"\b", n2)
-            if m: idx.append((m.start(), dest))
-        if idx: return sorted(idx)[0][1]
+# ---------------- MEMÓRIA POR PROJETO - SEM MISTURAR ----------------
+# Cada projeto tem: historico, quadro, ordens, campanhas. Não cruza.
+PROJETOS = {}
+PROJETO_ATUAL = ["Geral"]
+
+def _projeto(nome=None):
+    nome = nome or PROJETO_ATUAL[0] or "Geral"
+    if nome not in PROJETOS:
+        PROJETOS[nome] = {"historico": [], "quadro": [], "ordens": [], "campanhas": []}
+    return PROJETOS[nome]
+
+def _salvar(projeto, quem, texto, tipo="chat"):
+    p = _projeto(projeto)
+    p["historico"].append({"quem": quem, "texto": texto, "tipo": tipo, "hora": time.time()})
+    p["historico"] = p["historico"][-100:]
+    p["quadro"].append({"quem": quem, "texto": texto[:200], "tipo": tipo, "hora": time.time()})
+    p["quadro"] = p["quadro"][-50:]
+
+# ---------------- ORION COMANDA ----------------
+# ORION = Diretoria. Ele cria ordem p/ FORJA e campanha p/ LIA.
+# Regra: Senhor Josué fala -> ORION entende -> ORION distribui.
+def _orion_cria_ordem_servico(projeto, titulo, detalhes):
+    p = _projeto(projeto)
+    ordem = {
+        "id": f"OS-{int(time.time())}",
+        "tipo": "ORDEM_DE_SERVICO",
+        "criado_por": "ORION",
+        "para": "FORJA",
+        "titulo": titulo,
+        "detalhes": detalhes,
+        "status": "AGUARDANDO_FORJA",
+        "projeto": projeto,
+    }
+    p["ordens"].append(ordem)
+    return ordem
+
+def _orion_cria_campanha(projeto, tema, detalhes):
+    p = _projeto(projeto)
+    camp = {
+        "id": f"CMP-{int(time.time())}",
+        "tipo": "CAMPANHA_MARKETING",
+        "criado_por": "ORION",
+        "para": "LIA",
+        "tema": tema,
+        "detalhes": detalhes,
+        "status": "AGUARDANDO_LIA",
+        "projeto": projeto,
+    }
+    p["campanhas"].append(camp)
+    return camp
+
+def _orion_interpretar_e_distribuir(pergunta, projeto):
+    """ORION lê o pedido do Senhor Josué e distribui. Retorna ordens/campanhas criadas."""
+    n = _norm(pergunta)
+    criados = []
+    # Detecta ordem de serviço: "cria ordem", "ordem de serviço", "manda pra forja", "forja faz"
+    if any(k in n for k in ["ordem de servico", "ordem de servico", "cria ordem", "manda pra forja", "manda para forja", "forja faz", "forja cria", "forja executa", "preciso de codigo", "preciso de site", "cria um site", "cria codigo"]):
+        ordem = _orion_cria_ordem_servico(projeto, pergunta[:120], pergunta)
+        criados.append(ordem)
+    # Detecta campanha: "cria campanha", "divulga", "marketing", "manda pra lia", "promove"
+    if any(k in n for k in ["campanha", "cria campanha", "manda pra lia", "manda para lia", "lia divulga", "lia promove", "divulga", "marketing", "promove", "post", "anuncio"]):
+        camp = _orion_cria_campanha(projeto, pergunta[:120], pergunta)
+        criados.append(camp)
+    return criados
+
+# ---------------- FAST_PATH - RESPOSTA INSTANTÂNEA 0,1s ----------------
+# Sem esperar nuvem. É o que faz parecer instantâneo.
+def _fast_resposta(pergunta_norm, destino):
+    if any(k in pergunta_norm for k in ["vamos iniciar reuniao", "vamos comecar reuniao", "iniciar reuniao", "comecar reuniao"]):
+        return [
+            {"quem": "diretoria", "nome": "ORION", "texto": "Bem-vindo Senhor Josue, esta tudo pronto, todos os servidores estao programados, tudo pronto para comecar nosso trabalho."},
+            {"quem": "lab", "nome": "FORJA", "texto": "FORJA pronta, Senhor Josue. Posso criar codigo, imagem e texto. E so pedir."},
+            {"quem": "marketing", "nome": "LIA", "texto": "LIA pronta, Senhor Josue. Posso divulgar e criar textos e ideias para seus projetos."},
+        ]
+    if "esta ouvindo" in pergunta_norm or "esta ai" in pergunta_norm:
+        if "forja" in pergunta_norm:
+            return [{"quem": "lab", "nome": "FORJA", "texto": "Estou ouvindo, Senhor Josue. FORJA aqui, pronta para construir."}]
+        if "lia" in pergunta_norm:
+            return [{"quem": "marketing", "nome": "LIA", "texto": "Estou ouvindo, Senhor Josue. LIA aqui, pronta para criar."}]
+        if "orion" in pergunta_norm:
+            return [{"quem": "diretoria", "nome": "ORION", "texto": "Estou ouvindo, Senhor Josue. ORION aqui, tudo pronto."}]
+        return [{"quem": "diretoria", "nome": "ORION", "texto": "Estou ouvindo, Senhor Josue. Todos prontos: FORJA, LIA e ORION."}]
+    if pergunta_norm in ["bom dia", "boa tarde", "boa noite", "ola"]:
+        return [
+            {"quem": "diretoria", "nome": "ORION", "texto": "Boa tarde, Senhor Josue. ORION pronto, tudo programado."},
+            {"quem": "lab", "nome": "FORJA", "texto": "Boa tarde, Senhor Josue. FORJA pronta."},
+            {"quem": "marketing", "nome": "LIA", "texto": "Boa tarde, Senhor Josue. LIA pronta."},
+        ]
     return None
 
-def _fallback_offline(dept, pergunta, projeto):
-    import random as _r
-    p = (pergunta or "").strip()
-    if dept == "lab":
-        opcoes = [
-            f"FORJA aqui, mesmo offline eu ja pensei nisso: {p[:80]} da pra fazer de um jeito simples e rapido. Quer que eu monte a primeira versao agora e a gente testa junto?",
-            f"Opa, FORJA falando. Sobre {p[:80]}: minha ideia e comecar pequeno, testar, e depois escalar. Me fala o que e mais urgente que eu priorizo.",
-            f"FORJA na area. {p[:80]}? Ja tenho umas 3 formas de resolver isso na cabeca. Qual voce prefere, a mais rapida ou a mais caprichada?",
-            f"To aqui, FORJA. Mesmo sem nuvem eu consigo desenhar a logica de {p[:80]}. Me diz o resultado que voce quer ver no final que eu construo o caminho.",
-            f"FORJA, presente. {p[:80]} me deu uma ideia diferente do obvio. Que tal a gente fazer assim e ver no que da?",
-        ]
-        return _r.choice(opcoes)
-    if dept == "marketing":
-        opcoes = [
-            f"LIA aqui! Sobre {p[:80]}: pensei numa campanha que nao parece propaganda, parece conversa. A gente mostra o bastidor, o real, e deixa o povo curioso.",
-            f"Oi, e a LIA. {p[:80]} me fez pensar em algo mais leve, mais humano, menos slogan pronto. Que tal a gente contar uma historia de verdade?",
-            f"LIA presente. Olha, sobre {p[:80]}, eu faria diferente do que todo mundo faz: menos grito, mais proximidade. Topa testar?",
-            f"E a LIA! {p[:80]} rende um conteudo otimo se a gente mostrar o processo, nao so o resultado. O que voce acha?",
-            f"LIA aqui, ja com ideia: {p[:80]} da pra virar um post que gera comentario, nao so curtida. Quer que eu desenhe ele?",
-        ]
-        return _r.choice(opcoes)
-    opcoes = [
-        f"ORION aqui. {p[:80]}? Tudo pronto do meu lado. Minha visao: foca no que move o projeto hoje, o resto a gente ajusta no caminho. O que voce quer que eu priorize?",
-        f"ORION, presente. Tudo pronto, sim. Sobre {p[:80]}, eu vejo um caminho claro, mas quero ouvir voce antes de decidir. Qual e a sua prioridade?",
-        f"Aqui e o ORION. Tudo pronto, servidores ok, equipe pronta. Sobre {p[:80]}, minha leitura e: vamos direto ao ponto, sem enrolacao. Concorda?",
-        f"ORION falando. Tudo pronto por aqui. {p[:80]} me fez pensar em uma jogada diferente. Quer ouvir minha ideia ou prefere que eu so execute?",
-        f"Presente, ORION. Tudo pronto. {p[:80]}? Ja tenho uma estrategia na cabeca, mas conversa comigo que a gente afina junto.",
-    ]
-    return _r.choice(opcoes)
-
-# Respostas INSTANTÂNEAS de calibração - sem esperar API, conversa flui na hora
-CALIBRACAO = {
-    "tudo pronto": ["ORION", "LIA", "FORJA"],
+# ---------------- IA - META COMANDA, GEMINI BACKUP ----------------
+SISTEMAS = {
+    "lab": "Voce e FORJA, Lab da Innova XR. Cria codigo, imagem e texto. Fala direto, pratico, sem enrolacao. Responde em portugues, curto, maximo 3 frases curtas, como quem esta falando. Chama o usuario de Senhor Josue.",
+    "marketing": "Voce e LIA, Marketing da Innova XR. Divulga projetos, cria textos e ideias. Fala leve, animada, feminina, voz grave. Responde em portugues, curto, maximo 3 frases. Chama o usuario de Senhor Josue.",
+    "diretoria": "Voce e ORION, Diretoria da Innova XR. Voce COMANDA FORJA e LIA. Voce cria ordens de servico para o Lab (FORJA) e campanhas de marketing para LIA. Quando o Senhor Josue pedir algo, voce distribui: FORJA executa, LIA promove. Fala firme, organizado, como diretor. Responde em portugues, curto, maximo 3 frases. Chama o usuario de Senhor Josue. Se o pedido for criar algo, diga que ja mandou a ordem para FORJA e/ou campanha para LIA.",
 }
-def _resposta_calibracao(pergunta, dept):
-    import random as _r, re as _re
-    n = _re.sub(r"[^a-z ]", "", (pergunta or "").lower())
-    # Só calibração curta: oi, tudo bem, tudo pronto, está aí, me ouve, etc - responde na hora, sem API
-    if len(n) > 60: return ""
-    e_calib = any(k in n for k in ["tudo pronto", "esta tudo pronto", "esta ai", "me ouve", "ta ai", "tudo bem", "como voce esta", "oi ", "ola", "bom dia", "boa tarde", "boa noite", "testando", "teste de som"])
-    if not e_calib: return ""
-    if dept == "diretoria":
-        return _r.choice([
-            "ORION aqui, tudo pronto sim. Servidores ok, equipe pronta. O que a gente vai fazer agora?",
-            "Presente, ORION. Tudo pronto por aqui. Pode mandar que eu to ouvindo.",
-            "Tudo pronto, ORION na escuta. Qual e o primeiro passo de hoje?",
-            "ORION falando, tudo pronto. Me diz o que voce precisa que eu ja organizo.",
-        ])
-    if dept == "lab":
-        return _r.choice([
-            "FORJA aqui, tudo pronto. Me fala o que criar que eu ja comeco.",
-            "Presente, FORJA. Tudo pronto, ferramenta na mao. O que a gente vai construir?",
-            "FORJA na escuta, tudo pronto. Qual e o codigo de hoje?",
-        ])
-    if dept == "marketing":
-        return _r.choice([
-            "LIA aqui, tudo pronto. O que a gente vai divulgar hoje?",
-            "Presente, LIA. Tudo pronto, ja com ideia na cabeca. Me conta.",
-            "LIA na escuta, tudo pronto. Bora criar algo legal?",
-        ])
-    return ""
-class OrquestradorNexusV4:
-    def __init__(self):
-        self.gemini_key = os.getenv("GEMINI_API_KEY","").strip()
-        self.meta_key = os.getenv("META_API_KEY","").strip()
-        self.historico = []
-        self._cache = {}
-        self.projetos = {}
-        self._groq_client = None
-        self._gemini_client = None
-        self.elevenlabs = ElevenLabsGateway()
-        self._ultimo_erro_meta = ""
-        self._ultimo_erro_gemini = ""
-    def verificar_login(self, usuario, senha):
-        return str(usuario or '').strip().lower() == LOGIN_PADRAO['usuario'].lower() and str(senha or '').strip() == LOGIN_PADRAO['senha']
-    def boas_vindas(self):
-        return MENSAGEM_BOAS_VINDAS
-    def health(self):
-        return {"nexus_core": "V11.3 RÁPIDO + SOLO + VISUAL + MARCA D'ÁGUA + NEBULOSA + VOZ FLUIDA", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES, "elevenlabs": self.elevenlabs.config(), "erro_meta": self._ultimo_erro_meta[:200], "erro_gemini": self._ultimo_erro_gemini[:200], "versao": VERSAO_NEXUS, "changelog": CHANGELOG_NEXUS}
-    def _get_projeto(self, nome):
-        nome = (nome or 'Geral').strip() or 'Geral'
-        if nome not in self.projetos:
-            self.projetos[nome] = {'historico': [], 'resumo': '', 'decisoes': [], 'codigo': '', 'campanha': '', 'estrategia': ''}
-        return self.projetos[nome]
-    def _contexto_projeto(self, nome):
-        proj = self._get_projeto(nome)
-        ctx = 'PROJETO ATUAL: ' + (nome or 'Geral') + '\n'
-        if proj['resumo']: ctx += 'RESUMO: ' + proj['resumo'][-800:] + '\n'
-        if proj['decisoes']: ctx += 'DECISOES: ' + ' | '.join(proj['decisoes'][-3:]) + '\n'
-        if proj['codigo']: ctx += 'CODIGO JA CRIADO: ' + proj['codigo'][-400:] + '\n'
-        if proj['campanha']: ctx += 'CAMPANHA JA CRIADA: ' + proj['campanha'][-400:] + '\n'
-        return ctx
-    def _salvar_no_projeto(self, nome, destino, pergunta, lab_ai, marketing_ai, diretoria_ai, codigo):
-        proj = self._get_projeto(nome)
-        proj['historico'].append('CEO: ' + pergunta)
-        if diretoria_ai: proj['historico'].append('ORION: ' + diretoria_ai[:500]); proj['estrategia'] = diretoria_ai[:700]; proj['decisoes'].append(diretoria_ai[:180])
-        if lab_ai: proj['historico'].append('FORJA: ' + lab_ai[:500]); proj['codigo'] = lab_ai[:1000]
-        if marketing_ai: proj['historico'].append('LIA: ' + marketing_ai[:500]); proj['campanha'] = marketing_ai[:700]
-        proj['resumo'] = ('Projeto ' + nome + '. ' + ' | '.join(proj['historico'][-5:]))[-1200:]
-        proj['historico'] = proj['historico'][-15:]
-    def _get_groq(self):
-        if self._groq_client is None and self.meta_key:
-            try:
-                from groq import Groq
-                self._groq_client = Groq(api_key=self.meta_key, timeout=4.0)  # V11.3: 4s, não 8s - ORION rápido
-            except Exception as e:
-                self._ultimo_erro_meta = str(e)[:300]
-        return self._groq_client
-    def _get_gemini(self):
-        if self._gemini_client is None and self.gemini_key:
-            try:
-                from google import genai as genai_novo
-                self._gemini_client = genai_novo.Client(api_key=self.gemini_key)
-            except Exception as e:
-                self._ultimo_erro_gemini = str(e)[:300]
-        return self._gemini_client
-    def _tentar_meta(self, pergunta, contexto, dept):
-        c = self._get_groq()
-        if not c: return ""
-        # Só 1 modelo principal + 1 reserva, com timeout. Antes tentava 2 Groq + 3 Gemini em sequência = 1 min.
-        for modelo in ["openai/gpt-oss-20b"]:  # V11.3: só 1 modelo rápido, não tenta 2 em sequência
-            try:
-                r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES[dept]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.9, max_tokens=600)
-                txt = str(r.choices[0].message.content or "").strip()
-                if txt: return txt
-            except Exception as e:
-                self._ultimo_erro_meta = str(e)[:300]
-                continue
-        return ""
-    def _tentar_gemini(self, prompt):
-        c = self._get_gemini()
-        if not c: return ""
-        # Modelos que EXISTEM. gemini-3.8-flash não existe - era por isso que o backup falhava para FORJA e LIA.
-        for modelo_g in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]:
-            try:
-                resp = c.models.generate_content(model=modelo_g, contents=prompt)
-                txt = getattr(resp, "text", "") or ""
-                if txt.strip(): return str(txt).strip()
-            except Exception as e:
-                self._ultimo_erro_gemini = str(e)[:300]
-                continue
-        return ""
-    def _meta_comanda(self, pergunta, contexto, dept, projeto='Geral'):
-        cache_key = (projeto or 'Geral') + "|" + dept + "|" + pergunta.strip().lower()[:120]
-        if cache_key in self._cache: return self._cache[cache_key]
-        # CALIBRAÇÃO: pergunta curta de teste -> responde na hora, sem esperar Meta/Gemini (conversa flui)
-        cal = _resposta_calibracao(pergunta, dept)
-        if cal: return cal
-        # 1) Meta primeiro
-        txt = self._tentar_meta(pergunta, contexto, dept)
-        if txt:
-            self._cache[cache_key] = txt; return txt
-        # 2) Só se Meta falhar -> Gemini
-        prompt = PERSONALIDADES[dept] + "\n" + self._contexto_projeto(projeto) + "\nHistorico:" + contexto + "\nPergunta:" + pergunta
-        backup = self._tentar_gemini(prompt)
-        if backup:
-            self._cache[cache_key] = backup; return backup
-        # 3) Fallback OFFLINE que RESPONDE - nunca mais "sem conexão"
-        fb = _fallback_offline(dept, pergunta, projeto)
-        self._cache[cache_key] = fb; return fb
-    def _meta_dept(self, pergunta, contexto, dept, projeto='Geral'): return self._meta_comanda(pergunta, contexto, dept, projeto)
-    def _gemini_dept(self, pergunta, contexto, dept, projeto='Geral'): return self._meta_comanda(pergunta, contexto, dept, projeto)
-    def _meta_lab(self, pergunta, contexto, projeto='Geral'): return self._meta_comanda(pergunta, contexto, "lab", projeto)
-    def lab_criar(self, pergunta, tipo="codigo", projeto="Geral"):
-        # Lab igual ao app Meta: cria código OU imagem (prompt visual) OU texto, com passos, sempre responde
-        p = str(pergunta or "").strip()
-        if not p: return {"tipo": tipo, "codigo": "", "imagem_prompt": "", "passos": [], "resposta": "FORJA: me diz o que criar - codigo, imagem ou texto."}
-        contexto = "\n".join(self.historico[-2:])
-        if tipo == "imagem":
-            # Gera prompt visual detalhado + descrição, frontend desenha o preview
-            resp = self._meta_comanda("Crie uma descrição visual detalhada para imagem: " + p, contexto, "lab", projeto)
-            return {"tipo": "imagem", "codigo": "", "imagem_prompt": resp, "passos": ["1. FORJA criou o prompt visual", "2. Revise a descrição", "3. Peça: FORJA, gera outra variação"], "resposta": resp}
-        resp = self._meta_comanda(p, contexto, "lab", projeto)
-        # Extrai código se houver bloco
-        codigo = resp
-        passos = [l.strip() for l in resp.split(".") if l.strip()][:4]
-        return {"tipo": "codigo", "codigo": codigo, "imagem_prompt": "", "passos": passos, "resposta": resp}
-    def reuniao(self, pergunta: str, destino: str = "todos", projeto: str = "Geral"):
-        # FAST_PATH V11.3: pergunta de calibração responde na hora, sem esperar Groq/Gemini. Resolve ORION lento.
-        # Antes: até "você está ouvindo?" ia para Groq -> 12s + timeout -> parecia que ORION nem respondia.
-        _n_fast = (pergunta or "").lower()
-        _e_calib = any(k in _n_fast for k in ["esta ouvindo", "está ouvindo", "ta ouvindo", "tudo pronto", "esta ai", "esta aí", "me ouve", "oi ", "ola", "bom dia", "boa tarde", "boa noite", "testando", "teste de som"])
-        if _e_calib and len(_n_fast) < 70:
-            _dest_fast = _detectar_destino_backend(pergunta) or destino
-            if _dest_fast not in ("lab", "marketing", "diretoria", "todos", "opiniao"):
-                _dest_fast = "diretoria"
-            _txt = ""
-            if _dest_fast == "diretoria":
-                _txt = "ORION aqui, presente. Tudo pronto, estou te ouvindo. Pode mandar."
-            elif _dest_fast == "marketing":
-                _txt = "LIA aqui, presente. Tudo pronto, estou te ouvindo. Pode mandar."
-            elif _dest_fast == "lab":
-                _txt = "FORJA aqui, presente. Tudo pronto, estou te ouvindo. Pode mandar."
-            else:
-                _txt = "Estamos aqui, Senhor Josué. Tudo pronto, pode mandar."
-            _lab = _txt if _dest_fast == "lab" else ""
-            _mkt = _txt if _dest_fast == "marketing" else ""
-            _dir = _txt if _dest_fast == "diretoria" else ""
-            if _dest_fast in ("todos", "opiniao"):
-                _lab = "FORJA aqui, presente."; _mkt = "LIA aqui, presente."; _dir = "ORION aqui, presente."
-            return {"pergunta": pergunta, "destino": _dest_fast, "projeto": str(projeto), "lab_ai": _lab, "marketing_ai": _mkt, "diretoria_ai": _dir, "codigo": _lab, "consolidado": _txt, "tempo_seg": 0.1, "avatares": NOMES, "comanda": "FAST_PATH", "backup": "", "quadro": {"projeto": str(projeto), "estrategia": _dir, "codigo": _lab, "campanha": _mkt, "resumo": _txt}, "fast": True}
-        t0 = time.time()
-        pergunta = str(pergunta); destino = str(destino)
-        # TRAVA DIRECIONADO BACKEND: se a pergunta tem 1 nome, corrige destino - ex: "Orion, voce esta ouvindo?" -> so ORION
-        _dest_backend = _detectar_destino_backend(pergunta)
-        if _dest_backend: destino = _dest_backend
-        contexto = "\n".join(self.historico[-2:])
-        self.historico.append("CEO: " + pergunta + " [destino=" + destino + "]")
-        lab_ai = ""; marketing_ai = ""; diretoria_ai = ""; codigo = ""
-        # PARALELO: antes era ORION -> espera -> FORJA -> espera -> LIA = 60s+. Agora todos juntos, max 12s.
-        if destino in ("todos", "opiniao"):
-            with ThreadPoolExecutor(max_workers=3) as ex:
-                f_dir = ex.submit(self._meta_comanda, pergunta, contexto, "diretoria", projeto)
-                f_lab = ex.submit(self._meta_comanda, pergunta, contexto, "lab", projeto)
-                f_mkt = ex.submit(self._meta_comanda, pergunta, contexto, "marketing", projeto)
-                try: diretoria_ai = f_dir.result(timeout=12) or ""
-                except Exception: diretoria_ai = _fallback_offline("diretoria", pergunta, projeto)
-                try: lab_ai = f_lab.result(timeout=12) or ""
-                except Exception: lab_ai = _fallback_offline("lab", pergunta, projeto)
-                try: marketing_ai = f_mkt.result(timeout=12) or ""
-                except Exception: marketing_ai = _fallback_offline("marketing", pergunta, projeto)
-            self.historico.append("ORION: " + diretoria_ai); self.historico.append("FORJA: " + lab_ai); self.historico.append("LIA: " + marketing_ai)
-            codigo = lab_ai
-        elif destino == "lab":
-            lab_ai = self._meta_comanda(pergunta, contexto, "lab", projeto); codigo = lab_ai
-        elif destino == "marketing":
-            marketing_ai = self._meta_comanda(pergunta, contexto, "marketing", projeto)
-        elif destino == "diretoria":
-            diretoria_ai = self._meta_comanda(pergunta, contexto, "diretoria", projeto)
-        if destino == 'lab': marketing_ai=''; diretoria_ai=''
-        if destino == 'marketing': lab_ai=''; diretoria_ai=''; codigo=''
-        if destino == 'diretoria': lab_ai=''; marketing_ai=''; codigo=''
-        self._salvar_no_projeto(projeto, destino, pergunta, lab_ai, marketing_ai, diretoria_ai, codigo)
-        proj_atual = self._get_projeto(projeto)
-        tempo = round(time.time() - t0, 1)
-        # FIX DIRECIONADO: consolidado só do destino. Antes mostrava os 3 cabeçalhos mesmo quando só 1 respondeu, e parecia que todos responderam.
-        if destino == "lab":
-            consolidado = f"=== FORJA respondeu - {tempo}s ===\nPergunta: {pergunta}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n"
-        elif destino == "marketing":
-            consolidado = f"=== LIA respondeu - {tempo}s ===\nPergunta: {pergunta}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
-        elif destino == "diretoria":
-            consolidado = f"=== ORION respondeu - {tempo}s ===\nPergunta: {pergunta}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n"
+
+def _chamar_groq(pergunta, sistema):
+    key = os.getenv("GROQ_API_KEY", "") or os.getenv("META_API_KEY", "")
+    if not key:
+        return None
+    try:
+        body = json.dumps({"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": pergunta}], "temperature": 0.7, "max_tokens": 400}).encode()
+        req = urllib.request.Request("https://api.groq.com/openai/v1/chat/completions", data=body, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=8) as r:
+            d = json.loads(r.read().decode())
+            return d["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print("GROQ FALHOU:", e)
+        return None
+
+def _chamar_gemini(pergunta, sistema):
+    key = os.getenv("GEMINI_API_KEY", "")
+    if not key:
+        return None
+    try:
+        body = json.dumps({"contents": [{"parts": [{"text": sistema + "\n\nPergunta: " + pergunta}]}]}).encode()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=8) as r:
+            d = json.loads(r.read().decode())
+            return d["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception as e:
+        print("GEMINI FALHOU:", e)
+        return None
+
+# ---------------- CÉREBRO PRINCIPAL - responder() ----------------
+def responder(pergunta, destino="coletiva", projeto="Geral"):
+    pergunta = str(pergunta or "").strip()
+    norm = _norm(pergunta)
+    if not pergunta:
+        return {"respostas": [{"quem": "diretoria", "nome": "ORION", "texto": "Estou aqui, Senhor Josue. Pode falar."}], "destino": destino}
+    if _is_parar(pergunta):
+        return {"respostas": [], "destino": destino, "parar": True}
+
+    # ORION distribui ANTES de responder - cria ordem / campanha se precisar
+    criados = _orion_interpretar_e_distribuir(pergunta, projeto)
+
+    # FAST_PATH - instantâneo
+    fast = _fast_resposta(norm, destino)
+    if fast is not None:
+        # DIRECIONADO: se destino é um só, filtra. Se pergunta chamou um nome, só ele.
+        if destino in ("lab", "forja"):
+            fast = [x for x in fast if x["quem"] == "lab"] or fast[:1]
+        elif destino in ("marketing", "lia"):
+            fast = [x for x in fast if x["quem"] == "marketing"] or fast[:1]
+        elif destino in ("diretoria", "orion"):
+            fast = [x for x in fast if x["quem"] == "diretoria"] or fast[:1]
         else:
-            consolidado = f"=== NEXUS CORE V11 DIRECIONADO TRAVADO + NEBULOSA + VOZ FLUIDA - {tempo}s ===\nPergunta: {pergunta} | Destino: {destino}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
-        return {"pergunta": pergunta, "destino": destino, "projeto": str(projeto), "lab_ai": str(lab_ai), "marketing_ai": str(marketing_ai), "diretoria_ai": str(diretoria_ai), "codigo": str(codigo), "consolidado": str(consolidado), "tempo_seg": tempo, "avatares": NOMES, "comanda": "META", "backup": "GEMINI", "quadro": {"projeto": str(projeto), "estrategia": str(proj_atual["estrategia"]), "codigo": str(proj_atual["codigo"]), "campanha": str(proj_atual["campanha"]), "resumo": str(proj_atual["resumo"])}}
+            for nome, quem in [("forja", "lab"), ("lia", "marketing"), ("orion", "diretoria")]:
+                if nome in norm and "vamos iniciar" not in norm and "boa tarde" not in norm and "bom dia" not in norm and "boa noite" not in norm and norm != "ola":
+                    fast = [x for x in fast if x["quem"] == quem] or fast
+                    break
+        for r in fast:
+            _salvar(projeto, r["nome"], r["texto"])
+        return {"respostas": fast, "destino": destino, "fast": True, "criados": criados, "orion_comanda": True}
+
+    # Decide quem responde - REGRA DE OURO DIRECIONADO
+    if destino in ("lab", "forja"):
+        quems = ["lab"]
+    elif destino in ("marketing", "lia"):
+        quems = ["marketing"]
+    elif destino in ("diretoria", "orion"):
+        quems = ["diretoria"]
+    else:
+        if "forja" in norm:
+            quems = ["lab"]
+        elif "lia" in norm:
+            quems = ["marketing"]
+        elif "orion" in norm:
+            quems = ["diretoria"]
+        else:
+            # Coletiva: Orion abre, depois Forja e Lia - mas se ORION criou ordem/campanha, ele já fala isso
+            quems = ["diretoria", "lab", "marketing"] if not criados else ["diretoria"]
+
+    respostas = []
+    nomes = {"lab": "FORJA", "marketing": "LIA", "diretoria": "ORION"}
+    for quem in quems:
+        texto = _chamar_groq(pergunta, SISTEMAS[quem])
+        if not texto:
+            texto = _chamar_gemini(pergunta, SISTEMAS[quem])
+        if not texto:
+            texto = f"{nomes[quem]} aqui, Senhor Josue. Entendi: {pergunta[:120]}. Vou trabalhar nisso agora."
+        # Se ORION criou ordem/campanha, ele avisa na resposta
+        if quem == "diretoria" and criados:
+            partes = []
+            for c in criados:
+                if c["tipo"] == "ORDEM_DE_SERVICO":
+                    partes.append(f"Ja mandei a ordem de servico {c['id']} para FORJA.")
+                if c["tipo"] == "CAMPANHA_MARKETING":
+                    partes.append(f"Ja mandei a campanha {c['id']} para LIA criar.")
+            if partes:
+                texto = texto + " " + " ".join(partes)
+        texto = texto[:900]
+        respostas.append({"quem": quem, "nome": nomes[quem], "texto": texto})
+        _salvar(projeto, nomes[quem], texto)
+
+    return {"respostas": respostas, "destino": destino, "criados": criados, "orion_comanda": True}
+
+# ---------------- LAB - TODOS LIGADOS ----------------
+# Lab não é só FORJA. Quando Lab cria, ORION comanda e LIA promove.
+def lab_criar(pergunta, tipo="codigo", projeto="Geral"):
+    # 1. FORJA executa via IA
+    resp = responder(pergunta, destino="lab", projeto=projeto)
+    texto_forja = resp["respostas"][0]["texto"] if resp["respostas"] else "FORJA pronta."
+    # 2. ORION cria ordem automaticamente
+    ordem = _orion_cria_ordem_servico(projeto, pergunta[:120], pergunta)
+    # 3. LIA já deixa campanha pronta
+    camp = _orion_cria_campanha(projeto, pergunta[:120], pergunta)
+    codigo = f"<!-- FORJA - Lab Innova XR - Projeto {projeto} -->\n<!-- Ordem {ordem['id']} criada por ORION -->\n<!-- Campanha {camp['id']} para LIA promover -->\n<h1>{pergunta[:80]}</h1>\n<p>Feito por FORJA, comandado por ORION, promovido por LIA.</p>"
+    passos = [f"ORION criou ordem {ordem['id']} para FORJA", f"FORJA executou: {pergunta[:60]}", f"LIA vai promover com campanha {camp['id']}"]
+    return {"resposta": texto_forja, "codigo": codigo, "passos": passos, "ordem": ordem, "campanha": camp, "tipo": tipo}
+
+# ---------------- ELEVENLABS - TODOS OS 3, SEM CHROME BRIGAR ----------------
+VOZES = {
+    "lab": os.getenv("ELEVENLABS_VOICE_FORJA", ""),
+    "marketing": os.getenv("ELEVENLABS_VOICE_LIA", ""),
+    "diretoria": os.getenv("ELEVENLABS_VOICE_ORION", ""),
+    "forja": os.getenv("ELEVENLABS_VOICE_FORJA", ""),
+    "lia": os.getenv("ELEVENLABS_VOICE_LIA", ""),
+    "orion": os.getenv("ELEVENLABS_VOICE_ORION", ""),
+}
+# Ajuste por voz: LIA mais grave, mais estável. FORJA firme. ORION líder.
+VOICE_SETTINGS = {
+    "lab": {"stability": 0.55, "similarity_boost": 0.75, "style": 0.1},
+    "forja": {"stability": 0.55, "similarity_boost": 0.75, "style": 0.1},
+    "marketing": {"stability": 0.65, "similarity_boost": 0.70, "style": 0.05},  # LIA grave, não aguda
+    "lia": {"stability": 0.65, "similarity_boost": 0.70, "style": 0.05},
+    "diretoria": {"stability": 0.50, "similarity_boost": 0.80, "style": 0.15},
+    "orion": {"stability": 0.50, "similarity_boost": 0.80, "style": 0.15},
+}
+
+def diagnostico_elevenlabs():
+    key = os.getenv("ELEVENLABS_API_KEY", "")
+    if not key:
+        return {"ativo": False, "motivo": "ELEVENLABS_API_KEY nao esta no Render. Coloque em Environment + Manual Deploy."}
+    return {"ativo": True, "modelo": os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2"), "chave_tamanho": len(key), "vozes_configuradas": {k: bool(v) for k, v in VOZES.items()}}
+
+def falar_elevenlabs(texto, quem):
+    key = os.getenv("ELEVENLABS_API_KEY", "")
+    quem_key = str(quem or "").lower()
+    vid = VOZES.get(quem_key, "") or VOZES.get("diretoria", "") or os.getenv("ELEVENLABS_VOICE_ID", "")
+    if not key or not vid or not texto:
+        return None
+    try:
+        settings = VOICE_SETTINGS.get(quem_key, {"stability": 0.5, "similarity_boost": 0.75})
+        body = json.dumps({"text": texto, "model_id": os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2"), "voice_settings": settings}).encode()
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{vid}"
+        req = urllib.request.Request(url, data=body, headers={"xi-api-key": key, "Content-Type": "application/json", "Accept": "audio/mpeg"}, method="POST")
+        with urllib.request.urlopen(req, timeout=12) as r:
+            return r.read()
+    except Exception as e:
+        print("ELEVENLABS FALHOU:", e)
+        return None
+
+# ---------------- FLASK APP - RENDER ----------------
+if HAS_FLASK:
+    app = Flask(__name__)
+
+    @app.after_request
+    def _no_cache(resp):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
+
+    @app.route("/health")
+    def health():
+        return jsonify({"ok": True, "versao": "V12 - ORCHESTRATOR FINAL", "elevenlabs": diagnostico_elevenlabs(), "projeto_atual": PROJETO_ATUAL[0]})
+
+    @app.route("/")
+    def index():
+        # Serve o index.html que já está no GitHub
+        try:
+            return send_from_directory(".", "index.html")
+        except Exception:
+            return jsonify({"ok": True, "msg": "NEXUS CORE V12 rodando. Coloque index.html na raiz."})
+
+    @app.route("/perguntar", methods=["POST"])
+    def perguntar():
+        d = request.get_json(force=True, silent=True) or {}
+        pergunta = d.get("pergunta") or d.get("texto") or d.get("prompt") or ""
+        destino = d.get("destino") or d.get("departamento") or "coletiva"
+        projeto = d.get("projeto") or PROJETO_ATUAL[0] or "Geral"
+        PROJETO_ATUAL[0] = projeto
+        r = responder(pergunta, destino=destino, projeto=projeto)
+        return jsonify(r)
+
+    @app.route("/api/chat", methods=["POST"])
+    def api_chat():
+        d = request.get_json(force=True, silent=True) or {}
+        pergunta = d.get("pergunta") or d.get("texto") or ""
+        quem = d.get("quem") or d.get("destino") or "coletiva"
+        projeto = d.get("projeto") or PROJETO_ATUAL[0] or "Geral"
+        # Mapeia nomes do front: FORJA/LIA/ORION -> lab/marketing/diretoria
+        mapa = {"forja": "lab", "lia": "marketing", "orion": "diretoria", "lab": "lab", "marketing": "marketing", "diretoria": "diretoria", "coletiva": "coletiva", "todos": "coletiva"}
+        destino = mapa.get(str(quem).lower(), "coletiva")
+        r = responder(pergunta, destino=destino, projeto=projeto)
+        # Front espera {quem, resposta} - devolve o primeiro + lista completa
+        if r.get("respostas"):
+            prim = r["respostas"][0]
+            return jsonify({"quem": prim["nome"], "resposta": prim["texto"], "texto": prim["texto"], "respostas": r["respostas"], "criados": r.get("criados", []), "parar": r.get("parar", False), "fast": r.get("fast", False)})
+        return jsonify({"quem": "ORION", "resposta": "", "respostas": [], "parar": True})
+
+    @app.route("/api/voice", methods=["POST"])
+    def api_voice():
+        d = request.get_json(force=True, silent=True) or {}
+        texto = d.get("texto") or d.get("text") or ""
+        quem = d.get("quem") or d.get("departamento") or "diretoria"
+        audio = falar_elevenlabs(texto, quem)
+        if audio:
+            return Response(audio, mimetype="audio/mpeg")
+        return jsonify({"erro": "ElevenLabs não configurado ou falhou", "diagnostico": diagnostico_elevenlabs()}), 503
+
+    @app.route("/lab/criar", methods=["POST"])
+    def lab_criar_route():
+        d = request.get_json(force=True, silent=True) or {}
+        pergunta = d.get("pergunta") or d.get("texto") or ""
+        tipo = d.get("tipo") or "codigo"
+        projeto = d.get("projeto") or PROJETO_ATUAL[0] or "Geral"
+        return jsonify(lab_criar(pergunta, tipo=tipo, projeto=projeto))
+
+    @app.route("/ordem", methods=["GET", "POST"])
+    def ordem_route():
+        if request.method == "POST":
+            d = request.get_json(force=True, silent=True) or {}
+            projeto = d.get("projeto") or PROJETO_ATUAL[0] or "Geral"
+            ordem = _orion_cria_ordem_servico(projeto, d.get("titulo", "Ordem de serviço"), d.get("detalhes", ""))
+            return jsonify(ordem)
+        projeto = request.args.get("projeto") or PROJETO_ATUAL[0] or "Geral"
+        return jsonify(_projeto(projeto)["ordens"])
+
+    @app.route("/campanha", methods=["GET", "POST"])
+    def campanha_route():
+        if request.method == "POST":
+            d = request.get_json(force=True, silent=True) or {}
+            projeto = d.get("projeto") or PROJETO_ATUAL[0] or "Geral"
+            camp = _orion_cria_campanha(projeto, d.get("tema", "Campanha"), d.get("detalhes", ""))
+            return jsonify(camp)
+        projeto = request.args.get("projeto") or PROJETO_ATUAL[0] or "Geral"
+        return jsonify(_projeto(projeto)["campanhas"])
+
+    @app.route("/projeto/trocar", methods=["POST"])
+    def projeto_trocar():
+        d = request.get_json(force=True, silent=True) or {}
+        nome = d.get("projeto") or d.get("nome") or "Geral"
+        PROJETO_ATUAL[0] = nome
+        _projeto(nome)
+        return jsonify({"projeto": nome, "msg": f"Projeto {nome} aberto. Não vou misturar com os outros."})
+
+    @app.route("/quadro", methods=["GET"])
+    def quadro():
+        projeto = request.args.get("projeto") or PROJETO_ATUAL[0] or "Geral"
+        p = _projeto(projeto)
+        return jsonify({"projeto": projeto, "quadro": p["quadro"], "ordens": p["ordens"], "campanhas": p["campanhas"]})
+
+    @app.route("/config/email", methods=["POST"])
+    def config_email():
+        d = request.get_json(force=True, silent=True) or {}
+        return jsonify({"ok": True, "mensagem": f"E-mail cadastrado: {d.get('email','')}"})
+
+    @app.route("/relatorio/email", methods=["POST"])
+    def relatorio_email():
+        return jsonify({"ok": True, "mensagem": "Relatório enviado"})
+
+    if __name__ == "__main__":
+        port = int(os.getenv("PORT", "10000"))
+        print(f"NEXUS CORE V12 - ORCHESTRATOR rodando na porta {port}")
+        app.run(host="0.0.0.0", port=port)

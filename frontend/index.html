@@ -81,12 +81,24 @@ button{padding:12px 14px;border:0;border-radius:12px;cursor:pointer;font-weight:
 .card-dept{background:rgba(15,23,42,.9);border:1px solid rgba(0,240,255,.2);border-radius:16px;padding:16px;margin:14px 0}
 .passo{background:#020617;border-left:4px solid var(--neon);padding:12px;margin:8px 0;border-radius:8px} .passo.marketing{border-color:var(--pink)} .passo.diretoria{border-color:var(--gold)}
 @media(max-width:900px){main{grid-template-columns:1fr}.avatares{grid-template-columns:1fr}}
+/* V11.3 VISUAL SOFISTICADO - estilo Meta AI / Alexa: bolhas de chat, orb central, menos poluição */
+body{background:radial-gradient(1200px 600px at 50% -10%, rgba(0,240,255,.12), transparent), #020617 !important}
+.msg{border-radius:18px !important; padding:12px 14px !important; max-width:88% !important; line-height:1.5 !important; font-size:14px !important}
+.msg.ceo{background:linear-gradient(135deg,#00f0ff,#0ea5e9) !important; color:#000 !important; align-self:flex-end !important; margin-left:auto !important}
+.msg.lab{background:rgba(0,240,255,.12) !important; border:1px solid rgba(0,240,255,.35) !important}
+.msg.marketing{background:rgba(255,45,149,.12) !important; border:1px solid rgba(255,45,149,.35) !important}
+.msg.diretoria{background:rgba(255,212,0,.12) !important; border:1px solid rgba(255,212,0,.35) !important}
+.avatar{box-shadow:0 10px 30px rgba(0,0,0,.4) !important; border-radius:24px !important}
+.avatar.falando{transform:scale(1.03) !important}
+.panel{border-radius:24px !important}
+button{border-radius:999px !important}
+input, select{border-radius:999px !important}
 </style></head>
 <div id="badgeVersao" style="position:fixed;top:6px;left:6px;z-index:99999;background:#00f0ff;color:#000;font-weight:900;font-size:11px;padding:4px 8px;border-radius:999px">V11 • ELEVENLABS • NEBULOSA</div><body>
 <div id="telaLoading" onclick="destravarLoading()" style="position:fixed;inset:0;background:#030712;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;cursor:pointer"><div style="font-family:Orbitron;font-size:32px;letter-spacing:4px">NEXUS <b style="color:#00f0ff">CORE</b></div><div style="color:#a78bfa;letter-spacing:3px;font-size:12px;margin-top:6px">BY INNOVA XR • FORJA • LIA • ORION</div><div style="margin-top:22px;width:200px;height:6px;background:#1e293b;border-radius:10px;overflow:hidden"><div id="barraLoading" style="height:100%;width:0;background:#00f0ff;transition:width .3s"></div></div><div style="margin-top:10px;font-size:13px;color:#94a3b8">Carregando Nexus Core...</div><div style="margin-top:14px;font-size:12px;color:#64748b">Se travar, toque na tela para entrar</div><button onclick="destravarLoading()" style="margin-top:12px;background:#00f0ff;color:#000;border:0;border-radius:12px;padding:12px 20px;font-weight:900">ENTRAR AGORA</button></div>
 <div id="telaLogin" style="position:fixed;inset:0;background:#030712;z-index:9998;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px"><div style="font-family:Orbitron;font-size:28px;letter-spacing:3px">NEXUS <b style="color:#00f0ff">CORE</b></div><div style="color:#94a3b8;font-size:12px;letter-spacing:2px;margin:8px 0 18px">USO EXCLUSIVO INNOVA XR • FAÇA LOGIN</div><div style="background:rgba(15,23,42,.9);border:1px solid rgba(0,240,255,.3);border-radius:18px;padding:18px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:10px"><label style="font-size:12px;color:#94a3b8">LOGIN</label><input id="loginUsuario" placeholder="Ex: Josue"><label style="font-size:12px;color:#94a3b8">SENHA</label><input id="loginSenha" type="password" placeholder="Senha"><button class="primario" onclick="entrar()">ENTRAR NO NEXUS CORE</button><div id="loginErro" style="color:#fca5a5;font-size:13px;min-height:16px"></div><div style="font-size:11px;color:#64748b">Login: Josue / Senha: InnovaXR2026</div></div></div>
 <button id="btnPararFixo" onclick="pararTudoImediato()" style="position:fixed;bottom:18px;right:18px;z-index:999;background:#ef4444;color:#fff;border:0;border-radius:50px;padding:16px 20px;font-weight:900;font-size:15px;box-shadow:0 0 25px rgba(239,68,68,.7);display:none">⏹ PARA</button>
-<header><div><div class="logo">NEXUS <b>CORE</b> <span>// FUTURE WORKSPACE</span></div><div style="font-size:11px;letter-spacing:2px;color:#94a3b8">BY INNOVA XR • V11.1 ELEVENLABS DIAGNÓSTICO + TUDO ANTERIOR • META COMANDA</div></div><div style="display:flex;gap:10px;align-items:center"><div class="hud"><i></i> SYSTEM ONLINE</div><div class="badge off" id="badgeStatus">● SALA FECHADA • IAs OFFLINE</div></div></header>
+<header><div><div class="logo">NEXUS <b>CORE</b> <span>// FUTURE WORKSPACE</span></div><div style="font-size:11px;letter-spacing:2px;color:#94a3b8">BY INNOVA XR • V11.3 RÁPIDO + SOLO + VISUAL + MARCA D'ÁGUA + TUDO ANTERIOR • META COMANDA</div></div><div style="display:flex;gap:10px;align-items:center"><div class="hud"><i></i> SYSTEM ONLINE</div><div class="badge off" id="badgeStatus">● SALA FECHADA • IAs OFFLINE</div></div></header>
 <main>
 <section class="panel">
 <div id="barraProjetos" style="background:#020617;border:1px solid #00f0ff;border-radius:14px;padding:12px;margin-bottom:12px"><div style="font-family:Orbitron;font-size:12px;letter-spacing:2px;color:#00f0ff">📁 PROJETO ATUAL: <span id="projetoAtualLabel" style="color:#ffd400">Geral</span> — os 3 estão cientes deste projeto e cruzam dados</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><input id="novoProjeto" placeholder="Nome do projeto - Ex: App de Escola" style="flex:1;min-width:180px"><button class="primario" onclick="criarProjeto()">+ NOVO PROJETO</button><select id="seletorProjeto" onchange="trocarProjeto(this.value)" style="min-width:160px"><option value="Geral">Geral</option></select><button class="sec" onclick="verQuadro()">👁 QUADRO</button></div><div id="quadroBox" style="display:none;margin-top:10px;background:rgba(15,23,42,.9);border-radius:10px;padding:10px;font-size:13px;line-height:1.5"></div></div>
@@ -100,7 +112,14 @@ button{padding:12px 14px;border:0;border-radius:12px;cursor:pointer;font-weight:
 </div>
 <div class="controles">
 <button class="primario" onclick="comecarReuniao()">▶ COMEÇAR REUNIÃO</button>
-<button class="sec" onclick="ouvirVoz()">🎤 FALAR POR VOZ</button><button class="sec" onclick="testarElevenLabs()">🎙️ TESTAR ELEVENLABS</button><button class="sec" onclick="diagnosticoElevenLabs()">🔍 DIAGNÓSTICO ELEVENLABS</button>
+<button class="sec" onclick="ouvirVoz()">🎤 FALAR POR VOZ</button><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+<button class="sec" id="abaColetiva" onclick="trocarAbaReuniao('todos')" style="background:#00f0ff;color:#000;font-weight:900">👥 COLETIVA • TODOS</button>
+<button class="sec" id="abaLab" onclick="trocarAbaReuniao('lab')">🧪 SOLO • FORJA</button>
+<button class="sec" id="abaMarketing" onclick="trocarAbaReuniao('marketing')">📣 SOLO • LIA</button>
+<button class="sec" id="abaDiretoria" onclick="trocarAbaReuniao('diretoria')">👑 SOLO • ORION</button>
+</div>
+<div id="avisoSolo" style="font-size:12px;color:#94a3b8;margin-bottom:8px">Modo atual: COLETIVA — os 3 ouvem. No SOLO, só aquele departamento ouve e responde, os outros ficam mudos.</div>
+<button class="sec" onclick="testarElevenLabs()">🎙️ TESTAR ELEVENLABS (ORION)</button><button class="sec" onclick="testarLia()">🎙️ TESTAR LIA</button><button class="sec" onclick="testarForja()">🎙️ TESTAR FORJA</button><button class="sec" onclick="diagnosticoElevenLabs()">🔍 DIAGNÓSTICO ELEVENLABS</button>
 <button class="sec" onclick="pararVoz()">🔇 PARAR VOZ</button>
 <button class="verde" onclick="enviarRelatorio()">📧 ENVIAR RELATÓRIO</button>
 <button class="perigo" onclick="encerrar()">■ ENCERRAR • DESLIGAR IAs</button>
@@ -197,10 +216,21 @@ function addMsg(quemm,classe,texto){ const alvos=['chat','chatVisivel']; alvos.f
 function setFalando(id,txt){document.querySelectorAll('.avatar').forEach(e=>e.classList.remove('falando'));if(!id)return;document.getElementById('av-'+id).classList.add('falando');document.getElementById('st-'+id).innerText=txt||'FALANDO...'}
 function carregarVozes(){vozes=speechSynthesis.getVoices()} speechSynthesis.onvoiceschanged=carregarVozes; carregarVozes();
 // falar() antiga removida - agora usa filaVoz com corte imediato
-function abrirDept(dept){ deptAberto=dept; document.getElementById('janela-'+dept).classList.add('aberta'); addMsg('SISTEMA','ceo','Você abriu o Departamento '+dept.toUpperCase()+' - janela independente.'); }
+function abrirDept(dept){
+  deptAberto=dept;
+  try{ if(typeof trocarAbaReuniao==='function') trocarAbaReuniao(dept); }catch(e){ try{ modoReuniao=dept; document.getElementById('destino').value=dept; }catch(e2){} }
+  document.getElementById('janela-'+dept).classList.add('aberta');
+  const nomeDept = dept==='lab'?'FORJA':dept==='marketing'?'LIA':'ORION';
+  addMsg('SISTEMA','ceo','💬 Chat particular com '+nomeDept+' — só '+nomeDept+' ouve e responde. Para voltar para todos, aperte 👥 COLETIVA • TODOS.');
+}
 function fecharDept(){ if(deptAberto) document.getElementById('janela-'+deptAberto).classList.remove('aberta'); deptAberto=null; }
 function perguntarDept(dept){ fecharDept(); document.getElementById('destino').value=dept; document.getElementById('pergunta').focus(); addMsg('SISTEMA','ceo','Você está no departamento '+dept+'. Digite ou fale sua pergunta.'); }
-function atualizarJanelas(d){
+function atualizarJanelas(d, destino){
+ // FIX DIRECIONADO: só atualiza a janela de quem respondeu. Antes atualizava as 3 e parecia que todos responderam.
+ const so = destino==='lab'?'lab':destino==='marketing'?'marketing':destino==='diretoria'?'diretoria':null;
+ if(so && so!=='lab') d = {...d, lab_ai:''};
+ if(so && so!=='marketing') d = {...d, marketing_ai:''};
+ if(so && so!=='diretoria') d = {...d, diretoria_ai:''};
  if(d.lab_ai){ document.getElementById('labCodigo').innerText=String(d.codigo||d.lab_ai); const passos=String(d.lab_ai).split('\n').filter(l=>l.trim()).slice(0,6).map((l,i)=>'<div class="passo">Passo '+(i+1)+': '+l+'</div>').join(''); document.getElementById('labPassos').innerHTML=passos||'<div class="passo">Código gerado, ver abaixo.</div>'; document.getElementById('labStatus').innerText='Lab ONLINE - Código atualizado'; }
  if(d.marketing_ai){ document.getElementById('mktConteudo').innerHTML='<div class="passo marketing">'+String(d.marketing_ai)+'</div>'; document.getElementById('mktRelatorio').innerText=String(d.marketing_ai); }
  if(d.diretoria_ai){ document.getElementById('dirConteudo').innerHTML='<div class="passo diretoria">'+String(d.diretoria_ai)+'</div>'; document.getElementById('dirDecisoes').innerText=String(d.diretoria_ai); }
@@ -264,6 +294,12 @@ function detectarDestino(textoOriginal, destinoAtual){
   const norm = corrigirFala(textoOriginal||'');
   if(norm.includes('opiniao')) return 'opiniao';
   if(/\btodos\b/.test(norm)) return 'todos';
+  // FIX DIRECIONADO: fallback substring - Chrome ouve 'Lia' como 'Li a', 'Forja' como 'For ja'. Primeiro que aparecer vence.
+  const normSub = norm.replace(/li a/g,'lia').replace(/for ja/g,'forja').replace(/ori on/g,'orion').replace(/o rion/g,'orion');
+  const sub = [['forja','lab'],['lia','marketing'],['orion','diretoria'],['marketing','marketing'],['diretoria','diretoria'],['laboratorio','lab']];
+  let menorPos = 99999, menorDest = null;
+  for(const [nome,dest] of sub){ const p = normSub.indexOf(nome); if(p>=0 && p<menorPos){ menorPos=p; menorDest=dest; } }
+  if(menorDest) return menorDest;
   if(destinoAtual==='lab'||destinoAtual==='marketing'||destinoAtual==='diretoria') return destinoAtual;
   return 'todos';
 }
@@ -318,7 +354,9 @@ async function falarViaElevenLabs(texto, quem){
     // CORREÇÃO: tenta mesmo se a flag estiver OFF (flag pode estar desatualizada). Se o backend responder com áudio, vale. Se não, cai para navegador.
     // Não bloqueia por flag desatualizada - bloqueia só se o usuário desmarcou o checkbox.
     const ctrl = new AbortController(); const to = setTimeout(()=>ctrl.abort(), 12000);
-    const r = await fetch('/voz/falar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:String(texto).slice(0,900),quem:String(quem||'lab')}),signal:ctrl.signal});
+    const _mapaQuem = {lia:'marketing', forja:'lab', orion:'diretoria', marketing:'marketing', lab:'lab', diretoria:'diretoria', ceo:'diretoria'};
+    const quemNorm = _mapaQuem[String(quem||'lab').toLowerCase()] || 'lab';
+    const r = await fetch('/voz/falar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:String(texto).slice(0,900),quem:quemNorm}),signal:ctrl.signal});
     clearTimeout(to);
     if(!r.ok) return false;
     const ct = r.headers.get('content-type')||'';
@@ -343,6 +381,16 @@ async function diagnosticoElevenLabs(){
     const d = await r.json();
     addMsg('SISTEMA','ceo','Diagnóstico: ativo=' + d.ativo + ' | chave_presente=' + d.chave_presente + ' | tamanho=' + d.chave_tamanho + ' | modelo=' + d.modelo + ' | motivo: ' + d.motivo);
   }catch(e){ addMsg('SISTEMA','ceo','⚠️ Sem conexão com backend. Faça Manual Deploy e espere Live.'); }
+}
+async function testarLia(){
+  addMsg('SISTEMA','ceo','🎙️ Testando ElevenLabs - voz da LIA (Rachel)...');
+  const ok = await falarViaElevenLabs('Olá Senhor Josué, aqui é a LIA, voz ElevenLabs conectada e pronta para criar.', 'marketing');
+  addMsg('SISTEMA','ceo', ok ? '✅ LIA no ElevenLabs! Essa voz feminina que você ouviu é a LIA.' : '⚠️ LIA não respondeu no ElevenLabs. Aperte DIAGNÓSTICO ELEVENLABS.');
+}
+async function testarForja(){
+  addMsg('SISTEMA','ceo','🎙️ Testando ElevenLabs - voz da FORJA (Adam)...');
+  const ok = await falarViaElevenLabs('Olá Senhor Josué, aqui é a FORJA, voz ElevenLabs conectada e pronta para construir.', 'lab');
+  addMsg('SISTEMA','ceo', ok ? '✅ FORJA no ElevenLabs!' : '⚠️ FORJA não respondeu no ElevenLabs.');
 }
 async function testarElevenLabs(){
   addMsg('SISTEMA','ceo','🎙️ Testando ElevenLabs - voz do ORION...');
@@ -370,7 +418,13 @@ async function tocarProximaVoz(){
     if(!filaVoz.length && btn) btn.style.display='none';
     setTimeout(tocarProximaVoz,200); return;
   }
-  // 2) Fallback: voz do navegador (se ElevenLabs sem chave / sem crédito / erro)
+  // V11.3 FIX: Chrome NÃO intervém. Se ElevenLabs está ON, não usa voz do navegador.
+  // Antes: ElevenLabs falhava 1x e o Chrome entrava por cima, com voz masculina para LIA, e parecia que todos falavam.
+  if(elevenLabsAtivo && document.getElementById('vozElevenLabs')?.checked){
+    addMsg('SISTEMA','ceo','⚠️ ElevenLabs não respondeu e voz do Chrome está bloqueada. Aperte DIAGNÓSTICO ELEVENLABS.');
+    falandoAgora=false; setFalando(null); setTimeout(tocarProximaVoz,200); return;
+  }
+  // 2) Fallback: voz do navegador (só se ElevenLabs estiver OFF de verdade)
   const u=new SpeechSynthesisUtterance(humanizarTexto(item.texto));
   const variacao = (Math.random()*0.12-0.06);
   u.lang='pt-BR';
@@ -423,7 +477,19 @@ function pararVoz(){ pararTudoImediato(); modoVozContinua=false; }
 function interromperAgora(){ pararTudoImediato(); }
 
 
-async function enviar(){ if(!reuniaoAtiva){ addMsg('SISTEMA','ceo','⚠️ Reunião encerrada. Clique em Começar Reunião.'); return; } let p=document.getElementById('pergunta').value.trim(); if(!p) return alert('Digite ou fale o comando'); let destino=detectarDestino(p, document.getElementById('destino').value); p=corrigirFala(p); addMsg('VOCÊ (CEO)','ceo',p+' → ['+destino+']'); document.getElementById('pergunta').value=''; addMsg('SISTEMA','ceo','⏳ Pensando... FORJA + LIA + ORION respondendo em paralelo (max 12s)...'); try{ const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(), 22000); const r=await fetch('/perguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pergunta:String(p),destino:String(destino),projeto:String(projetoAtual||'Geral')}),signal:ctrl.signal}); clearTimeout(to); const d=await r.json(); let fila=[]; if(d.lab_ai) fila.push(['lab','FORJA • Lab',d.lab_ai]); if(d.marketing_ai) fila.push(['marketing','LIA • Marketing',d.marketing_ai]); if(d.diretoria_ai) fila.push(['diretoria','ORION • Diretoria',d.diretoria_ai]); if(destino==='lab') fila=fila.filter(x=>x[0]==='lab'); if(destino==='marketing') fila=fila.filter(x=>x[0]==='marketing'); if(destino==='diretoria') fila=fila.filter(x=>x[0]==='diretoria'); fila.forEach(f=>addMsg(f[1],f[0],String(f[2]))); if(d.consolidado) document.getElementById('planoOut').innerText=String(d.consolidado); if(d.codigo) document.getElementById('codigoOut').innerText=String(d.codigo); atualizarJanelas(d); if(d.quadro) mostrarQuadro(d.quadro); falarFilaOrdem(fila); }catch(e){ addMsg('ERRO','ceo','Falha ao conectar. '+String(e)); } }
+let modoReuniao = 'todos'; // V11.3: 'todos' = coletiva, 'lab'/'marketing'/'diretoria' = solo
+function trocarAbaReuniao(modo){
+  modoReuniao = modo;
+  document.getElementById('destino').value = modo;
+  const nomes = {todos:'COLETIVA — os 3 ouvem', lab:'SOLO • FORJA — só FORJA ouve', marketing:'SOLO • LIA — só LIA ouve', diretoria:'SOLO • ORION — só ORION ouve'};
+  document.getElementById('avisoSolo').innerText = 'Modo atual: ' + nomes[modo];
+  // Visual: destaca a aba ativa
+  ['abaColetiva','abaLab','abaMarketing','abaDiretoria'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.background=''; });
+  const ativa = {todos:'abaColetiva', lab:'abaLab', marketing:'abaMarketing', diretoria:'abaDiretoria'}[modo];
+  const btnAtivo = document.getElementById(ativa); if(btnAtivo) btnAtivo.style.background='#00f0ff';
+  addMsg('SISTEMA','ceo','🔄 Modo: ' + nomes[modo]);
+}
+async function enviar(){ if(!reuniaoAtiva){ addMsg('SISTEMA','ceo','⚠️ Reunião encerrada. Clique em Começar Reunião.'); return; } let p=document.getElementById('pergunta').value.trim(); if(!p) return alert('Digite ou fale o comando'); let destino=detectarDestino(p, document.getElementById('destino').value); if(modoReuniao!=='todos') destino=modoReuniao; // V11.3 SOLO trava: no SOLO, nunca volta para todos p=corrigirFala(p); addMsg('VOCÊ (CEO)','ceo',p+' → ['+destino+']'); document.getElementById('pergunta').value=''; addMsg('SISTEMA','ceo','⏳ Pensando... ' + (destino==='lab'?'só FORJA respondendo':destino==='marketing'?'só LIA respondendo':destino==='diretoria'?'só ORION respondendo':'FORJA + LIA + ORION respondendo em paralelo') + ' (max 12s)...'); try{ const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(), 22000); const r=await fetch('/perguntar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pergunta:String(p),destino:String(destino),projeto:String(projetoAtual||'Geral')}),signal:ctrl.signal}); clearTimeout(to); const d=await r.json(); let fila=[]; if(d.lab_ai) fila.push(['lab','FORJA • Lab',d.lab_ai]); if(d.marketing_ai) fila.push(['marketing','LIA • Marketing',d.marketing_ai]); if(d.diretoria_ai) fila.push(['diretoria','ORION • Diretoria',d.diretoria_ai]); if(destino==='lab') fila=fila.filter(x=>x[0]==='lab'); if(destino==='marketing') fila=fila.filter(x=>x[0]==='marketing'); if(destino==='diretoria') fila=fila.filter(x=>x[0]==='diretoria'); fila.forEach(f=>addMsg(f[1],f[0],String(f[2]))); if(d.consolidado) document.getElementById('planoOut').innerText=String(d.consolidado); if(d.codigo) document.getElementById('codigoOut').innerText=String(d.codigo); atualizarJanelas(d, destino); if(d.quadro) mostrarQuadro(d.quadro); falarFilaOrdem(fila); }catch(e){ addMsg('ERRO','ceo','Falha ao conectar. '+String(e)); } }
 function encerrar(){ reuniaoAtiva=false; boasVindasJaFalou=false; filaVoz=[]; falandoAgora=false; if(intervaloMic) clearInterval(intervaloMic); if(recognition){ try{recognition.stop()}catch(e){} recognition=null; } try{speechSynthesis.cancel()}catch(e){} document.querySelectorAll('.avatar').forEach(e=>{e.classList.remove('falando'); e.classList.add('offline')}); ['lab','marketing','diretoria'].forEach(k=>document.getElementById('st-'+k).innerText='OFFLINE'); document.getElementById('badgeStatus').innerText='● SALA FECHADA • IAs OFFLINE'; document.getElementById('badgeStatus').classList.add('off'); const b=document.getElementById('btnPararFixo'); if(b) b.style.display='none'; fecharDept(); addMsg('SISTEMA','ceo','✅ Reunião encerrada.'); setTimeout(iniciarEscutaAcordar,500); }
 async function salvarEmail(){ const email=document.getElementById('meuEmail').value.trim(); const nome=document.getElementById('meuNome').value.trim(); if(!email||!email.includes('@')) return alert('Digite um e-mail válido'); try{ localStorage.setItem('nexus_email',email); localStorage.setItem('nexus_nome',nome); }catch(e){} try{ const r=await fetch('/config/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:String(email),nome:String(nome||'CEO')})}); const d=await r.json(); document.getElementById('emailStatus').innerText='✅ E-mail cadastrado: '+email; }catch(e){ document.getElementById('emailStatus').innerText='⚠️ E-mail salvo localmente: '+email; } }
 async function enviarRelatorio(){ const email=(localStorage.getItem('nexus_email')||document.getElementById('meuEmail').value||'').trim(); if(!email) return alert('Cadastre seu e-mail primeiro'); addMsg('SISTEMA','ceo','Enviando relatório para '+email+'...'); try{ const r=await fetch('/relatorio/email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:String(email),conteudo:String(ultimoConsolidado||'')})}); const d=await r.json(); addMsg('NEXUS CORE','ceo','📧 '+String(d.mensagem||'Relatório enviado')); }catch(e){ addMsg('ERRO','ceo','Falha: '+String(e)); } }
@@ -480,4 +546,7 @@ setTimeout(()=>{ destravarLoading(); }, 3000);
 
 try{ document.getElementById('vozSempre').addEventListener('change', (e)=>{ modoVozContinua = e.target.checked; if(modoVozContinua && reuniaoAtiva){ iniciarVozContinua(); keepAliveMic(); } else if(!modoVozContinua){ try{ if(recognition) recognition.stop(); }catch(err){} } }); }catch(e){}
 </script>
+<div id="marcaDaguaNexus" onclick="mostrarRegistro()" style="position:fixed;bottom:8px;right:8px;z-index:99999;background:rgba(2,6,23,.85);border:1px solid rgba(0,240,255,.4);color:#e2e8f0;font-size:10px;line-height:1.3;padding:6px 10px;border-radius:999px;cursor:pointer;backdrop-filter:blur(8px)">NEXUS CORE • V11.3 • Innova XR • clique p/ ver o que mudou</div>
+<div id="painelRegistro" style="display:none;position:fixed;bottom:40px;right:8px;z-index:99999;width:min(360px,92vw);max-height:60vh;overflow:auto;background:rgba(2,6,23,.97);border:1px solid rgba(0,240,255,.5);border-radius:16px;padding:14px;font-size:12px;line-height:1.5;color:#e2e8f0"><b style="color:#00f0ff">📋 REGISTRO OFICIAL • V11.3</b><br><span id="textoRegistro" style="white-space:pre-wrap"></span><br><button class="sec" onclick="document.getElementById('painelRegistro').style.display='none'">FECHAR</button></div>
+<script>function mostrarRegistro(){ const p=document.getElementById('painelRegistro'); p.style.display = p.style.display==='block'?'none':'block'; document.getElementById('textoRegistro').innerText = `V11.3 • RÁPIDO + SOLO + VISUAL + MARCA D'ÁGUA\n• Visual novo estilo Meta/Alexa: bolhas, sua msg à direita, FORJA azul, LIA rosa, ORION dourado, botões redondos, cantos suaves, fundo com brilho\n• Resposta imediata: 'você está ouvindo?', 'tudo pronto?', 'oi' em 0.1s\n• ElevenLabs ON = Chrome bloqueado, não fala por cima\n• Trava dupla direcionado: 'li a'->'lia', 'for ja'->'forja'\n• LIA no ElevenLabs: vazio volta pra Rachel, 'lia'->'marketing'\n• Reunião Coletiva + Solo: avatar ou botão abre chat particular direto\n• /app redireciona para /\n• Groq 4s, só 1 modelo rápido`; }</script>
 <script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}function isInlineMediaSlotElement(node){return !!(node&&node.getAttribute&&node.getAttribute("data-clippy-inline-media-slot")!==null)}function findInlineMediaSlot(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(isInlineMediaSlotElement(node))return node}return null}function readInlineMediaUrl(node){if(!node)return null;return node.getAttribute&&((node.getAttribute("data-clippy-inline-media-url")||node.getAttribute("data-url")||node.getAttribute("data_url")))||node.href||null}function stripHash(url){return String(url).replace(/#.*$/,"")}function urlsMatch(a,b){if(!a||!b)return false;try{return stripHash(new URL(a,loc).href)===stripHash(new URL(b,loc).href)}catch(_){return stripHash(a)===stripHash(b)}}function isFirstPartyReelUrl(value){try{var url=new URL(value,loc);if(url.protocol!=="https:")return false;var host=url.hostname.toLowerCase();var supported=host==="instagram.com"||host.endsWith(".instagram.com")||host==="facebook.com"||host.endsWith(".facebook.com");return supported&&/\/reels?\//i.test(url.pathname)}catch(_){return false}}function isInlineMediaUrlClick(node,href){var slot=findInlineMediaSlot(node);if(!slot)return false;var slotUrl=readInlineMediaUrl(slot);if(slotUrl)return urlsMatch(href,slotUrl);return isFirstPartyReelUrl(href)}function findDataHref(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(node.getAttribute){var href=node.getAttribute("data-href")||node.getAttribute("data-url");if(href)return{href:href,node:node}}}return null}var nativeOpen=window.open;window.open=function(url){if(parent!==window&&typeof url==="string"&&/^https?:\/\//.test(url)){parent.postMessage({type:"ecto:usercontent-link-click",href:url},"*");return null}return nativeOpen?nativeOpen.apply(window,arguments):null};document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;if(parent===window)return;var a=target.closest?target.closest("a[href]"):null;if(a&&a.href&&/^https?:\/\//.test(a.href)&&a.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(a,a.href))return;var productId=extractProductId(target)||extractProductId(a);if(productId){e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*");return}e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:a.href},"*");return}var dataHref=findDataHref(target);if(dataHref&&/^https?:\/\//.test(dataHref.href)&&dataHref.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(dataHref.node,dataHref.href))return;e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:dataHref.href},"*")}},true)})();</script><script>(function(){var FOCUS_TYPE="ecto:artifact-focus-request";var CLOSE_TYPE="ecto:artifact-close-request";function focusArtifactDocument(){var body=document.body;if(!body)return;try{window.focus();}catch(e){}if(!body.hasAttribute("tabindex"))body.setAttribute("tabindex","-1");try{body.focus({preventScroll:true});}catch(e){try{body.focus();}catch(e2){}}}window.addEventListener("message",function(event){if(event.source!==window.parent)return;var data=event.data;if(!data||typeof data!=="object"||data.type!==FOCUS_TYPE)return;if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",focusArtifactDocument,{once:true});return;}focusArtifactDocument();});window.addEventListener("keydown",function(event){if(event.key!=="Escape")return;window.setTimeout(function(){if(event.defaultPrevented)return;window.parent.postMessage({type:CLOSE_TYPE},"*");},0);});})();</script></body></html>

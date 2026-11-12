@@ -1,6 +1,7 @@
+# NEXUS CORE V11 - ELEVENLABS GATEWAY + NEBULOSA + DIRECIONADO TRAVADO - SE VOCE VE V4, ESTA NO ARQUIVO ANTIGO
 import os, re, time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
-# V10 - MAPEAMENTO TOTAL CORRIGIDO
+# V11 - MAPEAMENTO TOTAL CORRIGIDO
 # 1) Meta comanda, Gemini só backup, nunca ao contrário
 # 2) Chamadas em PARALELO (antes era 1 por vez = 60-90s). Agora todos juntos, max 12s
 # 3) Timeout 8s por modelo - se travar, não fica esperando 1 minuto
@@ -32,7 +33,9 @@ ELEVENLABS_VOZES_PADRAO = {
 }
 class ElevenLabsGateway:
     def __init__(self):
-        self.api_key = os.getenv("ELEVENLABS_API_KEY", "").strip()
+        # NÃO guarda a chave fixa. Lê de novo a cada chamada (propriedade api_key abaixo).
+        # Assim, se a chave for colocada no Render depois, ele já pega sem precisar reiniciar o código.
+        self._api_key_ignorado = None
         self.modelo = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2").strip() or "eleven_multilingual_v2"
         # Vozes por departamento - você pode trocar no Render sem mexer no código
         self.vozes = {
@@ -41,6 +44,24 @@ class ElevenLabsGateway:
             "diretoria": os.getenv("ELEVENLABS_VOICE_ORION", ELEVENLABS_VOZES_PADRAO["diretoria"]).strip(),
         }
         self._cache_audio = {}
+    @property
+    def api_key(self):
+        # Lê a chave FRESCA do ambiente toda vez. Nunca usa valor guardado antigo.
+        return os.getenv("ELEVENLABS_API_KEY", "").strip()
+    def diagnostico(self):
+        # Diz o motivo exato, não só ON/OFF. Não expõe a chave, só os 3 primeiros caracteres e o tamanho.
+        k = self.api_key
+        return {
+            "ativo": bool(k),
+            "chave_presente": bool(k),
+            "chave_tamanho": len(k),
+            "chave_comeco": (k[:3] + "...") if k else "",
+            "modelo": self.modelo,
+            "vozes": self.vozes,
+            "backend": "V11",
+            "motivo": "OK - chave presente" if k else "CHAVE NÃO CHEGOU NO BACKEND - confira Environment no Render, nome exato ELEVENLABS_API_KEY, e faça Manual Deploy",
+            "falta": [] if k else ["ELEVENLABS_API_KEY"],
+        }
     def config(self):
         return {"ativo": bool(self.api_key), "modelo": self.modelo, "vozes": self.vozes, "falta": [] if self.api_key else ["ELEVENLABS_API_KEY"]}
     def gerar_audio(self, texto, quem="lab"):
@@ -303,5 +324,5 @@ class OrquestradorNexusV4:
         self._salvar_no_projeto(projeto, destino, pergunta, lab_ai, marketing_ai, diretoria_ai, codigo)
         proj_atual = self._get_projeto(projeto)
         tempo = round(time.time() - t0, 1)
-        consolidado = f"=== NEXUS CORE V10.2 DIRECIONADO TRAVADO + NEBULOSA + VOZ FLUIDA - {tempo}s ===\nPergunta: {pergunta} | Destino: {destino}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
+        consolidado = f"=== NEXUS CORE V11 DIRECIONADO TRAVADO + NEBULOSA + VOZ FLUIDA - {tempo}s ===\nPergunta: {pergunta} | Destino: {destino}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
         return {"pergunta": pergunta, "destino": destino, "projeto": str(projeto), "lab_ai": str(lab_ai), "marketing_ai": str(marketing_ai), "diretoria_ai": str(diretoria_ai), "codigo": str(codigo), "consolidado": str(consolidado), "tempo_seg": tempo, "avatares": NOMES, "comanda": "META", "backup": "GEMINI", "quadro": {"projeto": str(projeto), "estrategia": str(proj_atual["estrategia"]), "codigo": str(proj_atual["codigo"]), "campanha": str(proj_atual["campanha"]), "resumo": str(proj_atual["resumo"])}}

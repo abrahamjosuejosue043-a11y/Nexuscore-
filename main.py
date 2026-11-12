@@ -1,4 +1,4 @@
-# NEXUS CORE V11 - ELEVENLABS GATEWAY + NEBULOSA + DIRECIONADO TRAVADO
+# NEXUS CORE V11.2 - ELEVENLABS GATEWAY + NEBULOSA + DIRECIONADO TRAVADO
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 from backend.orchestrator import OrquestradorNexusV4
 from backend.email_service import EmailService
-app = FastAPI(title="Nexus Core V11 - Innova XR")
+app = FastAPI(title="Nexus Core V11.2 - Innova XR")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
 orc = OrquestradorNexusV4()
@@ -34,9 +34,9 @@ class LabCriar(BaseModel):
     projeto: str = "Geral"
 @app.get("/voz/diagnostico")
 def voz_diagnostico():
-    # Mostra o motivo exato: chave presente? tamanho? backend V11? Sem expor a chave.
+    # Mostra o motivo exato: chave presente? tamanho? backend V11.2? Sem expor a chave.
     d = orc.elevenlabs.diagnostico()
-    d["rota"] = "/voz/diagnostico OK - backend V11 novo"
+    d["rota"] = "/voz/diagnostico OK - backend V11.2 novo"
     return d
 @app.get("/voz/config")
 def voz_config():
@@ -84,8 +84,8 @@ def relatorio(dados: Relatorio):
 def home():
     idx = os.path.join(frontend_path, "index.html")
     if os.path.exists(idx): return FileResponse(idx)
-    return {"nexus_core": "V11 - Innova XR", "gemini": bool(os.getenv("GEMINI_API_KEY")), "meta": bool(os.getenv("META_API_KEY"))}
-# CORRIGIDO V11: /app NÃO abre mais pasta antiga. /app redireciona para / (entrada certa).
+    return {"nexus_core": "V11.2 - Innova XR", "gemini": bool(os.getenv("GEMINI_API_KEY")), "meta": bool(os.getenv("META_API_KEY"))}
+# CORRIGIDO V11.2: /app NÃO abre mais pasta antiga. /app redireciona para / (entrada certa).
 # Antes, /app abria a pasta frontend direto e mostrava versão velha em cache.
 @app.get("/app")
 def app_redirect():

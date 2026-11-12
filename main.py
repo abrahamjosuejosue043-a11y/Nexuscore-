@@ -1,97 +1,114 @@
-# NEXUS CORE V11.2 - ELEVENLABS GATEWAY + NEBULOSA + DIRECIONADO TRAVADO
+# ============================================================
+# NEXUS CORE - MAIN.PY - LIGA TUDO
+# Arquivo para o GitHub: main.py (na raiz, do lado de index.html e orchestrator.py)
+# No Render: Start Command = python main.py
+#
+# O QUE ELE LIGA:
+# 1. index.html = CARA DO APP (PASSO 1 - travado, profissional)
+# 2. cerebro.js = MIC + BOTÕES + VOZ NO NAVEGADOR (PASSO 2)
+# 3. orchestrator.py = CÉREBRO (PASSO 2 - ORION comanda, FORJA executa, LIA promove)
+# 4. ElevenLabs = VOZES (via /api/voice, chave só no Render)
+# 5. Groq Meta + Gemini backup = INTELIGÊNCIA
+#
+# SEM main.py, cada arquivo fica solto. COM main.py, vira UM produto só.
+# ============================================================
 import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
-from pydantic import BaseModel
-from dotenv import load_dotenv
-load_dotenv()
-from backend.orchestrator import OrquestradorNexusV4
-from backend.email_service import EmailService
-app = FastAPI(title="Nexus Core V11.2 - Innova XR")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
-frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
-orc = OrquestradorNexusV4()
-email_svc = EmailService()
-class Pergunta(BaseModel):
-    pergunta: str
-    destino: str = "todos"
-    projeto: str = "Geral"
-class EmailConfig(BaseModel):
-    email: str
-    nome: str = "CEO Innova XR"
-class Relatorio(BaseModel):
-    email: str = ""
-    conteudo: str = ""
-class VozFalar(BaseModel):
-    texto: str
-    quem: str = "lab"
-    # quem: lab=FORJA, marketing=LIA, diretoria=ORION
-class LabCriar(BaseModel):
-    pergunta: str
-    tipo: str = "codigo"
-    projeto: str = "Geral"
-@app.get("/voz/diagnostico")
-def voz_diagnostico():
-    # Mostra o motivo exato: chave presente? tamanho? backend V11.2? Sem expor a chave.
-    d = orc.elevenlabs.diagnostico()
-    d["rota"] = "/voz/diagnostico OK - backend V11.2 novo"
-    return d
-@app.get("/voz/config")
-def voz_config():
-    # Frontend pergunta: ElevenLabs está ligado? Sem expor a chave.
-    return orc.elevenlabs.config()
-@app.post("/voz/falar")
-def voz_falar(dados: VozFalar):
-    # GATEWAY: frontend manda texto, backend manda para ElevenLabs com a chave secreta, devolve MP3.
-    audio = orc.elevenlabs.gerar_audio(str(dados.texto or ""), str(dados.quem or "lab"))
-    if not audio:
-        diag = orc.elevenlabs.diagnostico()
-        return {"ok": False, "mensagem": "ElevenLabs indisponível - usando voz do navegador.", "motivo_detalhado": diag.get("motivo", ""), "diagnostico": diag}
-    return Response(content=audio, media_type="audio/mpeg")
-@app.post("/voz/teste")
-def voz_teste():
-    # Teste rápido: 1 frase do ORION para confirmar que a chave funciona
-    audio = orc.elevenlabs.gerar_audio("Olá Senhor Josué, aqui é o ORION, voz ElevenLabs conectada e pronta.", "diretoria")
-    if not audio: return {"ok": False, "mensagem": "ElevenLabs não respondeu. Confira a chave e o crédito em elevenlabs.io"}
-    return Response(content=audio, media_type="audio/mpeg")
-@app.get("/health")
-def health(): return orc.health()
-@app.get("/api/health")
-def health2(): return orc.health()
-@app.post("/perguntar")
-def perguntar(dados: Pergunta):
-    # ANTES: não recebia projeto, perdia o contexto. AGORA: recebe projeto.
-    return orc.reuniao(str(dados.pergunta), str(dados.destino), str(dados.projeto or "Geral"))
-@app.post("/lab/criar")
-def lab_criar(dados: LabCriar):
-    # Lab igual ao app Meta: codigo, imagem, texto - sempre responde
-    return orc.lab_criar(str(dados.pergunta), str(dados.tipo or "codigo"), str(dados.projeto or "Geral"))
-@app.post("/config/email")
-def config_email(dados: EmailConfig):
-    email = str(dados.email).strip(); nome = str(dados.nome or "CEO")
-    email_svc.cadastrar(email, nome)
-    return {"ok": True, "mensagem": "E-mail cadastrado no Nexus Core: " + email, "email": email}
-@app.post("/relatorio/email")
-def relatorio(dados: Relatorio):
-    email = str(dados.email or email_svc.email_atual or "").strip()
-    conteudo = str(dados.conteudo or "")
-    if not email: return {"ok": False, "modo": "erro", "mensagem": "Cadastre seu e-mail primeiro na aba E-mail / Config"}
-    return email_svc.enviar_relatorio(email, conteudo)
-# Frontend na RAIZ: antes / retornava JSON e /app era o frontend, por isso no Render aparecia tela estranha. Agora / abre o app.
-@app.get("/")
-def home():
-    idx = os.path.join(frontend_path, "index.html")
-    if os.path.exists(idx): return FileResponse(idx)
-    return {"nexus_core": "V11.2 - Innova XR", "gemini": bool(os.getenv("GEMINI_API_KEY")), "meta": bool(os.getenv("META_API_KEY"))}
-# CORRIGIDO V11.2: /app NÃO abre mais pasta antiga. /app redireciona para / (entrada certa).
-# Antes, /app abria a pasta frontend direto e mostrava versão velha em cache.
-@app.get("/app")
-def app_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/")
+import sys
+
+# Garante que a pasta atual está no caminho
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Tenta importar o cérebro (orchestrator.py)
+try:
+    import orchestrator as cerebro
+    print("NEXUS: orchestrator.py carregado - CEREBRO OK")
+except Exception as e:
+    print(f"NEXUS: ERRO ao carregar orchestrator.py: {e}")
+    cerebro = None
+
+# Se o orchestrator já tem app Flask, usa ele direto - é o mais simples e certo
+# Ele já tem / , /perguntar, /api/chat, /api/voice, /lab/criar, /ordem, /campanha, /quadro, /health
+if cerebro is not None and hasattr(cerebro, "app"):
+    app = cerebro.app
+    print("NEXUS: usando app do orchestrator.py - tudo ligado")
+else:
+    # Fallback: se orchestrator não tiver app, cria um app mínimo aqui
+    # Isso só acontece se o orchestrator estiver velho. O novo já tem app.
+    from flask import Flask, request, jsonify, send_from_directory, Response
+
+    app = Flask(__name__)
+
+    @app.after_request
+    def _no_cache(resp):
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
+
+    @app.route("/")
+    def index():
+        try:
+            return send_from_directory(".", "index.html")
+        except Exception:
+            return jsonify({"ok": True, "msg": "NEXUS CORE rodando. Coloque index.html na raiz."})
+
+    @app.route("/cerebro.js")
+    def cerebro_js():
+        try:
+            return send_from_directory(".", "cerebro.js")
+        except Exception:
+            return jsonify({"erro": "cerebro.js nao encontrado"}), 404
+
+    @app.route("/health")
+    def health():
+        return jsonify({"ok": True, "versao": "V12 - MAIN.PY LIGANDO TUDO", "cerebro": cerebro is not None})
+
+    @app.route("/perguntar", methods=["POST"])
+    def perguntar():
+        d = request.get_json(force=True, silent=True) or {}
+        pergunta = d.get("pergunta") or d.get("texto") or ""
+        destino = d.get("destino") or "coletiva"
+        projeto = d.get("projeto") or "Geral"
+        if cerebro and hasattr(cerebro, "responder"):
+            return jsonify(cerebro.responder(pergunta, destino=destino, projeto=projeto))
+        return jsonify({"respostas": [{"quem": "diretoria", "nome": "ORION", "texto": "Estou aqui, Senhor Josue."}]})
+
+    @app.route("/api/chat", methods=["POST"])
+    def api_chat():
+        d = request.get_json(force=True, silent=True) or {}
+        pergunta = d.get("pergunta") or d.get("texto") or ""
+        quem = d.get("quem") or "coletiva"
+        mapa = {"forja": "lab", "lia": "marketing", "orion": "diretoria", "lab": "lab", "marketing": "marketing", "diretoria": "diretoria", "coletiva": "coletiva"}
+        destino = mapa.get(str(quem).lower(), "coletiva")
+        if cerebro and hasattr(cerebro, "responder"):
+            r = cerebro.responder(pergunta, destino=destino, projeto=d.get("projeto") or "Geral")
+            if r.get("respostas"):
+                prim = r["respostas"][0]
+                return jsonify({"quem": prim["nome"], "resposta": prim["texto"], "respostas": r["respostas"]})
+        return jsonify({"quem": "ORION", "resposta": "Estou aqui, Senhor Josue."})
+
+    @app.route("/api/voice", methods=["POST"])
+    def api_voice():
+        d = request.get_json(force=True, silent=True) or {}
+        texto = d.get("texto") or ""
+        quem = d.get("quem") or "diretoria"
+        if cerebro and hasattr(cerebro, "falar_elevenlabs"):
+            audio = cerebro.falar_elevenlabs(texto, quem)
+            if audio:
+                return Response(audio, mimetype="audio/mpeg")
+        return jsonify({"erro": "ElevenLabs nao configurado"}), 503
+
+# ---------------- RODA NO RENDER ----------------
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    port = int(os.getenv("PORT", "10000"))
+    print(f"==========================================")
+    print(f"NEXUS CORE V12 - MAIN.PY LIGANDO TUDO")
+    print(f"Porta: {port}")
+    print(f"Cara do app: index.html")
+    print(f"Cerebro: orchestrator.py")
+    print(f"Mic + Botoes: cerebro.js")
+    print(f"Voz: ElevenLabs via /api/voice")
+    print(f"IA: Meta (Groq) comanda, Gemini backup")
+    print(f"Orion comanda -> Forja executa -> Lia promove")
+    print(f"==========================================")
+    app.run(host="0.0.0.0", port=port)

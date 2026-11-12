@@ -47,10 +47,14 @@ else:
 
     @app.route("/")
     def index():
-        try:
-            return send_from_directory(".", "index.html")
-        except Exception:
-            return jsonify({"ok": True, "msg": "NEXUS CORE rodando. Coloque index.html na raiz."})
+        import os as _os
+        for _nome in ["index.html", "PASSO1-CORRETO-SEU-CODIGO.html"]:
+            if _os.path.exists(_nome):
+                try:
+                    return send_from_directory(".", _nome)
+                except Exception:
+                    pass
+        return "<h1>NEXUS CORE V12 rodando</h1><p>Servidor vivo. Coloque index.html na raiz.</p>", 200
 
     @app.route("/cerebro.js")
     def cerebro_js():

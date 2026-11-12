@@ -1,3 +1,4 @@
+# NEXUS CORE V11.3 - MARCA D'ÁGUA + REGISTRO DE MUDANÇAS
 # NEXUS CORE V11 - ELEVENLABS GATEWAY + NEBULOSA + DIRECIONADO TRAVADO - SE VOCE VE V4, ESTA NO ARQUIVO ANTIGO
 import os, re, time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutTimeout
@@ -20,6 +21,17 @@ EMAIL_NEXUS = "nexus@innovaxr.com.br"
 
 
 
+VERSAO_NEXUS = "V11.3"
+CHANGELOG_NEXUS = """V11.3 • RÁPIDO + SOLO + VISUAL + MARCA D'ÁGUA
+• Visual novo estilo Meta/Alexa: bolhas, sua msg à direita, FORJA azul, LIA rosa, ORION dourado, botões redondos, cantos suaves, fundo com brilho
+• Resposta imediata FAST_PATH: 'você está ouvindo?', 'tudo pronto?', 'oi' em 0.1s, sem esperar nuvem
+• ElevenLabs ON = Chrome bloqueado, não fala por cima
+• Trava dupla direcionado: frontend + backend, fallback 'li a'->'lia', 'for ja'->'forja'
+• LIA no ElevenLabs: vazio volta pra Rachel, 'lia'->'marketing'
+• Reunião Coletiva + Solo: avatar ou botão abre chat particular direto
+• /app redireciona para /
+• Groq 4s, só 1 modelo rápido"""
+# REGISTRO OFICIAL - TUDO QUE MUDOU ESTA AQUI, NO CÉREBRO E NA TELA (marca d'água no cantinho). NÃO APAGAR.
 # ============ GATEWAY ELEVENLABS (V11) ============
 # O frontend NUNCA vê a chave. A chave fica só no Render (Environment).
 # Frontend -> POST /voz/falar (nosso backend) -> ElevenLabs -> áudio volta -> frontend toca.
@@ -63,6 +75,7 @@ class ElevenLabsGateway:
             "modelo": self.modelo,
             "vozes": self.vozes,
             "backend": "V11",
+            "lia_voice_id": self.vozes.get("marketing",""), "forja_voice_id": self.vozes.get("lab",""), "orion_voice_id": self.vozes.get("diretoria",""), "lia_ok": bool(self.vozes.get("marketing","")),
             "motivo": "OK - chave presente" if k else "CHAVE NÃO CHEGOU NO BACKEND - confira Environment no Render, nome exato ELEVENLABS_API_KEY, e faça Manual Deploy",
             "falta": [] if k else ["ELEVENLABS_API_KEY"],
         }
@@ -207,7 +220,7 @@ class OrquestradorNexusV4:
     def boas_vindas(self):
         return MENSAGEM_BOAS_VINDAS
     def health(self):
-        return {"nexus_core": "V11.2 LIA + DIRECIONADO CORRIGIDOS + NEBULOSA + VOZ FLUIDA", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES, "elevenlabs": self.elevenlabs.config(), "erro_meta": self._ultimo_erro_meta[:200], "erro_gemini": self._ultimo_erro_gemini[:200]}
+        return {"nexus_core": "V11.3 RÁPIDO + SOLO + VISUAL + MARCA D'ÁGUA + NEBULOSA + VOZ FLUIDA", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES, "elevenlabs": self.elevenlabs.config(), "erro_meta": self._ultimo_erro_meta[:200], "erro_gemini": self._ultimo_erro_gemini[:200], "versao": VERSAO_NEXUS, "changelog": CHANGELOG_NEXUS}
     def _get_projeto(self, nome):
         nome = (nome or 'Geral').strip() or 'Geral'
         if nome not in self.projetos:
@@ -233,7 +246,7 @@ class OrquestradorNexusV4:
         if self._groq_client is None and self.meta_key:
             try:
                 from groq import Groq
-                self._groq_client = Groq(api_key=self.meta_key, timeout=8.0)
+                self._groq_client = Groq(api_key=self.meta_key, timeout=4.0)  # V11.3: 4s, não 8s - ORION rápido
             except Exception as e:
                 self._ultimo_erro_meta = str(e)[:300]
         return self._groq_client
@@ -249,7 +262,7 @@ class OrquestradorNexusV4:
         c = self._get_groq()
         if not c: return ""
         # Só 1 modelo principal + 1 reserva, com timeout. Antes tentava 2 Groq + 3 Gemini em sequência = 1 min.
-        for modelo in ["openai/gpt-oss-20b", "llama-3.3-70b-versatile"]:
+        for modelo in ["openai/gpt-oss-20b"]:  # V11.3: só 1 modelo rápido, não tenta 2 em sequência
             try:
                 r = c.chat.completions.create(model=modelo, messages=[{"role": "system", "content": PERSONALIDADES[dept]}, {"role": "user", "content": "Historico:" + contexto + "\nPergunta:" + pergunta}], temperature=0.9, max_tokens=600)
                 txt = str(r.choices[0].message.content or "").strip()
@@ -307,6 +320,29 @@ class OrquestradorNexusV4:
         passos = [l.strip() for l in resp.split(".") if l.strip()][:4]
         return {"tipo": "codigo", "codigo": codigo, "imagem_prompt": "", "passos": passos, "resposta": resp}
     def reuniao(self, pergunta: str, destino: str = "todos", projeto: str = "Geral"):
+        # FAST_PATH V11.3: pergunta de calibração responde na hora, sem esperar Groq/Gemini. Resolve ORION lento.
+        # Antes: até "você está ouvindo?" ia para Groq -> 12s + timeout -> parecia que ORION nem respondia.
+        _n_fast = (pergunta or "").lower()
+        _e_calib = any(k in _n_fast for k in ["esta ouvindo", "está ouvindo", "ta ouvindo", "tudo pronto", "esta ai", "esta aí", "me ouve", "oi ", "ola", "bom dia", "boa tarde", "boa noite", "testando", "teste de som"])
+        if _e_calib and len(_n_fast) < 70:
+            _dest_fast = _detectar_destino_backend(pergunta) or destino
+            if _dest_fast not in ("lab", "marketing", "diretoria", "todos", "opiniao"):
+                _dest_fast = "diretoria"
+            _txt = ""
+            if _dest_fast == "diretoria":
+                _txt = "ORION aqui, presente. Tudo pronto, estou te ouvindo. Pode mandar."
+            elif _dest_fast == "marketing":
+                _txt = "LIA aqui, presente. Tudo pronto, estou te ouvindo. Pode mandar."
+            elif _dest_fast == "lab":
+                _txt = "FORJA aqui, presente. Tudo pronto, estou te ouvindo. Pode mandar."
+            else:
+                _txt = "Estamos aqui, Senhor Josué. Tudo pronto, pode mandar."
+            _lab = _txt if _dest_fast == "lab" else ""
+            _mkt = _txt if _dest_fast == "marketing" else ""
+            _dir = _txt if _dest_fast == "diretoria" else ""
+            if _dest_fast in ("todos", "opiniao"):
+                _lab = "FORJA aqui, presente."; _mkt = "LIA aqui, presente."; _dir = "ORION aqui, presente."
+            return {"pergunta": pergunta, "destino": _dest_fast, "projeto": str(projeto), "lab_ai": _lab, "marketing_ai": _mkt, "diretoria_ai": _dir, "codigo": _lab, "consolidado": _txt, "tempo_seg": 0.1, "avatares": NOMES, "comanda": "FAST_PATH", "backup": "", "quadro": {"projeto": str(projeto), "estrategia": _dir, "codigo": _lab, "campanha": _mkt, "resumo": _txt}, "fast": True}
         t0 = time.time()
         pergunta = str(pergunta); destino = str(destino)
         # TRAVA DIRECIONADO BACKEND: se a pergunta tem 1 nome, corrige destino - ex: "Orion, voce esta ouvindo?" -> so ORION

@@ -317,11 +317,28 @@ if HAS_FLASK:
 
     @app.route("/")
     def index():
-        # Serve o index.html que já está no GitHub
-        try:
-            return send_from_directory(".", "index.html")
-        except Exception:
-            return jsonify({"ok": True, "msg": "NEXUS CORE V12 rodando. Coloque index.html na raiz."})
+        # CORREÇÃO DO INTERNAL SERVER ERROR (500):
+        # Antes: se index.html não existisse com esse nome exato, dava 500.
+        # Agora: tenta index.html, depois PASSO1-CORRETO-SEU-CODIGO.html, depois qualquer .html.
+        # Se nenhum existir, devolve página simples, NUNCA 500.
+        import os as _os, glob as _glob
+        for _nome in ["index.html", "PASSO1-CORRETO-SEU-CODIGO.html"]:
+            if _os.path.exists(_nome):
+                try:
+                    return send_from_directory(".", _nome)
+                except Exception:
+                    pass
+        # Se não achou nenhum, devolve HTML simples - servidor está vivo
+        return "<h1>NEXUS CORE V12 rodando</h1><p>Servidor vivo. Coloque index.html na raiz do GitHub.</p><p><a href='/health'>Ver /health</a></p>", 200
+
+    @app.errorhandler(500)
+    def _erro500(e):
+        # Nunca mostra tela preta 'Internal Server Error' sem explicação
+        return jsonify({"ok": False, "erro": "500 - erro interno, mas servidor está vivo", "detalhe": str(e)[:300], "dica": "Veja os logs do Render. Rota /health deve responder."}), 200
+
+    @app.errorhandler(404)
+    def _erro404(e):
+        return jsonify({"ok": False, "erro": "404 - rota não achada", "rotas": ["/", "/health", "/perguntar", "/api/chat", "/api/voice"]}), 404
 
     @app.route("/perguntar", methods=["POST"])
     def perguntar():

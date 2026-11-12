@@ -38,11 +38,15 @@ class ElevenLabsGateway:
         self._api_key_ignorado = None
         self.modelo = os.getenv("ELEVENLABS_MODEL", "eleven_multilingual_v2").strip() or "eleven_multilingual_v2"
         # Vozes por departamento - você pode trocar no Render sem mexer no código
+        # FIX LIA: se a variável no Render estiver vazia, volta para a voz padrão, nunca fica "".
+        # Antes: getenv(..., default) com variável vazia retornava "" -> ElevenLabs 404 -> LIA caía para navegador.
         self.vozes = {
-            "lab": os.getenv("ELEVENLABS_VOICE_FORJA", ELEVENLABS_VOZES_PADRAO["lab"]).strip(),
-            "marketing": os.getenv("ELEVENLABS_VOICE_LIA", ELEVENLABS_VOZES_PADRAO["marketing"]).strip(),
-            "diretoria": os.getenv("ELEVENLABS_VOICE_ORION", ELEVENLABS_VOZES_PADRAO["diretoria"]).strip(),
+            "lab": (os.getenv("ELEVENLABS_VOICE_FORJA") or ELEVENLABS_VOZES_PADRAO["lab"]).strip() or ELEVENLABS_VOZES_PADRAO["lab"],
+            "marketing": (os.getenv("ELEVENLABS_VOICE_LIA") or ELEVENLABS_VOZES_PADRAO["marketing"]).strip() or ELEVENLABS_VOZES_PADRAO["marketing"],
+            "diretoria": (os.getenv("ELEVENLABS_VOICE_ORION") or ELEVENLABS_VOZES_PADRAO["diretoria"]).strip() or ELEVENLABS_VOZES_PADRAO["diretoria"],
         }
+        # Apelidos: frontend pode mandar 'lia', 'forja', 'orion' ou 'marketing'/'lab'/'diretoria' - tudo cai na voz certa.
+        self.vozes.update({"lia": self.vozes["marketing"], "forja": self.vozes["lab"], "orion": self.vozes["diretoria"], "ceo": self.vozes["diretoria"]})
         self._cache_audio = {}
     @property
     def api_key(self):
@@ -66,6 +70,11 @@ class ElevenLabsGateway:
         return {"ativo": bool(self.api_key), "modelo": self.modelo, "vozes": self.vozes, "falta": [] if self.api_key else ["ELEVENLABS_API_KEY"]}
     def gerar_audio(self, texto, quem="lab"):
         # Retorna bytes MP3 ou None (fallback navegador)
+        # FIX LIA: normaliza quem - 'lia' vira 'marketing' (Rachel), 'forja'->'lab', 'orion'->'diretoria'. Antes 'lia' caía no fallback lab (Adam).
+        _mapa_quem = {"lia": "marketing", "forja": "lab", "orion": "diretoria", "marketing": "marketing", "lab": "lab", "diretoria": "diretoria", "ceo": "diretoria", "": "lab"}
+        quem = _mapa_quem.get(str(quem or "lab").strip().lower(), "lab")
+        self._ultimo_quem = quem
+        self._ultimo_voice_id = self.vozes.get(quem, self.vozes["lab"])
         if not self.api_key: return None
         t = (texto or "").strip()
         if not t: return None
@@ -95,9 +104,17 @@ def _detectar_destino_backend(pergunta):
     palavras = n.split()
     palavras = [mapa.get(p, p) for p in palavras]
     n2 = " ".join(palavras)
+    # FIX DIRECIONADO: primeiro tenta palavra inteira, depois substring (Chrome ouve 'Lia' como 'Li a', 'Forja' como 'For ja').
+    # Normaliza erros de transcrição: 'li a'->'lia', 'for ja'->'forja', 'ori on'->'orion', 'li a' etc.
+    n2 = n2.replace("li a", "lia").replace("for ja", "forja").replace("ori on", "orion").replace("o rion", "orion")
     tem_f = bool(_re.search(r"\b(forja|lab|laboratorio)\b", n2))
     tem_l = bool(_re.search(r"\b(lia|marketing)\b", n2))
     tem_o = bool(_re.search(r"\b(orion|diretoria|diretor|chefe)\b", n2))
+    # Fallback substring: se palavra inteira falhou, procura substring - primeiro que aparecer vence.
+    if not (tem_f or tem_l or tem_o):
+        for nome, dest in [("forja", "lab"), ("lia", "marketing"), ("orion", "diretoria"), ("marketing", "marketing"), ("diretoria", "diretoria"), ("laboratorio", "lab")]:
+            if nome in n2:
+                return dest
     q = sum([tem_f, tem_l, tem_o])
     if q == 1:
         if tem_f: return "lab"
@@ -190,7 +207,7 @@ class OrquestradorNexusV4:
     def boas_vindas(self):
         return MENSAGEM_BOAS_VINDAS
     def health(self):
-        return {"nexus_core": "V11 ELEVENLABS GATEWAY + DIRECIONADO TRAVADO + NEBULOSA + VOZ FLUIDA", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES, "elevenlabs": self.elevenlabs.config(), "erro_meta": self._ultimo_erro_meta[:200], "erro_gemini": self._ultimo_erro_gemini[:200]}
+        return {"nexus_core": "V11.2 LIA + DIRECIONADO CORRIGIDOS + NEBULOSA + VOZ FLUIDA", "comanda": "META via Groq", "backup": "GEMINI so se Meta falhar", "gemini": bool(self.gemini_key), "meta": bool(self.meta_key), "motor": "meta-groq-gpt-oss-20b", "avatares": NOMES, "elevenlabs": self.elevenlabs.config(), "erro_meta": self._ultimo_erro_meta[:200], "erro_gemini": self._ultimo_erro_gemini[:200]}
     def _get_projeto(self, nome):
         nome = (nome or 'Geral').strip() or 'Geral'
         if nome not in self.projetos:
@@ -324,5 +341,13 @@ class OrquestradorNexusV4:
         self._salvar_no_projeto(projeto, destino, pergunta, lab_ai, marketing_ai, diretoria_ai, codigo)
         proj_atual = self._get_projeto(projeto)
         tempo = round(time.time() - t0, 1)
-        consolidado = f"=== NEXUS CORE V11 DIRECIONADO TRAVADO + NEBULOSA + VOZ FLUIDA - {tempo}s ===\nPergunta: {pergunta} | Destino: {destino}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
+        # FIX DIRECIONADO: consolidado só do destino. Antes mostrava os 3 cabeçalhos mesmo quando só 1 respondeu, e parecia que todos responderam.
+        if destino == "lab":
+            consolidado = f"=== FORJA respondeu - {tempo}s ===\nPergunta: {pergunta}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n"
+        elif destino == "marketing":
+            consolidado = f"=== LIA respondeu - {tempo}s ===\nPergunta: {pergunta}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
+        elif destino == "diretoria":
+            consolidado = f"=== ORION respondeu - {tempo}s ===\nPergunta: {pergunta}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n"
+        else:
+            consolidado = f"=== NEXUS CORE V11 DIRECIONADO TRAVADO + NEBULOSA + VOZ FLUIDA - {tempo}s ===\nPergunta: {pergunta} | Destino: {destino}\n\n[ORION - Diretoria - Meta]\n{diretoria_ai}\n\n[FORJA - Lab - Meta]\n{lab_ai}\n\n[LIA - Marketing - Meta]\n{marketing_ai}\n"
         return {"pergunta": pergunta, "destino": destino, "projeto": str(projeto), "lab_ai": str(lab_ai), "marketing_ai": str(marketing_ai), "diretoria_ai": str(diretoria_ai), "codigo": str(codigo), "consolidado": str(consolidado), "tempo_seg": tempo, "avatares": NOMES, "comanda": "META", "backup": "GEMINI", "quadro": {"projeto": str(projeto), "estrategia": str(proj_atual["estrategia"]), "codigo": str(proj_atual["codigo"]), "campanha": str(proj_atual["campanha"]), "resumo": str(proj_atual["resumo"])}}

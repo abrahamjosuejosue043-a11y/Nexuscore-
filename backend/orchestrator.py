@@ -331,7 +331,15 @@ if HAS_FLASK:
         # Se não achou nenhum, devolve HTML simples - servidor está vivo
         return "<h1>NEXUS CORE V12 rodando</h1><p>Servidor vivo. Coloque index.html na raiz do GitHub.</p><p><a href='/health'>Ver /health</a></p>", 200
 
-    @app.errorhandler(500)
+    
+    @app.route("/app")
+    @app.route("/app/")
+    def app_redirect():
+        # Foto 2 mostrava Not Found ao abrir /app - agora /app vai para /
+        from flask import redirect
+        return redirect("/", code=302)
+
+@app.errorhandler(500)
     def _erro500(e):
         # Nunca mostra tela preta 'Internal Server Error' sem explicação
         return jsonify({"ok": False, "erro": "500 - erro interno, mas servidor está vivo", "detalhe": str(e)[:300], "dica": "Veja os logs do Render. Rota /health deve responder."}), 200

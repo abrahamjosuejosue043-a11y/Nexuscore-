@@ -1,153 +1,131 @@
 import os
-import httpx
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, Response
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import httpx
+from dotenv import load_dotenv
+load_dotenv()
 
-app = FastAPI(title="NEXUS CORE • Innova XR")
+from backend.orchestrator import orchestrator
+from backend.email_service import enviar_relatorio_para_voce, verificar_ideias_novas
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="NEXUS CORE - Innova XR")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# Chaves configuradas nas Variáveis de Ambiente do Render (nunca expostas no HTML)
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")       # Roda os modelos Meta Llama 3.3 com velocidade instantânea
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")   # Backup oficial Google Gemini
-ELEVEN_API_KEY = os.getenv("ELEVEN_API_KEY", "")   # Vozes realistas
-
-# Personalidades do Conselho Innova XR
-PERSONAS = {
-    "ORION": (
-        "Você é ORION, Diretor Executivo de Estratégia da Innova XR. "
-        "Fale sempre em português do Brasil, tratando o usuário como 'Senhor Josué'. "
-        "Seja direto, estratégico, analítico e conciso (máximo 3 frases curtas para fluir bem em áudio)."
-    ),
-    "FORJA": (
-        "Você é FORJA, Engenheiro Chefe de Software e Laboratório da Innova XR. "
-        "Fale em português do Brasil, chamando o usuário de 'Senhor Josué'. "
-        "Foque em código, arquitetura, automação e soluções técnicas práticas. Seja objetivo (máximo 3 frases)."
-    ),
-    "LIA": (
-        "Você é LIA, Diretora de Marketing, Comunicação e Expansão da Innova XR. "
-        "Fale em português do Brasil, chamando o usuário de 'Senhor Josué'. "
-        "Foque em copywriting, vendas, posicionamento e divulgação criativa. Seja persuasiva e breve (máximo 3 frases)."
-    ),
-    "COLETIVA": (
-        "Você coordena uma reunião executiva da Innova XR com ORION (Estratégia), FORJA (Engenharia) e LIA (Marketing) "
-        "para o Senhor Josué. Responda de forma integrada e objetiva em no máximo 4 frases."
-    )
+# Chaves - todas vêm do Render, nenhuma fica no GitHub
+ELEVEN_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+META_KEY = os.getenv("META_AI_API_KEY", "")
+GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
+VOICES = {
+    "ORION": os.getenv("ELEVENLABS_VOICE_ORION", "21m00Tcm4TlvDq8ikWAM"),
+    "FORJA": os.getenv("ELEVENLABS_VOICE_FORJA", "21m00Tcm4TlvDq8ikWAM"),
+    "LIA": os.getenv("ELEVENLABS_VOICE_LIA", "21m00Tcm4TlvDq8ikWAM"),
 }
 
-# IDs de vozes da ElevenLabs (você pode trocar pelos IDs que preferir na sua conta)
-VOZES_ELEVEN = {
-    "ORION": "pNInz6obpgDQGcFmaJgB",  # Adam (Voz masculina grave e executiva)
-    "FORJA": "TxGEqnHWrfWFTfGW9XjX",  # Josh (Voz masculina firme e técnica)
-    "LIA":   "EXAVITQu4vr4xnSDxMaL",  # Bella (Voz feminina clara e articulada)
-}
-
-class ChatRequest(BaseModel):
+class VoiceIn(BaseModel):
     quem: str = "ORION"
-    modo: str = "SOLO"
-    pergunta: str
-
-class VoiceRequest(BaseModel):
+    texto: str = ""
+class ChatIn(BaseModel):
     quem: str = "ORION"
-    texto: str
+    pergunta: str = ""
+class TaskIn(BaseModel):
+    quem: str = "ORION"
+    titulo: str = ""
+    status: str = "todo"
+class MoveIn(BaseModel):
+    id: int = 0
+    status: str = "todo"
+class EmailIdeia(BaseModel):
+    assunto: str = ""
+    texto: str = ""
 
-async def chamar_meta_llama(sistema: str, pergunta: str) -> str:
-    if not GROQ_API_KEY:
-        raise ValueError("Chave GROQ_API_KEY não configurada.")
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": sistema},
-            {"role": "user", "content": pergunta}
-        ],
-        "temperature": 0.6,
-        "max_tokens": 300
-    }
-    async with httpx.AsyncClient(timeout=12.0) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"].strip()
+@app.get("/api/health")
+async def health():
+    return {"ok": True, "meta": bool(META_KEY), "gemini_backup": bool(GEMINI_KEY), "elevenlabs": bool(ELEVEN_KEY), "versao": "12.0"}
 
-async def chamar_gemini_backup(sistema: str, pergunta: str) -> str:
-    if not GEMINI_API_KEY:
-        raise ValueError("Chave GEMINI_API_KEY não configurada.")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "systemInstruction": {"parts": [{"text": sistema}]},
-        "contents": [{"parts": [{"text": pergunta}]}],
-        "generationConfig": {"temperature": 0.6, "maxOutputTokens": 300}
-    }
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+@app.get("/api/status")
+async def status():
+    return {"meta_online": bool(META_KEY), "gemini_online": bool(GEMINI_KEY), "voz_online": bool(ELEVEN_KEY), "modo": "Meta principal, Gemini reserva"}
 
-@app.get("/", response_class=HTMLResponse)
-async def servir_frontend():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return f.read()
+@app.get("/api/project")
+async def get_project():
+    return {"tarefas": orchestrator.listar_tarefas()}
+
+@app.post("/api/project/task")
+async def add_task(body: TaskIn):
+    t = orchestrator.adicionar_tarefa(body.quem, body.titulo, body.status)
+    return {"ok": True, "tarefa": t, "tarefas": orchestrator.listar_tarefas()}
+
+@app.post("/api/project/move")
+async def move_task(body: MoveIn):
+    t = orchestrator.mover_tarefa(body.id, body.status)
+    return {"ok": True, "tarefa": t}
 
 @app.post("/api/chat")
-async def processar_chat(req: ChatRequest):
-    quem = req.quem.upper() if req.quem.upper() in PERSONAS else "ORION"
-    chave_persona = "COLETIVA" if req.modo.upper() == "COLETIVA" else quem
-    sistema = PERSONAS[chave_persona]
-
-    motor_usado = "META-LLAMA"
+async def chat(body: ChatIn):
+    # Tenta usar o cérebro Meta/Gemini, se falhar usa resposta rápida
     try:
-        # 1ª Tentativa: Meta Llama (Cérebro Principal)
-        resposta = await chamar_meta_llama(sistema, req.pergunta)
-    except Exception as e_meta:
-        print(f"[AVISO] Meta Llama falhou ({e_meta}). Acionando backup Gemini...")
-        try:
-            # 2ª Tentativa: Google Gemini (Backup Automático)
-            resposta = await chamar_gemini_backup(sistema, req.pergunta)
-            motor_usado = "GEMINI-BACKUP"
-        except Exception as e_gem:
-            print(f"[ERRO] Falha total nas APIs: {e_gem}")
-            resposta = "Senhor Josué, houve uma instabilidade na conexão com os servidores externos. Verifique as chaves de API."
-            motor_usado = "OFFLINE"
-
-    return {
-        "quem": quem,
-        "motor": motor_usado,
-        "resposta": resposta
-    }
+        resposta = await orchestrator.responder_async(body.quem, body.pergunta)
+    except:
+        resposta = orchestrator.responder(body.quem, body.pergunta)
+    return {"quem": body.quem.upper(), "resposta": resposta}
 
 @app.post("/api/voice")
-async def gerar_voz(req: VoiceRequest):
-    if not ELEVEN_API_KEY:
-        raise HTTPException(status_code=503, detail="Chave de voz não configurada.")
-
-    voice_id = VOZES_ELEVEN.get(req.quem.upper(), VOZES_ELEVEN["ORION"])
+async def voice(body: VoiceIn):
+    if not ELEVEN_KEY:
+        return JSONResponse({"erro": "ElevenLabs não configurada"}, status_code=503)
+    voice_id = VOICES.get(body.quem.upper(), VOICES["ORION"])
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "xi-api-key": ELEVEN_API_KEY,
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg"
-    }
-    payload = {
-        "text": req.texto,
-        "model_id": "eleven_multilingual_v2",
-        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75}
-    }
+    payload = {"text": body.texto, "model_id": "eleven_multilingual_v2", "voice_settings": {"stability": 0.45, "similarity_boost": 0.75}}
+    headers = {"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json", "Accept": "audio/mpeg"}
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(url, json=payload, headers=headers)
+        if r.status_code != 200:
+            return JSONResponse({"erro": "ElevenLabs falhou"}, status_code=r.status_code)
+        return Response(content=r.content, media_type="audio/mpeg")
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        if resp.status_code != 200:
-            raise HTTPException(status_code=resp.status_code, detail="Erro ao sintetizar voz.")
-        return Response(content=resp.content, media_type="audio/mpeg")
+# E-mail: você manda ideia, cai pro Orion primeiro
+@app.post("/api/email/ideia")
+async def receber_ideia(body: EmailIdeia):
+    # Orion recebe primeiro, depois distribui
+    texto_orion = f"Ideia nova do Senhor Josué: {body.assunto} - {body.texto}. Vou passar para Forja e Lia."
+    # Salva como tarefa do Orion
+    orchestrator.adicionar_tarefa("ORION", f"Ideia: {body.assunto} - {body.texto[:80]}", "todo")
+    return {"ok": True, "para": "ORION primeiro", "resposta": texto_orion, "proximo": "Forja e 【entity-Lia¦canonical_name=Lia】 vão receber em seguida"}
+
+@app.get("/api/email/ideias-novas")
+async def ler_ideias():
+    ideias = verificar_ideias_novas()
+    for ideia in ideias:
+        orchestrator.adicionar_tarefa("ORION", f"E-mail ideia: {ideia['assunto']}", "todo")
+    return {"ok": True, "quantidade": len(ideias), "ideias": ideias, "fluxo": "Orion recebeu primeiro, depois passa pro time"}
+
+@app.post("/api/email/relatorio")
+async def enviar_relatorio():
+    tarefas = orchestrator.listar_tarefas()
+    feitas = len([t for t in tarefas if t["status"] == "feito"])
+    resumo = f"Projeto: {feitas} de {len(tarefas)} prontas.\n"
+    for t in tarefas:
+        resumo += f"- [{t['quem']}] {t['titulo']} - {t['status']}\n"
+    ok = enviar_relatorio_para_voce(resumo)
+    return {"ok": ok, "mensagem": "Relatório enviado pro seu e-mail pessoal" if ok else "E-mail não configurado ainda - faça o Passo 2"}
+
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+@app.get("/")
+async def index():
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+@app.get("/manifest.json")
+async def manifest():
+    return FileResponse(os.path.join(FRONTEND_DIR, "manifest.json"))
+@app.get("/sw.js")
+async def sw():
+    return FileResponse(os.path.join(FRONTEND_DIR, "sw.js"))
+if os.path.isdir(FRONTEND_DIR):
+    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+@app.get("/{path:path}")
+async def fallback(path: str):
+    if path.startswith("api/"):
+        return JSONResponse({"erro": "rota não encontrada"}, status_code=404)
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))

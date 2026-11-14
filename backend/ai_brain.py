@@ -1,7 +1,7 @@
 import os
 import httpx
 
-META_KEY = os.getenv(" META_AI_API_KEY", "")
+META_KEY = os.getenv("META_AI_API_KEY", "")
 META_URL = os.getenv("META_AI_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 ELEVENLABS_KEY = os.getenv("ELEVENLABS_API_KEY", "")
@@ -12,12 +12,12 @@ VOZ_LIA = os.getenv("ELEVENLABS_VOICE_LIA", "")
 PERSONALIDADES = {
     "ORION": "Voce e Orion, moderador do NEXUS CORE. Fala com respeito, chama o usuario de Senhor Josue. Voce organiza a reuniao. Regra: so uma IA fala por vez. Responda curto e rapido, em portugues simples.",
     "FORJA": "Voce e Forja Lab, tecnico do NEXUS CORE. Fala simples, passo a passo, sem palavra dificil. Responda curto e rapido.",
-    " 【entity-LIA¦canonical_name=Lia】": "Voce e 【entity-Lia¦canonical_name=Lia】, marketing do NEXUS CORE. Fala leve e criativa. Crie sempre um texto novo, nunca repita a mesma frase. Responda curto e rapido."
+    "【entity-LIA¦canonical_name=LIA】": "Voce e 【entity-Lia¦canonical_name=LIA】, marketing do NEXUS CORE. Fala leve e criativa. Crie sempre um texto novo, nunca repita a mesma frase. Responda curto e rapido."
 }
 
 def status_brain():
     return {
-        " meta": bool(META_KEY),
+        "meta": bool(META_KEY),
         "gemini": bool(GEMINI_KEY),
         "elevenlabs": bool(ELEVENLABS_KEY)
     }
@@ -36,7 +36,7 @@ def falar_com_meta(personagem, mensagem):
             "temperature": 0.7,
             "max_tokens": 400
         }
-        cabecalho = {"Authorization": f"Bearer {META_KEY}", "Content-Type": "application/json"}
+        cabecalho = {"Authorization": f"Bearer {【entity-META¦canonical_name=META】_KEY}", "Content-Type": "application/json"}
         resposta = httpx.post(META_URL, json=dados, headers=cabecalho, timeout=15.0)
         if resposta.status_code == 200:
             dado = resposta.json()
@@ -84,7 +84,7 @@ def gerar_voz(personagem, texto):
     voz_id = VOZ_ORION
     if personagem == "FORJA":
         voz_id = VOZ_FORJA
-    if personagem == " 【entity-LIA¦canonical_name=Lia】":
+    if personagem == "【entity-LIA¦canonical_name=LIA】":
         voz_id = VOZ_LIA
     if not voz_id:
         return None

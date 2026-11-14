@@ -1,15 +1,12 @@
 # NEXUS CORE - Organizador que deixa o cerebro falar, sem frase pronta
 from backend.ai_brain import perguntar, gerar_resposta, status_brain
 
-# Sem frase fixa, sem repetir. Tudo vem do cerebro.
-PERSONALIDADES = ["ORION", "FORJA", "【entity-LIA¦canonical_name=Lia】"]
+PERSONALIDADES = ["ORION", "FORJA", " LIA"]
 
 def processar_mensagem(personagem, mensagem):
-    # Limpa o nome, tira espaco, deixa maiusculo
     personagem = personagem.upper().strip()
     if personagem not in PERSONALIDADES:
         personagem = "ORION"
-    # Pergunta pro cerebro, que usa Meta primeiro, depois Gemini
     resultado = perguntar(personagem, mensagem)
     return resultado
 
@@ -30,3 +27,8 @@ class Orchestrator:
         return processar_mensagem(personagem, mensagem)
     def processar(self, personagem, mensagem):
         return processar_mensagem(personagem, mensagem)
+    def orquestrar(self, personagem, mensagem):
+        return processar_mensagem(personagem, mensagem)
+
+# Nome com letra minuscula que o main.py procura
+orchestrator = Orchestrator()

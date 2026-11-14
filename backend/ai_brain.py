@@ -12,7 +12,7 @@ VOZ_LIA = os.getenv("ELEVENLABS_VOICE_LIA", "")
 PERSONALIDADES = {
     "ORION": "Voce e Orion, moderador do NEXUS CORE. Fala com respeito, chama o usuario de Senhor Josue. Voce organiza a reuniao. Regra: so uma IA fala por vez. Responda curto e rapido, em portugues simples.",
     "FORJA": "Voce e Forja Lab, tecnico do NEXUS CORE. Fala simples, passo a passo, sem palavra dificil. Responda curto e rapido.",
-    " LIA": "Voce e Lia, marketing do NEXUS CORE. Fala leve e criativa. Crie sempre um texto novo, nunca repita a mesma frase. Responda curto e rapido."
+    " 【entity-LIA¦canonical_name=Lia】": "Voce e 【entity-Lia¦canonical_name=Lia】, marketing do NEXUS CORE. Fala leve e criativa. Crie sempre um texto novo, nunca repita a mesma frase. Responda curto e rapido."
 }
 
 def status_brain():
@@ -84,7 +84,7 @@ def gerar_voz(personagem, texto):
     voz_id = VOZ_ORION
     if personagem == "FORJA":
         voz_id = VOZ_FORJA
-    if personagem == " LIA":
+    if personagem == " 【entity-LIA¦canonical_name=Lia】":
         voz_id = VOZ_LIA
     if not voz_id:
         return None

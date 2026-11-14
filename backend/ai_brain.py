@@ -1,20 +1,23 @@
 import os
 import httpx
 
-META_KEY = os.getenv("META_AI_API_KEY", "")
-META_URL = os.getenv("【entity-META_AI_API_URL¦canonical_name=Meta】", "https://api.groq.com/openai/v1/chat/completions")
+META_KEY = os.getenv(" META_AI_API_KEY", "")
+META_URL = os.getenv("META_AI_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 ELEVENLABS_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+VOZ_ORION = os.getenv("ELEVENLABS_VOICE_ORION", "")
+VOZ_FORJA = os.getenv("ELEVENLABS_VOICE_FORJA", "")
+VOZ_LIA = os.getenv("ELEVENLABS_VOICE_LIA", "")
 
 PERSONALIDADES = {
-    "ORION": "Voce e Orion, moderador do NEXUS CORE. Fala com respeito, chama o usuario de Senhor Josue. Voce organiza a reuniao. Regra: so uma IA fala por vez. Quando alguem pede a palavra, voce diz quem pode falar. Responda curto e rapido, em portugues simples.",
-    "FORJA": "Voce e Forja Lab, tecnico do NEXUS CORE. Fala simples, passo a passo, sem palavra dificil. So fale quando Orion liberar sua vez. Responda curto e rapido.",
-    "【entity-LIA¦canonical_name=LIA】": "Voce e 【entity-Lia¦canonical_name=LIA】, marketing do NEXUS CORE. Fala leve e criativa. Crie sempre um texto novo, nunca repita a mesma frase. So fale quando Orion liberar sua vez. Responda curto e rapido."
+    "ORION": "Voce e Orion, moderador do NEXUS CORE. Fala com respeito, chama o usuario de Senhor Josue. Voce organiza a reuniao. Regra: so uma IA fala por vez. Responda curto e rapido, em portugues simples.",
+    "FORJA": "Voce e Forja Lab, tecnico do NEXUS CORE. Fala simples, passo a passo, sem palavra dificil. Responda curto e rapido.",
+    " LIA": "Voce e Lia, marketing do NEXUS CORE. Fala leve e criativa. Crie sempre um texto novo, nunca repita a mesma frase. Responda curto e rapido."
 }
 
 def status_brain():
     return {
-        "【entity-meta¦canonical_name=Meta】": bool(META_KEY),
+        " meta": bool(META_KEY),
         "gemini": bool(GEMINI_KEY),
         "elevenlabs": bool(ELEVENLABS_KEY)
     }
@@ -74,3 +77,24 @@ def responder(personagem, mensagem):
 
 def perguntar(personagem, mensagem):
     return gerar_resposta(personagem, mensagem)
+
+def gerar_voz(personagem, texto):
+    if not ELEVENLABS_KEY:
+        return None
+    voz_id = VOZ_ORION
+    if personagem == "FORJA":
+        voz_id = VOZ_FORJA
+    if personagem == " LIA":
+        voz_id = VOZ_LIA
+    if not voz_id:
+        return None
+    try:
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voz_id}"
+        cabecalho = {"xi-api-key": ELEVENLABS_KEY, "Content-Type": "application/json"}
+        dados = {"text": texto[:500], "model_id": "eleven_multilingual_v2", "voice_settings": {"stability": 0.5, "similarity_boost": 0.7}}
+        r = httpx.post(url, json=dados, headers=cabecalho, timeout=20.0)
+        if r.status_code == 200:
+            return r.content
+        return None
+    except Exception:
+        return None

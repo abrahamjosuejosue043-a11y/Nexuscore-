@@ -1,17 +1,12 @@
 import os
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
-from backend.ai_brain import gerar_resposta, status_brain
+from backend.ai_brain import gerar_resposta, status_brain, gerar_voz
 from backend.orchestrator import processar_mensagem, orchestrator
 
 app = FastAPI(title="NEXUS CORE")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 @app.get("/api/health")
 def health():
@@ -26,19 +21,15 @@ async def chat(req: Request):
     resultado = processar_mensagem(quem, mensagem)
     return JSONResponse(resultado)
 
-@app.post("/api/reuniao/iniciar")
-async def reuniao_iniciar(req: Request):
+@app.post("/api/voz")
+async def voz(req: Request):
     dados = await req.json()
-    mensagem = dados.get("mensagem", "inicia reuniao")
-    resultado = processar_mensagem("ORION", mensagem)
-    return JSONResponse(resultado)
-
-@app.post("/api/reuniao/pedir-palavra")
-async def pedir_palavra(req: Request):
-    dados = await req.json()
-    quem = str(dados.get("quem", "FORJA")).upper().strip()
-    resultado = orchestrator.pedir_palavra(quem, "pedir a palavra")
-    return JSONResponse(resultado)
+    quem = str(dados.get("quem", "ORION")).upper().strip()
+    texto = str(dados.get("texto", ""))[:500]
+    audio = gerar_voz(quem, texto)
+    if audio:
+        return Response(content=audio, media_type="audio/mpeg")
+    return JSONResponse({"ok": False, "erro": "ElevenLabs sem voz"}, status_code=404)
 
 @app.get("/api/email/ideias-novas")
 def ideias_novas():
@@ -56,7 +47,3 @@ def home():
         with open(caminho, "r", encoding="utf-8") as f:
             return HTMLResponse(f.read())
     return HTMLResponse("<h1>NEXUS CORE Online</h1>")
-
-@app.get("/api/status")
-def status():
-    return health()

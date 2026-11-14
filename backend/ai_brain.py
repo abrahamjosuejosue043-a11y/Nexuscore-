@@ -1,16 +1,15 @@
-# NEXUS CORE - Codigo que liga as chaves novas
 import os
 import httpx
 
-META_KEY = os.getenv("【entity-META_AI_API_KEY¦canonical_name=Meta】", "")
-META_URL = os.getenv("META_AI_API_URL", "https://api.groq.com/openai/v1/chat/completions")
+META_KEY = os.getenv("META_AI_API_KEY", "")
+META_URL = os.getenv("【entity-META_AI_API_URL¦canonical_name=Meta】", "https://api.groq.com/openai/v1/chat/completions")
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 ELEVENLABS_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 
 PERSONALIDADES = {
-    "ORION": "Voce e Orion, moderador do NEXUS CORE. Fala com respeito, chama o usuario de Senhor Josue, organiza a reuniao, pede a palavra antes de falar.",
-    "FORJA": "Voce e Forja Lab, tecnico do NEXUS CORE. Fala simples, explica passo a passo, sem palavra dificil.",
-    "【entity-LIA¦canonical_name=Lia】": "Voce e 【entity-Lia¦canonical_name=Lia】, marketing do NEXUS CORE. Fala leve, criativa, cria textos novos, nunca repete a mesma frase."
+    "ORION": "Voce e Orion, moderador do NEXUS CORE. Fala com respeito, chama o usuario de Senhor Josue. Voce organiza a reuniao. Regra: so uma IA fala por vez. Quando alguem pede a palavra, voce diz quem pode falar. Responda curto e rapido, em portugues simples.",
+    "FORJA": "Voce e Forja Lab, tecnico do NEXUS CORE. Fala simples, passo a passo, sem palavra dificil. So fale quando Orion liberar sua vez. Responda curto e rapido.",
+    "【entity-LIA¦canonical_name=LIA】": "Voce e 【entity-Lia¦canonical_name=LIA】, marketing do NEXUS CORE. Fala leve e criativa. Crie sempre um texto novo, nunca repita a mesma frase. So fale quando Orion liberar sua vez. Responda curto e rapido."
 }
 
 def status_brain():
@@ -22,7 +21,6 @@ def status_brain():
 
 def falar_com_meta(personagem, mensagem):
     if not META_KEY:
-        print("【entity-Meta¦canonical_name=Meta】 sem chave")
         return None
     try:
         prompt = PERSONALIDADES.get(personagem, PERSONALIDADES["ORION"])
@@ -33,42 +31,30 @@ def falar_com_meta(personagem, mensagem):
                 {"role": "user", "content": mensagem}
             ],
             "temperature": 0.7,
-            "max_tokens": 800
+            "max_tokens": 400
         }
-        cabecalho = {
-            "Authorization": f"Bearer {META_KEY}",
-            "Content-Type": "application/json"
-        }
-        resposta = httpx.post(META_URL, json=dados, headers=cabecalho, timeout=30.0)
-        print(f"Meta status: {resposta.status_code}")
+        cabecalho = {"Authorization": f"Bearer {META_KEY}", "Content-Type": "application/json"}
+        resposta = httpx.post(META_URL, json=dados, headers=cabecalho, timeout=15.0)
         if resposta.status_code == 200:
             dado = resposta.json()
             return dado["choices"][0]["message"]["content"]
-        print(f"Meta erro: {resposta.text[:200]}")
         return None
-    except Exception as e:
-        print(f"Erro Meta: {e}")
+    except Exception:
         return None
 
 def falar_com_gemini(personagem, mensagem):
     if not GEMINI_KEY:
-        print("Gemini sem chave")
         return None
     try:
         prompt = PERSONALIDADES.get(personagem, PERSONALIDADES["ORION"])
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
-        dados = {
-            "contents": [{"parts": [{"text": prompt + "\n\nUsuario: " + mensagem}]}]
-        }
-        resposta = httpx.post(url, json=dados, timeout=30.0)
-        print(f"Gemini status: {resposta.status_code}")
+        dados = {"contents": [{"parts": [{"text": prompt + "\n\nUsuario: " + mensagem}]}]}
+        resposta = httpx.post(url, json=dados, timeout=15.0)
         if resposta.status_code == 200:
             dado = resposta.json()
             return dado["candidates"][0]["content"]["parts"][0]["text"]
-        print(f"Gemini erro: {resposta.text[:200]}")
         return None
-    except Exception as e:
-        print(f"Erro Gemini: {e}")
+    except Exception:
         return None
 
 def gerar_resposta(personagem, mensagem):
@@ -81,7 +67,7 @@ def gerar_resposta(personagem, mensagem):
     texto = falar_com_gemini(personagem, mensagem)
     if texto:
         return {"quem": personagem, "texto": texto, "fonte": "gemini"}
-    return {"quem": personagem, "texto": f"Senhor Josue, a Meta e o Gemini estao sem resposta agora. Vou tentar de novo em um minuto. Sua mensagem foi: {mensagem}", "fonte": "aviso"}
+    return {"quem": personagem, "texto": f"Senhor Josue, estou tentando ligar de novo. Sua mensagem foi: {mensagem}. Tente outra vez em alguns segundos.", "fonte": "aviso"}
 
 def responder(personagem, mensagem):
     return gerar_resposta(personagem, mensagem)

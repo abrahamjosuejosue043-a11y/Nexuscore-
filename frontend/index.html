@@ -3,84 +3,189 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEXUS CORE • Innova XR</title>
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0064E0">
+<title>NEXUS CORE - Innova XR</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#F0F2F5;color:#1C1E21}
-.top{background:#fff;border-bottom:1px solid #ddd;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
-.logo{font-weight:800;font-size:18px;color:#0064E0}.logo span{color:#7C3AED}
-.pill{font-size:11px;background:#E7F3FF;color:#0064E0;padding:5px 8px;border-radius:20px}
-.wrap{max-width:720px;margin:0 auto;padding:14px}
-.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-h2{margin:0 0 8px;font-size:16px}h3{margin:8px 0;font-size:14px}
-.row{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:20px;padding:10px 14px;font-weight:700;cursor:pointer;background:#E4E6EB}
-.btn.blue{background:#0064E0;color:#fff}.btn.green{background:#00A400;color:#fff}.btn.purple{background:#7C3AED;color:#fff}
-.btn.active{outline:2px solid #0064E0}
-.ai{display:flex;gap:10px;align-items:center;border:1px solid #eee;border-radius:12px;padding:10px;margin-top:8px}
-.avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px}
-.o{background:#0064E0}.f{background:#111}.l{background:#E1306C}
-#chat{height:260px;overflow:auto;background:#F8F9FA;border-radius:12px;padding:10px}
-.msg{margin:6px 0;padding:8px 10px;border-radius:12px;max-width:85%;font-size:14px;line-height:1.4}
-.me{background:#0064E0;color:#fff;margin-left:auto}.ai-msg{background:#fff;border:1px solid #eee}
-input,select,textarea{width:100%;padding:11px;border:1px solid #ddd;border-radius:10px;font-size:14px}
-.flex{display:flex;gap:8px}.flex input{flex:1}
-.kanban{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.col{background:#F0F2F5;border-radius:10px;padding:8px;min-height:100px}
-.task{background:#fff;border-radius:8px;padding:8px;margin:6px 0;font-size:13px}
-.small{font-size:12px;color:#65676B}
-.center{text-align:center;padding:40px 16px}.big{font-size:42px;font-weight:900;color:#0064E0;letter-spacing:-1px}.big span{color:#7C3AED}
-.hidden{display:none}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f0f2f5;color:#111}
+.topo{background:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+.logo{font-weight:800;color:#1877f2;font-size:20px}.logo span{color:#111;font-size:11px;display:block;color:#666;font-weight:400}
+.icones{display:flex;gap:10px;align-items:center}.bolaJ{width:36px;height:36px;border-radius:50%;background:#1877f2;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.stories{display:flex;gap:16px;padding:14px 16px;background:#fff;overflow-x:auto}
+.storie{text-align:center;font-size:12px}.circulo{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;margin:auto}
+.card-voz{background:#0a1f44;color:#fff;margin:14px;border-radius:24px;padding:22px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.mic{width:110px;height:110px;border-radius:50%;background:#1877f2;margin:14px auto;display:flex;align-items:center;justify-content:center;font-size:48px;cursor:pointer;position:relative}
+.mic.ativo{animation:pulso 1.2s infinite}
+@keyframes pulso{0%{box-shadow:0 0 0 0 rgba(24,119,242,.6)}100%{box-shadow:0 0 0 28px rgba(24,119,242,0)}}
+.onda{height:36px;background:linear-gradient(90deg,#1877f2,#00c6ff,#1877f2);border-radius:20px;opacity:.9;margin:12px 0}
+.chat{background:#fff;margin:0 14px 14px;border-radius:18px;padding:14px}
+.msg{background:#f0f2f5;border-radius:14px;padding:12px;margin:8px 0}
+.input-row{display:flex;gap:8px;margin-top:10px}.input-row input{flex:1;padding:12px;border-radius:20px;border:1px solid #ddd}.input-row button{background:#1877f2;color:#fff;border:none;padding:12px 16px;border-radius:20px;font-weight:700}
+.menu{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;justify-content:space-around;padding:12px 0;border-top:1px solid #eee}
+.menu button{border:none;background:none;font-size:14px}.menu .ativo{color:#1877f2;font-weight:700}
+.kanban{display:flex;gap:10px;padding:0 14px 90px}.col{flex:1;background:#fff;border-radius:14px;padding:10px}.col h3{font-size:14px}.task{background:#f0f2f5;padding:10px;border-radius:10px;margin:8px 0;font-size:13px}
+#tela-login,#tela-carregando{position:fixed;inset:0;background:#0a1f44;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20}
+#tela-login input{padding:12px;border-radius:12px;border:none;margin:6px;width:260px}
+#tela-login button{padding:12px 22px;border-radius:12px;border:none;background:#1877f2;color:#fff;font-weight:700}
+.escondido{display:none!important}
 </style>
 </head>
 <body>
-<div id="loading" class="center"><div class="big">N<span>EXUS</span> CORE</div><p>Innova XR • Carregando...</p></div>
+<div id="tela-carregando"><h1>NEXUS CORE</h1><p>Innova XR</p><p>Carregando...</p></div>
+<div id="tela-login" class="escondido"><h1>NEXUS CORE</h1><p>Innova XR</p><input id="login-user" placeholder="Usuario"><input id="login-senha" type="password" placeholder="Senha"><button onclick="fazerLogin()">Entrar</button><p id="login-erro"></p></div>
 
-<div id="login" class="wrap hidden">
-<div class="center"><div class="big">N<span>EXUS</span> CORE</div><p>Innova XR • Orion • Forja • Lia</p></div>
-<div class="card"><h2>Entrar</h2><p class="small">Use seu login da Innova XR</p><input id="user" placeholder="Usuário - ex: Josue"><br><br><input id="pass" type="password" placeholder="Senha"><br><br><button class="btn blue" style="width:100%" onclick="fazerLogin()">Entrar</button><p id="loginErro" class="small" style="color:red"></p></div>
+<div id="app" class="escondido">
+<div class="topo"><div class="logo">NEXUS CORE<span>Innova XR</span></div><div class="icones"><span id="status-meta">Meta: ...</span><span id="status-gemini">Gemini: ...</span><div class="bolaJ">J</div></div></div>
+<div class="stories">
+<div class="storie"><div class="circulo" style="background:#1877f2">O</div>Orion</div>
+<div class="storie"><div class="circulo" style="background:#f97316">F</div>Forja</div>
+<div class="storie"><div class="circulo" style="background:#7c3aed">L</div>Lia</div>
+<div class="storie"><div class="circulo" style="background:#fff;color:#1877f2;border:2px dashed #1877f2">+</div>Projeto</div>
 </div>
 
-<div id="app" class="hidden">
-<div class="top"><div class="logo">N<span>EXUS</span> CORE</div><div><span class="pill" id="statusMeta">Meta: ...</span> <span class="pill" id="statusGemini">Gemini: ...</span></div></div>
-<div class="wrap">
-<div class="card"><h2>Olá, Senhor Josué</h2><p class="small">Equipe pronta. Fale <b>“inicia reunião”</b> ou escreva abaixo.</p>
-<div class="row"><button class="btn blue" onclick="iniciarReuniao()">COLETIVA • Iniciar reunião</button><button class="btn" id="btnMic" onclick="toggleMic()">MIC • Ligado</button><button class="btn" onclick="mostrarProjeto()">PROJETO</button><button class="btn green" onclick="enviarRelatorio()">Enviar relatório</button><button class="btn purple" onclick="checarIdeias()">Checar ideias do e-mail</button></div>
-<p class="small" id="statusReuniao">Reunião: parada • Quem está falando: -</p></div>
+<div id="aba-inicio">
+<div class="card-voz">
+<div>VOZ ATIVA - NEXUS CORE</div>
+<div id="botao-mic" class="mic" onclick="ligarMicrofone()">🎤</div>
+<div id="texto-ouvindo">Aperte o microfone para ativar. Depois ele fica sempre ativo.</div>
+<div class="onda"></div>
+<div><b>Ouvindo... diga: inicia reunião</b></div>
+<div style="font-size:13px;opacity:.8">Elas falam uma por vez, sem interromper</div>
+<div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
+<button onclick="iniciarReuniao()" style="padding:10px 14px;border-radius:12px;border:none;background:#fff;color:#0a1f44;font-weight:700">Iniciar Reunião</button>
+<button onclick="pedirPalavra('FORJA')" style="padding:10px 14px;border-radius:12px;border:none;background:#f97316;color:#fff;font-weight:700">Forja pedir a palavra</button>
+<button onclick="pedirPalavra('LIA')" style="padding:10px 14px;border-radius:12px;border:none;background:#7c3aed;color:#fff;font-weight:700">Lia pedir a palavra</button>
+</div>
+</div>
+<div class="chat">
+<div><b>Orion • Moderador</b> <span style="color:green">Online</span></div>
+<div id="mensagens"><div class="msg">Bom dia, Senhor Josué, reunião pronta. Aperte o microfone e diga: inicia reunião.</div></div>
+<div style="display:flex;gap:6px;margin-top:8px">
+<button onclick="trocarQuem('ORION')">Orion</button><button onclick="trocarQuem('FORJA')">Forja</button><button onclick="trocarQuem('LIA')">Lia</button><span id="quem-atual">Falando com: ORION</span>
+</div>
+<div class="input-row"><input id="campo-msg" placeholder="Pergunte ao NEXUS..."><button onclick="enviarMensagem()">Enviar</button></div>
+<div style="margin-top:10px;display:flex;gap:8px"><button onclick="testarEmail()">Ver ideias do e-mail</button><button onclick="parar()">Para</button><button onclick="encerrarReuniao()">Encerrar reunião</button></div>
+</div>
+</div>
 
-<div class="card"><h2>Equipe</h2>
-<div class="ai"><div class="avatar o">O</div><div><b>ORION</b> • Chefe • Moderador<br><span class="small">Organiza, dá a palavra, aprova.</span></div><button class="btn" onclick="selecionar('ORION')">Falar com Orion</button></div>
-<div class="ai"><div class="avatar f">F</div><div><b>FORJA</b> • Lab<br><span class="small">Código, imagem, texto técnico.</span></div><button class="btn" onclick="selecionar('FORJA')">Falar com Forja</button></div>
-<div class="ai"><div class="avatar l">L</div><div><b>LIA</b> • Marketing<br><span class="small">Copy, legenda, roteiro leve.</span></div><button class="btn" onclick="selecionar('LIA')">Falar com Lia</button></div>
-<p class="small">Falando agora com: <b id="quemAtual">ORION</b> • Toque no nome pra trocar. Na reunião, eles pedem a palavra e não falam por cima.</p></div>
-
-<div class="card"><h2>Conversa</h2><div id="chat"></div><br><div class="flex"><input id="msg" placeholder="Ex: inicia reunião, como está o projeto, Forja cria um texto..."><button class="btn blue" onclick="enviar()">Enviar</button></div><div class="row" style="margin-top:8px"><button class="btn" onclick="comandoRapido('inicia reunião')">inicia reunião</button><button class="btn" onclick="comandoRapido('encerrar reunião')">encerrar reunião</button><button class="btn" onclick="comandoRapido('para')">para / silêncio</button><button class="btn" onclick="comandoRapido('pedir a palavra')">pedir a palavra</button></div></div>
-
-<div class="card" id="projetoCard"><h2>Projeto • Desenvolvimento</h2><div class="flex"><input id="novaTarefa" placeholder="Nova tarefa..."><select id="tarefaQuem"><option>ORION</option><option>FORJA</option><option>LIA</option></select><button class="btn blue" onclick="addTarefa()">Adicionar</button></div><br><div class="kanban"><div class="col"><b>A fazer</b><div id="colTodo"></div></div><div class="col"><b>Fazendo</b><div id="colDoing"></div></div><div class="col"><b>Feito</b><div id="colDone"></div></div></div></div>
-
-<div class="card"><h2>Voz</h2><p class="small">Aperta pra ouvir a voz de cada um.</p><div class="row"><button class="btn" onclick="falar('ORION','Olá Senhor Josué, sou Orion, chefe da reunião.')">Ouvir Orion</button><button class="btn" onclick="falar('FORJA','Olá Senhor Josué, sou Forja, do Lab.')">Ouvir Forja</button><button class="btn" onclick="falar('LIA','Olá Senhor Josué, sou Lia, do Marketing.')">Ouvir 【entity-Lia¦canonical_name=LIA】</button></div></div>
-</div></div>
+<div id="aba-projeto" class="escondido">
+<div style="padding:0 14px"><h2>Projeto</h2><div class="input-row"><input id="nova-tarefa" placeholder="Nova tarefa..."><button onclick="adicionarTarefa()">Adicionar</button></div></div>
+<div class="kanban">
+<div class="col"><h3>A Fazer</h3><div id="col-todo"></div></div>
+<div class="col"><h3>Fazendo</h3><div id="col-doing"></div></div>
+<div class="col"><h3>Feito</h3><div id="col-done"></div></div>
+</div>
+</div>
+</div>
+<div class="menu"><button class="ativo" onclick="mostrarAba('inicio',this)">Início</button><button onclick="mostrarAba('inicio',this)">Reunião</button><button onclick="mostrarAba('projeto',this)">Projeto</button><button onclick="mostrarAba('inicio',this)">Criar</button></div>
 
 <script>
-let quem='ORION', micLigado=true, reuniao=false;
-setTimeout(()=>{document.getElementById('loading').classList.add('hidden');document.getElementById('login').classList.remove('hidden');},800);
-function fazerLogin(){let u=document.getElementById('user').value.trim(),p=document.getElementById('pass').value.trim();if(u.toLowerCase()==='josue'&&p==='innovaxr2026'){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');carregarStatus();carregarProjeto();addMsg('ORION','Bem-vindo, Senhor Josué. Equipe pronta. Fale "inicia reunião" quando quiser.');}else{document.getElementById('loginErro').innerText='Usuário ou senha errados. Tente Josue / innovaxr2026';}}
-function selecionar(q){quem=q;document.getElementById('quemAtual').innerText=q;addMsg(q,'Você selecionou '+q+'. Pode falar, Senhor Josué.');}
-function addMsg(q,t){let c=document.getElementById('chat');let d=document.createElement('div');d.className='msg '+(q==='VOCÊ'?'me':'ai-msg');d.innerHTML='<b>'+q+':</b> '+t;c.appendChild(d);c.scrollTop=c.scrollHeight;}
-async function carregarStatus(){try{let r=await fetch('/api/health');let j=await r.json();document.getElementById('statusMeta').innerText='Meta: '+(j.meta?'Online':'Off');document.getElementById('statusGemini').innerText='Gemini: '+(j.gemini_backup?'Backup On':'Off');}catch(e){}}
-async function enviar(){let inp=document.getElementById('msg');let texto=inp.value.trim();if(!texto)return;addMsg('VOCÊ',texto);inp.value='';await processar(texto);}
-function comandoRapido(t){document.getElementById('msg').value=t;enviar();}
-async function processar(texto){let low=texto.toLowerCase();if(low.includes('inicia reunião')||low.includes('inicia reuniao')){return iniciarReuniao();}if(low.includes('encerrar reunião')||low.includes('encerrar reuniao')){return encerrarReuniao();}if(low.includes('para')||low.includes('silêncio')||low.includes('silencio')||low.includes('espera')){addMsg('ORION','Entendido, Senhor Josué. Pausando, todos em silêncio.');return;}if(low.includes('pedir a palavra')){addMsg(quem,'Posso falar, Senhor Josué?');return;}if(low.includes('forja'))quem='FORJA';else if(low.includes('lia'))quem='LIA';else if(low.includes('orion'))quem='ORION';document.getElementById('quemAtual').innerText=quem;try{let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quem:quem,pergunta:texto})});let j=await r.json();addMsg(j.quem||quem,j.resposta||'Entendido, Senhor Josué.');if(micLigado) falar(quem,j.resposta);}catch(e){addMsg(quem,'Entendido, Senhor Josué. Já estou organizando.');}}
-async function iniciarReuniao(){reuniao=true;document.getElementById('statusReuniao').innerText='Reunião: ligada • Quem está falando: ORION';addMsg('ORION','Reunião iniciada, Senhor Josué. Eu sou o moderador. Forja e Lia, peçam a palavra antes de falar.');setTimeout(()=>addMsg('FORJA','Posso falar, Senhor Josué? Estou pronto no Lab.'),900);setTimeout(()=>addMsg('【entity-LIA¦canonical_name=LIA】','Posso falar, Senhor Josué? Já tenho uma ideia leve pra você.'),1800);}
-function encerrarReuniao(){reuniao=false;document.getElementById('statusReuniao').innerText='Reunião: parada • Quem está falando: -';addMsg('ORION','Reunião encerrada, Senhor Josué. Resumo salvo.');}
-function toggleMic(){micLigado=!micLigado;document.getElementById('btnMic').innerText=micLigado?'MIC • Ligado':'MIC • Desligado (bloqueio de ruído)';addMsg('ORION',micLigado?'Microfone ligado, bloqueio de ruído ativo.':'Microfone pausado.');}
-function mostrarProjeto(){document.getElementById('projetoCard').scrollIntoView({behavior:'smooth'});carregarProjeto();}
-async function carregarProjeto(){try{let r=await fetch('/api/project');let j=await r.json();let tarefas=j.tarefas||[];let todo=document.getElementById('colTodo'),doing=document.getElementById('colDoing'),done=document.getElementById('colDone');todo.innerHTML='';doing.innerHTML='';done.innerHTML='';tarefas.forEach(t=>{let d=document.createElement('div');d.className='task';d.innerHTML='<b>['+t.quem+']</b> '+t.titulo+'<br><span class="small">'+t.status+' • '+t.progresso+'%</span><br><button onclick="mover('+t.id+',\'fazendo\')">Fazendo</button> <button onclick="mover('+t.id+',\'feito\')">Feito</button>';if(t.status==='todo')todo.appendChild(d);else if(t.status==='fazendo')doing.appendChild(d);else done.appendChild(d);});}catch(e){}}
-async function addTarefa(){let titulo=document.getElementById('novaTarefa').value.trim();if(!titulo)return;let q=document.getElementById('tarefaQuem').value;await fetch('/api/project/task',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quem:q,titulo:titulo,status:'todo'})});document.getElementById('novaTarefa').value='';carregarProjeto();}
-async function mover(id,st){await fetch('/api/project/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:st})});carregarProjeto();}
-async function falar(q,texto){try{let r=await fetch('/api/voice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quem:q,texto:texto})});if(!r.ok)return;let blob=await r.blob();let a=new Audio(URL.createObjectURL(blob));a.play();}catch(e){}}
-async function enviarRelatorio(){addMsg('ORION','Enviando relatório pro seu e-mail pessoal, Senhor Josué...');let r=await fetch('/api/email/relatorio',{method:'POST'});let j=await r.json();addMsg('ORION',j.mensagem||'Relatório enviado.');}
-async function checarIdeias(){addMsg('ORION','Checando ideias do e-mail da Nexus...');let r=await fetch('/api/email/ideias-novas');let j=await r.json();addMsg('ORION','Encontrei '+j.quantidade+' ideia(s). Eu recebi primeiro e já passei pro time. Olha no Projeto.');carregarProjeto();}
-document.getElementById('msg').addEventListener('keydown',e=>{if(e.key==='Enter')enviar();});
+let quemAtual = "ORION";
+let reconhecimento = null;
+let microfoneAtivo = false;
+let tarefas = [];
+
+setTimeout(()=>{document.getElementById("tela-carregando").classList.add("escondido");document.getElementById("tela-login").classList.remove("escondido");},1200);
+function fazerLogin(){
+  let u=document.getElementById("login-user").value.trim();
+  let s=document.getElementById("login-senha").value.trim();
+  if(u==="Josue" && s==="innovaxr2026"){
+    document.getElementById("tela-login").classList.add("escondido");
+    document.getElementById("app").classList.remove("escondido");
+    carregarStatus();
+  } else { document.getElementById("login-erro").innerText="Usuario ou senha errada. Use Josue / innovaxr2026"; }
+}
+async function carregarStatus(){
+  try{ let r=await fetch("/api/health"); let j=await r.json();
+    document.getElementById("status-meta").innerText="Meta: "+(j.meta?"Online":"Off");
+    document.getElementById("status-gemini").innerText="Gemini: "+(j.gemini?"Backup On":"Off");
+  }catch(e){}
+}
+function trocarQuem(q){ quemAtual=q; document.getElementById("quem-atual").innerText="Falando com: "+q; }
+function mostrarAba(aba,btn){
+  document.querySelectorAll(".menu button").forEach(b=>b.classList.remove("ativo")); if(btn) btn.classList.add("ativo");
+  document.getElementById("aba-inicio").classList.toggle("escondido", aba!=="inicio");
+  document.getElementById("aba-projeto").classList.toggle("escondido", aba!=="projeto");
+}
+function addMsg(quem, texto){
+  let d=document.createElement("div"); d.className="msg"; d.innerHTML="<b>"+quem+"</b>: "+texto;
+  document.getElementById("mensagens").appendChild(d);
+  falarVoz(texto, quem);
+}
+async function enviarMensagem(){
+  let campo=document.getElementById("campo-msg"); let texto=campo.value.trim(); if(!texto) return;
+  addMsg("Você", texto); campo.value="";
+  document.getElementById("texto-ouvindo").innerText="Pensando... resposta rápida...";
+  try{
+    let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:quemAtual,mensagem:texto})});
+    let j=await r.json(); addMsg(j.quem||quemAtual, j.texto||"Sem resposta");
+  }catch(e){ addMsg("ORION","Sem conexão agora. Tente de novo."); }
+  document.getElementById("texto-ouvindo").innerText="Ouvindo sempre... diga: inicia reunião";
+}
+async function iniciarReuniao(){
+  addMsg("Você","inicia reunião");
+  let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:"ORION",mensagem:"inicia reuniao"})});
+  let j=await r.json(); addMsg(j.quem, j.texto);
+}
+async function pedirPalavra(q){
+  let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:q,mensagem:"pedir a palavra"})});
+  let j=await r.json(); addMsg(j.quem, j.texto);
+}
+async function encerrarReuniao(){
+  let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:"ORION",mensagem:"encerrar reuniao"})});
+  let j=await r.json(); addMsg(j.quem, j.texto);
+}
+function parar(){ addMsg("Você","para"); }
+async function testarEmail(){
+  let r=await fetch("/api/email/ideias-novas"); let j=await r.json();
+  addMsg("ORION","Ideias novas no e-mail: "+(j.quantidade||0));
+}
+function falarVoz(texto, quem){
+  try{
+    if("speechSynthesis" in window){
+      let u=new SpeechSynthesisUtterance(texto); u.lang="pt-BR"; u.rate=1.0; window.speechSynthesis.speak(u);
+    }
+  }catch(e){}
+}
+function ligarMicrofone(){
+  microfoneAtivo=true;
+  document.getElementById("botao-mic").classList.add("ativo");
+  document.getElementById("texto-ouvindo").innerText="Microfone ativo, sempre ouvindo... diga: inicia reunião";
+  iniciarEscuta();
+}
+function iniciarEscuta(){
+  try{
+    let Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!Rec){ document.getElementById("texto-ouvindo").innerText="Seu Chrome não tem voz. Use o botão Enviar."; return; }
+    if(reconhecimento){ reconhecimento.stop(); }
+    reconhecimento=new Rec(); reconhecimento.lang="pt-BR"; reconhecimento.continuous=true; reconhecimento.interimResults=false;
+    reconhecimento.onresult=function(e){
+      let texto=e.results[e.results.length-1][0].transcript;
+      document.getElementById("campo-msg").value=texto;
+      document.getElementById("texto-ouvindo").innerText="Ouvi: "+texto;
+      enviarMensagem();
+    };
+    reconhecimento.onend=function(){ if(microfoneAtivo){ iniciarEscuta(); } };
+    reconhecimento.start();
+  }catch(e){}
+}
+function adicionarTarefa(){
+  let v=document.getElementById("nova-tarefa").value.trim(); if(!v) return;
+  tarefas.push({texto:v, status:"todo"}); document.getElementById("nova-tarefa").value=""; renderTarefas();
+}
+function moverTarefa(i, novo){
+  tarefas[i].status=novo; renderTarefas();
+}
+function renderTarefas(){
+  let todo=document.getElementById("col-todo"), doing=document.getElementById("col-doing"), done=document.getElementById("col-done");
+  todo.innerHTML=""; doing.innerHTML=""; done.innerHTML="";
+  tarefas.forEach((t,i)=>{
+    let d=document.createElement("div"); d.className="task"; d.innerText=t.texto+" ";
+    let b1=document.createElement("button"); b1.innerText="→"; b1.onclick=()=>{ if(t.status==="todo") moverTarefa(i,"doing"); else if(t.status==="doing") moverTarefa(i,"done"); };
+    d.appendChild(b1);
+    if(t.status==="todo") todo.appendChild(d);
+    if(t.status==="doing") doing.appendChild(d);
+    if(t.status==="done") done.appendChild(d);
+  });
+}
 </script>
 </body>
 </html>

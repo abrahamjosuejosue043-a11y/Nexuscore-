@@ -1,29 +1,30 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEXUS CORE - Innova XR</title>
+<【entity-meta¦canonical_name=Meta】 charset="UTF-8">
+<【entity-meta¦canonical_name=Meta】 name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS CORE</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f0f2f5;color:#111}
-.topo{background:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
-.logo{font-weight:800;color:#1877f2;font-size:20px}.logo span{color:#111;font-size:11px;display:block;color:#666;font-weight:400}
-.icones{display:flex;gap:10px;align-items:center}.bolaJ{width:36px;height:36px;border-radius:50%;background:#1877f2;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
-.stories{display:flex;gap:16px;padding:14px 16px;background:#fff;overflow-x:auto}
-.storie{text-align:center;font-size:12px}.circulo{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;margin:auto}
-.card-voz{background:#0a1f44;color:#fff;margin:14px;border-radius:24px;padding:22px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-.mic{width:110px;height:110px;border-radius:50%;background:#1877f2;margin:14px auto;display:flex;align-items:center;justify-content:center;font-size:48px;cursor:pointer;position:relative}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#18191a;color:#e4e6eb}
+.topo{background:#242526;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-weight:800;color:#1877f2;font-size:20px}.logo span{display:block;font-size:11px;color:#b0b3b8;font-weight:400}
+.bolaJ{width:36px;height:36px;border-radius:50%;background:#1877f2;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+.stories{display:flex;gap:16px;padding:14px 16px;background:#242526;overflow-x:auto}
+.storie{text-align:center;font-size:12px;color:#b0b3b8}.circulo{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;margin:auto}
+.card-voz{background:#242526;margin:14px;border-radius:20px;padding:20px;text-align:center}
+.mic{width:96px;height:96px;border-radius:50%;background:#1877f2;margin:12px auto;display:flex;align-items:center;justify-content:center;font-size:42px;cursor:pointer}
 .mic.ativo{animation:pulso 1.2s infinite}
-@keyframes pulso{0%{box-shadow:0 0 0 0 rgba(24,119,242,.6)}100%{box-shadow:0 0 0 28px rgba(24,119,242,0)}}
-.onda{height:36px;background:linear-gradient(90deg,#1877f2,#00c6ff,#1877f2);border-radius:20px;opacity:.9;margin:12px 0}
-.chat{background:#fff;margin:0 14px 14px;border-radius:18px;padding:14px}
-.msg{background:#f0f2f5;border-radius:14px;padding:12px;margin:8px 0}
-.input-row{display:flex;gap:8px;margin-top:10px}.input-row input{flex:1;padding:12px;border-radius:20px;border:1px solid #ddd}.input-row button{background:#1877f2;color:#fff;border:none;padding:12px 16px;border-radius:20px;font-weight:700}
-.menu{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;justify-content:space-around;padding:12px 0;border-top:1px solid #eee}
-.menu button{border:none;background:none;font-size:14px}.menu .ativo{color:#1877f2;font-weight:700}
-.kanban{display:flex;gap:10px;padding:0 14px 90px}.col{flex:1;background:#fff;border-radius:14px;padding:10px}.col h3{font-size:14px}.task{background:#f0f2f5;padding:10px;border-radius:10px;margin:8px 0;font-size:13px}
-#tela-login,#tela-carregando{position:fixed;inset:0;background:#0a1f44;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20}
-#tela-login input{padding:12px;border-radius:12px;border:none;margin:6px;width:260px}
+@keyframes pulso{0%{box-shadow:0 0 0 0 rgba(24,119,242,.6)}100%{box-shadow:0 0 0 26px rgba(24,119,242,0)}}
+.onda{height:30px;background:linear-gradient(90deg,#1877f2,#00c6ff,#1877f2);border-radius:20px;opacity:.8;margin:10px 0}
+.chat{background:#242526;margin:0 14px 14px;border-radius:18px;padding:14px}
+.msg{background:#3a3b3c;border-radius:14px;padding:12px;margin:8px 0}
+.input-row{display:flex;gap:8px;margin-top:10px}.input-row input{flex:1;padding:12px;border-radius:20px;border:none;background:#3a3b3c;color:#fff}.input-row button{background:#1877f2;color:#fff;border:none;padding:12px 16px;border-radius:20px;font-weight:700}
+.menu{position:fixed;bottom:0;left:0;right:0;background:#242526;display:flex;justify-content:space-around;padding:12px 0;border-top:1px solid #3a3b3c}
+.menu button{border:none;background:none;color:#b0b3b8;font-size:14px}.menu .ativo{color:#1877f2;font-weight:700}
+.projetos{padding:0 14px 90px}.abas-proj{display:flex;gap:8px;flex-wrap:wrap}.abas-proj button{padding:8px 12px;border-radius:16px;border:none;background:#3a3b3c;color:#fff}.abas-proj .ativo{background:#1877f2}
+.card-proj{background:#242526;border-radius:14px;padding:12px;margin:10px 0}
+#tela-login,#tela-carregando{position:fixed;inset:0;background:#18191a;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20}
+#tela-login input{padding:12px;border-radius:12px;border:none;margin:6px;width:260px;background:#3a3b3c;color:#fff}
 #tela-login button{padding:12px 22px;border-radius:12px;border:none;background:#1877f2;color:#fff;font-weight:700}
 .escondido{display:none!important}
 </style>
@@ -31,161 +32,45 @@
 <body>
 <div id="tela-carregando"><h1>NEXUS CORE</h1><p>Innova XR</p><p>Carregando...</p></div>
 <div id="tela-login" class="escondido"><h1>NEXUS CORE</h1><p>Innova XR</p><input id="login-user" placeholder="Usuario"><input id="login-senha" type="password" placeholder="Senha"><button onclick="fazerLogin()">Entrar</button><p id="login-erro"></p></div>
-
 <div id="app" class="escondido">
-<div class="topo"><div class="logo">NEXUS CORE<span>Innova XR</span></div><div class="icones"><span id="status-meta">Meta: ...</span><span id="status-gemini">Gemini: ...</span><div class="bolaJ">J</div></div></div>
-<div class="stories">
-<div class="storie"><div class="circulo" style="background:#1877f2">O</div>Orion</div>
-<div class="storie"><div class="circulo" style="background:#f97316">F</div>Forja</div>
-<div class="storie"><div class="circulo" style="background:#7c3aed">L</div>Lia</div>
-<div class="storie"><div class="circulo" style="background:#fff;color:#1877f2;border:2px dashed #1877f2">+</div>Projeto</div>
-</div>
+<div class="topo"><div class="logo">NEXUS CORE<span>Innova XR</span></div><div style="display:flex;gap:10px;align-items:center"><span id="status-meta">Meta: ...</span><span id="status-gemini">Gemini: ...</span><span id="status-voz">Voz: ...</span><div class="bolaJ">J</div></div></div>
+<div class="stories"><div class="storie"><div class="circulo" style="background:#1877f2">O</div>Orion</div><div class="storie"><div class="circulo" style="background:#f97316">F</div>Forja</div><div class="storie"><div class="circulo" style="background:#7c3aed">L</div>Lia</div><div class="storie"><div class="circulo" style="background:#3a3b3c;color:#1877f2">+</div>Projeto</div></div>
 
 <div id="aba-inicio">
-<div class="card-voz">
-<div>VOZ ATIVA - NEXUS CORE</div>
-<div id="botao-mic" class="mic" onclick="ligarMicrofone()">🎤</div>
-<div id="texto-ouvindo">Aperte o microfone para ativar. Depois ele fica sempre ativo.</div>
-<div class="onda"></div>
-<div><b>Ouvindo... diga: inicia reunião</b></div>
-<div style="font-size:13px;opacity:.8">Elas falam uma por vez, sem interromper</div>
-<div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
-<button onclick="iniciarReuniao()" style="padding:10px 14px;border-radius:12px;border:none;background:#fff;color:#0a1f44;font-weight:700">Iniciar Reunião</button>
-<button onclick="pedirPalavra('FORJA')" style="padding:10px 14px;border-radius:12px;border:none;background:#f97316;color:#fff;font-weight:700">Forja pedir a palavra</button>
-<button onclick="pedirPalavra('LIA')" style="padding:10px 14px;border-radius:12px;border:none;background:#7c3aed;color:#fff;font-weight:700">Lia pedir a palavra</button>
-</div>
-</div>
-<div class="chat">
-<div><b>Orion • Moderador</b> <span style="color:green">Online</span></div>
-<div id="mensagens"><div class="msg">Bom dia, Senhor Josué, reunião pronta. Aperte o microfone e diga: inicia reunião.</div></div>
-<div style="display:flex;gap:6px;margin-top:8px">
-<button onclick="trocarQuem('ORION')">Orion</button><button onclick="trocarQuem('FORJA')">Forja</button><button onclick="trocarQuem('LIA')">Lia</button><span id="quem-atual">Falando com: ORION</span>
-</div>
-<div class="input-row"><input id="campo-msg" placeholder="Pergunte ao NEXUS..."><button onclick="enviarMensagem()">Enviar</button></div>
-<div style="margin-top:10px;display:flex;gap:8px"><button onclick="testarEmail()">Ver ideias do e-mail</button><button onclick="parar()">Para</button><button onclick="encerrarReuniao()">Encerrar reunião</button></div>
-</div>
+<div class="card-voz"><div>VOZ ATIVA - NEXUS CORE</div><div id="botao-mic" class="mic" onclick="ligarMicrofone()">🎤</div><div id="texto-ouvindo">Aperte o microfone para ativar. Depois ele fica sempre ativo.</div><div class="onda"></div><div><b>Ouvindo... diga: inicia reunião</b></div><div style="font-size:13px;color:#b0b3b8">Elas falam uma por vez, sem interromper</div><div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button onclick="iniciarReuniao()" style="padding:10px 14px;border-radius:12px;border:none;background:#fff;color:#111;font-weight:700">Iniciar Reunião</button><button onclick="pedirPalavra('FORJA')" style="padding:10px 14px;border-radius:12px;border:none;background:#f97316;color:#fff;font-weight:700">Forja pedir a palavra</button><button onclick="pedirPalavra('LIA')" style="padding:10px 14px;border-radius:12px;border:none;background:#7c3aed;color:#fff;font-weight:700">Lia pedir a palavra</button></div></div>
+<div class="chat"><div><b>Orion • Moderador</b> <span style="color:#31a24c">Online</span></div><div id="mensagens"><div class="msg">Bom dia, Senhor Josué, reunião pronta. Aperte o microfone e diga: inicia reunião.</div></div><div style="display:flex;gap:6px;margin-top:8px;align-items:center"><button onclick="trocarQuem('ORION')">Orion</button><button onclick="trocarQuem('FORJA')">Forja</button><button onclick="trocarQuem('LIA')">Lia</button><span id="quem-atual">Falando com: ORION</span></div><div class="input-row"><input id="campo-msg" placeholder="Pergunte ao NEXUS..."><button onclick="enviarMensagem()">Enviar</button></div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button onclick="testarEmail()">Ver ideias do e-mail</button><button onclick="parar()">Para</button><button onclick="encerrarReuniao()">Encerrar reunião</button></div></div>
 </div>
 
-<div id="aba-projeto" class="escondido">
-<div style="padding:0 14px"><h2>Projeto</h2><div class="input-row"><input id="nova-tarefa" placeholder="Nova tarefa..."><button onclick="adicionarTarefa()">Adicionar</button></div></div>
-<div class="kanban">
-<div class="col"><h3>A Fazer</h3><div id="col-todo"></div></div>
-<div class="col"><h3>Fazendo</h3><div id="col-doing"></div></div>
-<div class="col"><h3>Feito</h3><div id="col-done"></div></div>
-</div>
-</div>
+<div id="aba-projeto" class="escondido"><div class="projetos"><h2>Projetos criados</h2><p style="color:#b0b3b8">Tudo que a equipe criar aparece aqui, separado por tipo.</p><div class="abas-proj"><button class="ativo" onclick="filtrarProj('todos',this)">Todos</button><button onclick="filtrarProj('ideia',this)">Ideias</button><button onclick="filtrarProj('codigo',this)">Códigos</button><button onclick="filtrarProj('imagem',this)">Imagens</button><button onclick="filtrarProj('marketing',this)">Marketing</button></div><div class="input-row"><input id="novo-proj-titulo" placeholder="Titulo do projeto..."><input id="novo-proj-texto" placeholder="Descricao..."><button onclick="adicionarProjeto()">Criar</button></div><div id="lista-projetos"></div></div></div>
 </div>
 <div class="menu"><button class="ativo" onclick="mostrarAba('inicio',this)">Início</button><button onclick="mostrarAba('inicio',this)">Reunião</button><button onclick="mostrarAba('projeto',this)">Projeto</button><button onclick="mostrarAba('inicio',this)">Criar</button></div>
-
 <script>
-let quemAtual = "ORION";
-let reconhecimento = null;
-let microfoneAtivo = false;
-let tarefas = [];
-
-setTimeout(()=>{document.getElementById("tela-carregando").classList.add("escondido");document.getElementById("tela-login").classList.remove("escondido");},1200);
-function fazerLogin(){
-  let u=document.getElementById("login-user").value.trim();
-  let s=document.getElementById("login-senha").value.trim();
-  if(u==="Josue" && s==="innovaxr2026"){
-    document.getElementById("tela-login").classList.add("escondido");
-    document.getElementById("app").classList.remove("escondido");
-    carregarStatus();
-  } else { document.getElementById("login-erro").innerText="Usuario ou senha errada. Use Josue / innovaxr2026"; }
-}
-async function carregarStatus(){
-  try{ let r=await fetch("/api/health"); let j=await r.json();
-    document.getElementById("status-meta").innerText="Meta: "+(j.meta?"Online":"Off");
-    document.getElementById("status-gemini").innerText="Gemini: "+(j.gemini?"Backup On":"Off");
-  }catch(e){}
-}
-function trocarQuem(q){ quemAtual=q; document.getElementById("quem-atual").innerText="Falando com: "+q; }
-function mostrarAba(aba,btn){
-  document.querySelectorAll(".menu button").forEach(b=>b.classList.remove("ativo")); if(btn) btn.classList.add("ativo");
-  document.getElementById("aba-inicio").classList.toggle("escondido", aba!=="inicio");
-  document.getElementById("aba-projeto").classList.toggle("escondido", aba!=="projeto");
-}
-function addMsg(quem, texto){
-  let d=document.createElement("div"); d.className="msg"; d.innerHTML="<b>"+quem+"</b>: "+texto;
-  document.getElementById("mensagens").appendChild(d);
-  falarVoz(texto, quem);
-}
-async function enviarMensagem(){
-  let campo=document.getElementById("campo-msg"); let texto=campo.value.trim(); if(!texto) return;
-  addMsg("Você", texto); campo.value="";
-  document.getElementById("texto-ouvindo").innerText="Pensando... resposta rápida...";
+let quemAtual="ORION"; let reconhecimento=null; let microfoneAtivo=false; let projetos=[]; let filtroAtual="todos";
+setTimeout(()=>{document.getElementById("tela-carregando").classList.add("escondido");document.getElementById("tela-login").classList.remove("escondido");},1000);
+function fazerLogin(){let u=document.getElementById("login-user").value.trim();let s=document.getElementById("login-senha").value.trim();if(u==="Josue"&&s==="innovaxr2026"){document.getElementById("tela-login").classList.add("escondido");document.getElementById("app").classList.remove("escondido");carregarStatus();}else{document.getElementById("login-erro").innerText="Usuario ou senha errada. Use Josue / innovaxr2026";}}
+async function carregarStatus(){try{let r=await fetch("/api/health");let j=await r.json();document.getElementById("status-meta").innerText="Meta: "+(j.meta?"Online":"Off");document.getElementById("status-gemini").innerText="Gemini: "+(j.gemini?"Backup On":"Off");document.getElementById("status-voz").innerText="Voz: "+(j.elevenlabs?"ElevenLabs On":"Voz do celular");}catch(e){}}
+function trocarQuem(q){quemAtual=q;document.getElementById("quem-atual").innerText="Falando com: "+q;}
+function mostrarAba(aba,btn){document.querySelectorAll(".menu button").forEach(b=>b.classList.remove("ativo"));if(btn)btn.classList.add("ativo");document.getElementById("aba-inicio").classList.toggle("escondido",aba!=="inicio");document.getElementById("aba-projeto").classList.toggle("escondido",aba!=="projeto");}
+async function addMsg(quem,texto){let d=document.createElement("div");d.className="msg";d.innerHTML="<b>"+quem+"</b>: "+texto;document.getElementById("mensagens").appendChild(d);await falarVozEleven(texto,quem);salvarComoProjeto(quem,texto);}
+async function falarVozEleven(texto,quem){
   try{
-    let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:quemAtual,mensagem:texto})});
-    let j=await r.json(); addMsg(j.quem||quemAtual, j.texto||"Sem resposta");
-  }catch(e){ addMsg("ORION","Sem conexão agora. Tente de novo."); }
-  document.getElementById("texto-ouvindo").innerText="Ouvindo sempre... diga: inicia reunião";
-}
-async function iniciarReuniao(){
-  addMsg("Você","inicia reunião");
-  let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:"ORION",mensagem:"inicia reuniao"})});
-  let j=await r.json(); addMsg(j.quem, j.texto);
-}
-async function pedirPalavra(q){
-  let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:q,mensagem:"pedir a palavra"})});
-  let j=await r.json(); addMsg(j.quem, j.texto);
-}
-async function encerrarReuniao(){
-  let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:"ORION",mensagem:"encerrar reuniao"})});
-  let j=await r.json(); addMsg(j.quem, j.texto);
-}
-function parar(){ addMsg("Você","para"); }
-async function testarEmail(){
-  let r=await fetch("/api/email/ideias-novas"); let j=await r.json();
-  addMsg("ORION","Ideias novas no e-mail: "+(j.quantidade||0));
-}
-function falarVoz(texto, quem){
-  try{
-    if("speechSynthesis" in window){
-      let u=new SpeechSynthesisUtterance(texto); u.lang="pt-BR"; u.rate=1.0; window.speechSynthesis.speak(u);
-    }
+    let r=await fetch("/api/voz",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:quem,texto:texto})});
+    if(r.ok){let blob=await r.blob();let url=URL.createObjectURL(blob);let a=new Audio(url);a.play();return;}
   }catch(e){}
+  try{if("speechSynthesis" in window){let u=new SpeechSynthesisUtterance(texto);u.lang="pt-BR";window.speechSynthesis.speak(u);}}catch(e){}
 }
-function ligarMicrofone(){
-  microfoneAtivo=true;
-  document.getElementById("botao-mic").classList.add("ativo");
-  document.getElementById("texto-ouvindo").innerText="Microfone ativo, sempre ouvindo... diga: inicia reunião";
-  iniciarEscuta();
-}
-function iniciarEscuta(){
-  try{
-    let Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if(!Rec){ document.getElementById("texto-ouvindo").innerText="Seu Chrome não tem voz. Use o botão Enviar."; return; }
-    if(reconhecimento){ reconhecimento.stop(); }
-    reconhecimento=new Rec(); reconhecimento.lang="pt-BR"; reconhecimento.continuous=true; reconhecimento.interimResults=false;
-    reconhecimento.onresult=function(e){
-      let texto=e.results[e.results.length-1][0].transcript;
-      document.getElementById("campo-msg").value=texto;
-      document.getElementById("texto-ouvindo").innerText="Ouvi: "+texto;
-      enviarMensagem();
-    };
-    reconhecimento.onend=function(){ if(microfoneAtivo){ iniciarEscuta(); } };
-    reconhecimento.start();
-  }catch(e){}
-}
-function adicionarTarefa(){
-  let v=document.getElementById("nova-tarefa").value.trim(); if(!v) return;
-  tarefas.push({texto:v, status:"todo"}); document.getElementById("nova-tarefa").value=""; renderTarefas();
-}
-function moverTarefa(i, novo){
-  tarefas[i].status=novo; renderTarefas();
-}
-function renderTarefas(){
-  let todo=document.getElementById("col-todo"), doing=document.getElementById("col-doing"), done=document.getElementById("col-done");
-  todo.innerHTML=""; doing.innerHTML=""; done.innerHTML="";
-  tarefas.forEach((t,i)=>{
-    let d=document.createElement("div"); d.className="task"; d.innerText=t.texto+" ";
-    let b1=document.createElement("button"); b1.innerText="→"; b1.onclick=()=>{ if(t.status==="todo") moverTarefa(i,"doing"); else if(t.status==="doing") moverTarefa(i,"done"); };
-    d.appendChild(b1);
-    if(t.status==="todo") todo.appendChild(d);
-    if(t.status==="doing") doing.appendChild(d);
-    if(t.status==="done") done.appendChild(d);
-  });
-}
+async function enviarMensagem(){let campo=document.getElementById("campo-msg");let texto=campo.value.trim();if(!texto)return;let d=document.createElement("div");d.className="msg";d.innerHTML="<b>Você</b>: "+texto;document.getElementById("mensagens").appendChild(d);campo.value="";document.getElementById("texto-ouvindo").innerText="Pensando...";try{let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:quemAtual,mensagem:texto})});let j=await r.json();await addMsg(j.quem||quemAtual,j.texto);}catch(e){await addMsg("ORION","Sem conexão agora.");}document.getElementById("texto-ouvindo").innerText="Ouvindo sempre... diga: inicia reunião";}
+async function iniciarReuniao(){let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:"ORION",mensagem:"inicia reuniao"})});let j=await r.json();await addMsg(j.quem,j.texto);}
+async function pedirPalavra(q){let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:q,mensagem:"pedir a palavra"})});let j=await r.json();await addMsg(j.quem,j.texto);}
+async function encerrarReuniao(){let r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({quem:"ORION",mensagem:"encerrar reuniao"})});let j=await r.json();await addMsg(j.quem,j.texto);}
+function parar(){}
+async function testarEmail(){let r=await fetch("/api/email/ideias-novas");let j=await r.json();await addMsg("ORION","Ideias novas no e-mail: "+(j.quantidade||0));}
+function ligarMicrofone(){microfoneAtivo=true;document.getElementById("botao-mic").classList.add("ativo");document.getElementById("texto-ouvindo").innerText="Microfone ativo, sempre ouvindo...";iniciarEscuta();}
+function iniciarEscuta(){try{let Rec=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Rec)return;if(reconhecimento)reconhecimento.stop();reconhecimento=new Rec();reconhecimento.lang="pt-BR";reconhecimento.continuous=true;reconhecimento.interimResults=false;reconhecimento.onresult=function(e){let texto=e.results[e.results.length-1][0].transcript;document.getElementById("campo-msg").value=texto;document.getElementById("texto-ouvindo").innerText="Ouvi: "+texto;enviarMensagem();};reconhecimento.onend=function(){if(microfoneAtivo)iniciarEscuta();};reconhecimento.start();}catch(e){}}
+function salvarComoProjeto(quem,texto){if(!texto||texto.length<20)return;let tipo="ideia";if(quem==="FORJA")tipo="codigo";if(quem==="LIA")tipo="marketing";if(texto.toLowerCase().includes("imagem"))tipo="imagem";projetos.push({tipo:tipo,titulo:quem+" - "+texto.slice(0,40),texto:texto});renderProjetos();}
+function adicionarProjeto(){let t=document.getElementById("novo-proj-titulo").value.trim();let d=document.getElementById("novo-proj-texto").value.trim();if(!t)return;projetos.push({tipo:"ideia",titulo:t,texto:d});document.getElementById("novo-proj-titulo").value="";document.getElementById("novo-proj-texto").value="";renderProjetos();}
+function filtrarProj(f,btn){filtroAtual=f;document.querySelectorAll(".abas-proj button").forEach(b=>b.classList.remove("ativo"));if(btn)btn.classList.add("ativo");renderProjetos();}
+function renderProjetos(){let c=document.getElementById("lista-projetos");c.innerHTML="";projetos.filter(p=>filtroAtual==="todos"||p.tipo===filtroAtual).forEach(p=>{let d=document.createElement("div");d.className="card-proj";d.innerHTML="<b>"+p.titulo+"</b><div style='font-size:12px;color:#b0b3b8'>"+p.tipo+"</div><div>"+p.texto+"</div>";c.appendChild(d);});if(c.innerHTML==="")c.innerHTML="<p style='color:#b0b3b8'>Nenhum projeto ainda. Fale com a equipe que aparece aqui.</p>";}
 </script>
 </body>
 </html>

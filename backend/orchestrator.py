@@ -10,13 +10,13 @@ def processar_mensagem(personagem, mensagem):
     personagem = personagem.upper().strip()
     if personagem not in PERSONALIDADES:
         personagem = "ORION"
-    texto Baixo = mensagem.lower().strip()
+    texto_baixo = mensagem.lower().strip()
 
     if "inicia reuniao" in texto_baixo or "iniciar reuniao" in texto_baixo:
         reuniao_ativa = True
         fila_palavra = []
         quem_falando = "ORION"
-        return {"quem": "ORION", "texto": "Senhor Josue, reuniao iniciada. Estou com o microfone ligado, ouvindo sempre. Forja e 【entity-Lia¦canonical_name=LIA】, esperem eu liberar a palavra. Quem quiser falar, diga: pedir a palavra.", "fonte": "【entity-meta¦canonical_name=Meta】", "reuniao": True}
+        return {"quem": "ORION", "texto": "Senhor Josue, reuniao iniciada. Estou com o microfone ligado, ouvindo sempre. Forja e 【entity-Lia¦canonical_name=LIA】, esperem eu liberar a palavra. Quem quiser falar, diga: pedir a palavra.", "fonte": "meta", "reuniao": True}
 
     if "encerrar reuniao" in texto_baixo or "encerrar" in texto_baixo:
         reuniao_ativa = False
@@ -31,11 +31,11 @@ def processar_mensagem(personagem, mensagem):
             fila_palavra.append(personagem)
         if len(fila_palavra) == 1:
             quem_falando = personagem
-            return {"quem": "ORION", "texto": f"{personagem}, pode falar agora. So voce fala, as outras esperam.", "fonte": "【entity-meta¦canonical_name=Meta】"}
-        return {"quem": "ORION", "texto": f"{personagem}, voce esta na fila. Agora esta falando {quem_falando}. Espere sua vez.", "fonte": "【entity-meta¦canonical_name=Meta】"}
+            return {"quem": "ORION", "texto": f"{personagem}, pode falar agora. So voce fala, as outras esperam.", "fonte": "meta"}
+        return {"quem": "ORION", "texto": f"{personagem}, voce esta na fila. Agora esta falando {quem_falando}. Espere sua vez.", "fonte": "meta"}
 
     if reuniao_ativa and personagem != "ORION" and personagem != quem_falando and "pedir a palavra" not in texto_baixo:
-        return {"quem": "ORION", "texto": f"{personagem}, pecam a palavra antes de falar. Agora esta falando {quem_falando}. Diga: pedir a palavra.", "fonte": "【entity-meta¦canonical_name=Meta】"}
+        return {"quem": "ORION", "texto": f"{personagem}, pecam a palavra antes de falar. Agora esta falando {quem_falando}. Diga: pedir a palavra.", "fonte": "meta"}
 
     resultado = perguntar(personagem, mensagem)
     if fila_palavra and personagem in fila_palavra:

@@ -4,7 +4,7 @@ import httpx
 GROQ_KEY = os.getenv("META_AI_API_KEY", "").strip()
 GROQ_URL = os.getenv("META_AI_API_URL", "https://api.groq.com/openai/v1/chat/completions").strip()
 GEMINI_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-ELEVEN_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip()
+ELEVEN_KEY = os.getenv("ELEVENLABS_API_KEY", "").strip().replace(" ", "").replace("\n", "").replace('"', "").replace("'", "")
 VOZ_ORION = os.getenv("ELEVENLABS_VOICE_ORION", "").strip()
 VOZ_FORJA = os.getenv("ELEVENLABS_VOICE_FORJA", "").strip()
 VOZ_LIA = os.getenv("ELEVENLABS_VOICE_LIA", "").strip()
@@ -137,7 +137,10 @@ def perguntar(personagem, mensagem):
 
 def gerar_voz(personagem, texto):
     if not ELEVEN_KEY:
-        ULTIMO_ERRO["elevenlabs"] = "Chave ElevenLabs vazia"
+        ULTIMO_ERRO["elevenlabs"] = "Chave ElevenLabs vazia no Render. Crie a chave no site ElevenLabs e cole em ELEVENLABS_API_KEY."
+        return None
+    if not ELEVEN_KEY.startswith("sk_"):
+        ULTIMO_ERRO["elevenlabs"] = "Chave ElevenLabs invalida - nao comeca com sk_. Voce colou a chave errada ou o ID da voz no lugar da chave. A chave certa comeca com sk_ e tem mais de 30 letras."
         return None
     voz_id = VOZ_ORION
     voz_gratis = VOZ_GRATIS_ORION
@@ -170,7 +173,7 @@ def gerar_voz(personagem, texto):
                     # Quebra o loop de modelo e vai para proxima voz (gratis)
                     break
                 if r.status_code == 401:
-                    ULTIMO_ERRO["elevenlabs"] = "ElevenLabs 401 - chave invalida. Confira ELEVENLABS_API_KEY no Render."
+                    ULTIMO_ERRO["elevenlabs"] = "ElevenLabs 401 - chave invalida ou vencida. Apague a chave velha no Render e cole uma chave nova que comeca com sk_."
                     return None
                 ULTIMO_ERRO["elevenlabs"] = "ElevenLabs " + str(r.status_code) + " modelo " + modelo_voz + " : " + corpo[:300]
                 continue

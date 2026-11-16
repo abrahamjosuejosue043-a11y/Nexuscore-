@@ -1,99 +1,80 @@
 import os
-import base64
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+import smtplib
+import imaplib
+import email as email_lib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
-app = FastAPI()
+def _limpa(v):
+    # Tira espaco, quebra de linha e aspas que vem sem querer no Render
+    return (v or "").strip().replace(" ", "").replace('"', "").replace("'", "")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+GMAIL_USER = _limpa(os.getenv("GMAIL_USER", ""))
+GMAIL_PASS = _limpa(os.getenv("GMAIL_APP_PASSWORD", ""))
+MEU_EMAIL = os.getenv("MEU_EMAIL_PESSOAL", "").strip()
 
-# Imports com fallback para nao derrubar o app se um arquivo falhar
-try:
-    from backend.ai_brain import gerar_resposta, status_brain, gerar_voz
-except Exception as e:
-    def status_brain():
-        return {"meta": False, "gemini": False, "elevenlabs": False, "ultimo_erro_groq": "Erro import ai_brain: " + str(e)}
-    def gerar_resposta(quem, msg):
-        return {"quem": quem, "texto": "Erro no cerebro: " + str(e), "fonte": "erro"}
-    def gerar_voz(quem, texto):
-        return None
-
-try:
-    from backend.orchestrator import processar_mensagem, orchestrator
-except Exception as e:
-    def processar_mensagem(quem="ORION", mensagem=None, **kw):
-        if mensagem is None:
-            mensagem = quem
-            quem = "ORION"
-        return gerar_resposta(quem, mensagem)
-    class _Fake:
-        fila = []
-        vez_de = "ORION"
-        def pedir_palavra(self, quem):
-            return {"fila": [], "vez_de": "ORION"}
-    orchestrator = _Fake()
-
-def carregar_index():
-    for caminho in ["frontend/index.html", "index.html", "frontend/index.htm"]:
-        if os.path.exists(caminho):
-            with open(caminho, "r", encoding="utf-8") as f:
-                return f.read()
-    return "<h1>NEXUS CORE - index.html nao encontrado</h1>"
-
-@app.get("/", response_class=HTMLResponse)
-async def home():
-    return carregar_index()
-
-@app.get("/api/status")
-async def api_status():
-    s = status_brain()
-    s["fila"] = getattr(orchestrator, "fila", [])
-    s["vez_de"] = getattr(orchestrator, "vez_de", "ORION")
-    return s
-
-@app.get("/api/health")
-async def api_health():
-    return await api_status()
-
-@app.post("/api/chat")
-async def api_chat(req: Request):
-    dados = await req.json()
-    quem = dados.get("quem") or dados.get("personagem") or "ORION"
-    mensagem = dados.get("mensagem") or dados.get("texto") or dados.get("message") or ""
-    if not mensagem:
-        return {"quem": quem, "texto": "Senhor Josue, mande uma mensagem.", "fonte": "aviso"}
-    return processar_mensagem(quem, mensagem)
-
-@app.post("/api/voz")
-async def api_voz(req: Request):
-    dados = await req.json()
-    quem = dados.get("quem") or "ORION"
-    texto = dados.get("texto") or dados.get("mensagem") or ""
-    if not texto:
-        return {"audio_base64": None, "usar_navegador": True}
-    audio = gerar_voz(quem, texto)
-    if audio:
-        b64 = base64.b64encode(audio).decode("utf-8")
-        return {"audio_base64": b64, "usar_navegador": False, "quem": quem}
-    # Sem audio do ElevenLabs, o navegador fala sozinho - voz nunca fica muda
-    return {"audio_base64": None, "usar_navegador": True, "quem": quem, "texto": texto}
-
-@app.post("/api/reuniao/pedir-palavra")
-async def api_pedir(req: Request):
-    dados = await req.json()
-    quem = dados.get("quem") or "FORJA"
-    return orchestrator.pedir_palavra(quem)
-
-@app.get("/api/email/ideias-novas")
-async def api_email():
+def enviar_email(destino, assunto, texto):
+    destino = (destino or MEU_EMAIL or "").strip()
+    if not GMAIL_USER or not GMAIL_PASS:
+        return {"sucesso": False, "erro": "GMAIL_USER ou GMAIL_APP_PASSWORD vazio no Render. Confira Environment."}
+    if not destino:
+        return {"sucesso": False, "erro": "Sem destino. Preencha Para ou MEU_EMAIL_PESSOAL no Render."}
     try:
-        from backend.email_service import listar_ideias_novas
-        return listar_ideias_novas()
+        msg = MIMEMultipart()
+        msg["From"] = GMAIL_USER
+        msg["To"] = destino
+        msg["Subject"] = assunto or "NEXUS CORE - Relatorio"
+        msg.attach(MIMEText(texto or "", "plain", "utf-8"))
+        # Gmail SMTP real
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as s:
+            s.starttls()
+            s.login(GMAIL_USER, GMAIL_PASS)
+            s.send_message(msg)
+        return {"sucesso": True, "para": destino}
     except Exception as e:
-        return {"quantidade": 0, "ideias": [], "erro": str(e)}
+        err = str(e)
+        # Traduz os erros mais comuns
+        if "Username and Password not accepted" in err or "535" in err:
+            err = "Gmail recusou login. Senha de app errada ou com espaco. Gere outra senha de app de 16 letras no Google, sem espaco, e cole no Render em GMAIL_APP_PASSWORD."
+        elif "Application-specific password" in err:
+            err = "Precisa usar senha de app, nao a senha normal do Gmail. Ative 2 etapas e crie senha de app."
+        return {"sucesso": False, "erro": err[:500]}
+
+def listar_ideias_novas():
+    # Le a caixa nexuscore.innovaxr@gmail.com via IMAP
+    if not GMAIL_USER or not GMAIL_PASS:
+        return {"quantidade": 0, "ideias": [], "erro": "GMAIL_USER ou GMAIL_APP_PASSWORD vazio"}
+    try:
+        m = imaplib.IMAP4_SSL("imap.gmail.com")
+        m.login(GMAIL_USER, GMAIL_PASS)
+        m.select("INBOX")
+        _, dados = m.search(None, "UNSEEN")
+        ids = dados[0].split() if dados and dados[0] else []
+        ideias = []
+        for id_b in ids[-10:]:
+            _, dados_msg = m.fetch(id_b, "(RFC822)")
+            msg = email_lib.message_from_bytes(dados_msg[0][1])
+            assunto = str(msg.get("Subject", "Sem assunto"))
+            texto = ""
+            if msg.is_multipart():
+                for part in msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        try:
+                            texto = part.get_payload(decode=True).decode("utf-8", errors="ignore")[:800]
+                        except Exception:
+                            pass
+                        break
+            else:
+                try:
+                    texto = msg.get_payload(decode=True).decode("utf-8", errors="ignore")[:800]
+                except Exception:
+                    texto = str(msg.get_payload())[:800]
+            ideias.append({"assunto": assunto, "texto": texto})
+        m.close()
+        m.logout()
+        return {"quantidade": len(ideias), "ideias": ideias}
+    except Exception as e:
+        return {"quantidade": 0, "ideias": [], "erro": str(e)[:400]}
+
+def enviar_relatorio(texto_relatorio):
+    return enviar_email(MEU_EMAIL, "NEXUS CORE - Relatorio", texto_relatorio)

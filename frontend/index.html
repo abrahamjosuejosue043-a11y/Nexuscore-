@@ -26,66 +26,177 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NEXUS CORE - Innova XR</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#0b0e14;color:#fff;font-family:Arial,sans-serif}
-header{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;background:#11141c;border-bottom:1px solid #222}
-.logo{font-weight:900;letter-spacing:1px;color:#4da3ff}.logo small{display:block;color:#aaa;font-weight:400;font-size:11px;letter-spacing:0}
-.pills{font-size:12px;color:#ccc}.pill{display:inline-block;background:#1e2330;padding:4px 8px;border-radius:12px;margin-left:4px}
-.tabs{display:flex;gap:10px;padding:12px 16px}
-.tab{width:52px;height:52px;border-radius:50%;border:none;color:#fff;font-weight:900;cursor:pointer}
-.tab small{display:block;font-size:10px;font-weight:400}
-.o{background:#1a6cff}.f{background:#e67e22}.l{background:#8e44ad}.p{background:#333}
-.card{background:#151923;margin:0 14px 12px;padding:14px;border-radius:14px}
-.mic-wrap{text-align:center}.mic{width:74px;height:74px;border-radius:50%;background:#1a6cff;border:none;font-size:34px;cursor:pointer;color:#fff}
-.mic.off{background:#444}.barra{height:14px;background:#1a6cff;border-radius:8px;margin:12px 0}
-.btn{border:none;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700;margin:4px 2px}
-.btn-w{background:#fff;color:#000}.btn-o{background:#e67e22;color:#fff}.btn-l{background:#8e44ad;color:#fff}
-.msg{background:#2a3042;padding:10px 12px;border-radius:12px;margin:8px 0;line-height:1.5;font-size:14px;word-break:break-word}
-.msg b{color:#4da3ff}.input-row{display:flex;gap:8px;margin-top:10px}
-input{flex:1;padding:12px;border-radius:12px;border:1px solid #333;background:#0b0e14;color:#fff}
-.send{background:#1a6cff;color:#fff;border:none;padding:0 18px;border-radius:12px;font-weight:800;cursor:pointer}
-footer{position:fixed;bottom:0;left:0;right:0;background:#11141c;display:flex;justify-content:space-around;padding:10px 0;font-size:12px;color:#aaa}
+*{box-sizing:border-box}
+body{margin:0;background:#0A0A0B;color:#EDEDED;font-family:Inter,Arial,sans-serif;padding-bottom:70px}
+a{color:inherit}
+.top{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(10,10,11,.92);border-bottom:1px solid #1F1F23;backdrop-filter:blur(8px)}
+.menu{font-size:22px;cursor:pointer}
+.logo{font-weight:900;letter-spacing:.2px;font-size:19px}
+.logo i{color:#FF6B2C;font-style:normal}
+.logo small{display:block;font-size:10px;color:#9A9AA3;font-weight:500;letter-spacing:2px}
+.right{display:flex;gap:12px;align-items:center}
+.bell{font-size:20px;position:relative}
+.dot{position:absolute;top:0;right:0;width:8px;height:8px;background:#FF6B2C;border-radius:50%}
+.avatar{width:34px;height:34px;background:#7A2E12;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.hero{padding:28px 18px 10px;text-align:center}
+.hero h1{font-size:34px;line-height:1.08;margin:0;font-weight:800;letter-spacing:-.5px}
+.hero h1 span{color:#FF6B2C}
+.hero p{color:#9A9AA3;font-size:14px;margin:12px 0 0}
+.prompt{margin:20px 14px 10px;background:#17171A;border:1px solid #2A2A2E;border-radius:18px;padding:16px}
+.prompt textarea{width:100%;background:transparent;border:none;outline:none;color:#EDEDED;font-size:16px;min-height:64px;resize:none;font-family:inherit}
+.prompt textarea::placeholder{color:#6B6B73}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;flex-wrap:wrap}
+.chipbtn{display:inline-flex;gap:6px;align-items:center;background:#1F1F23;border:1px solid #2A2A2E;color:#EDEDED;padding:9px 12px;border-radius:999px;font-size:13px;cursor:pointer}
+.chipbtn.primary{background:#2A1A10;border-color:#FF6B2C33;color:#FF8A4A}
+.send{width:44px;height:44px;border-radius:50%;background:#3A3A3E;border:none;color:#777;font-size:20px;cursor:pointer}
+.send.on{background:#FF6B2C;color:#fff}
+.sug{padding:4px 14px 12px;text-align:center;color:#9A9AA3;font-size:13px}
+.sug-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.sug-item{background:#1F1F23;border:1px solid #2A2A2E;padding:9px 13px;border-radius:999px;font-size:13px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.sug-item.active{background:#fff;color:#000}
+.tabs{display:flex;gap:8px;padding:10px 14px;overflow-x:auto}
+.tab{white-space:nowrap;background:#17171A;border:1px solid #2A2A2E;padding:10px 16px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600}
+.tab.active{background:#fff;color:#000}
+.panel{margin:6px 14px 14px;background:#141416;border:1px solid #232327;border-radius:18px;padding:16px;display:none}
+.panel.show{display:block}
+.panel h2{font-size:17px;margin:0 0 4px}
+.panel small{color:#9A9AA3}
+.status{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.pill{background:#1F1F23;border:1px solid #2A2A2E;padding:6px 10px;border-radius:999px;font-size:12px}
+.voices{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0}
+.voice{border:1px solid #2A2A2E;background:#17171A;border-radius:14px;padding:10px;text-align:center;cursor:pointer}
+.voice.active{border-color:#FF6B2C;background:#2A1A10}
+.voice b{display:block;font-size:14px}
+.voice span{font-size:11px;color:#9A9AA3}
+.micbox{text-align:center;padding:10px 0}
+.mic{width:74px;height:74px;border-radius:50%;background:#FF6B2C;border:none;color:#fff;font-size:30px;cursor:pointer}
+.mic.off{background:#2A2A2E}
+.btn{border:none;padding:11px 14px;border-radius:12px;cursor:pointer;font-weight:700;font-size:13px;margin:4px 2px}
+.btn-w{background:#fff;color:#000}
+.btn-o{background:#FF6B2C;color:#fff}
+.btn-g{background:#2A2A2E;color:#fff}
+.chat{max-height:360px;overflow:auto}
+.msg{background:#1E1E22;padding:11px 12px;border-radius:14px;margin:8px 0;line-height:1.5;font-size:14px;word-break:break-word}
+.msg b{color:#FF8A4A}
+.input-row{display:flex;gap:8px;margin-top:10px}
+.input-row input{flex:1;padding:12px;border-radius:12px;border:1px solid #2A2A2E;background:#0A0A0B;color:#fff;outline:none}
+.kanban{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.col{background:#17171A;border:1px solid #232327;border-radius:14px;padding:10px;min-height:120px}
+.col h3{font-size:12px;margin:0 0 8px;color:#9A9AA3}
+.card-mini{background:#1F1F23;border:1px solid #2A2A2E;padding:9px;border-radius:10px;font-size:12px;margin-bottom:8px}
+.progress{height:8px;background:#26262A;border-radius:99px;overflow:hidden;margin:10px 0}
+.progress i{display:block;height:100%;background:#FF6B2C;width:33%}
+.mail-item{background:#17171A;border:1px solid #232327;border-radius:12px;padding:12px;margin:8px 0;font-size:13px}
+.mail-item b{color:#FF8A4A}
+.field{width:100%;padding:11px;border-radius:12px;border:1px solid #2A2A2E;background:#0A0A0B;color:#fff;margin:6px 0;outline:none}
+.foot{position:fixed;bottom:0;left:0;right:0;background:#0F0F11;border-top:1px solid #1F1F23;display:flex;justify-content:space-around;padding:11px 0;font-size:12px;color:#9A9AA3;z-index:20}
+.foot b{color:#fff}
+@media(max-width:560px){.hero h1{font-size:28px}.kanban{grid-template-columns:1fr}.voices{grid-template-columns:1fr 1fr 1fr}}
 </style>
 </head>
 <body>
-<header><div class="logo">NEXUS CORE<small>Innova XR</small></div><div class="pills"><span class="pill" id="st-meta">Meta: ...</span><span class="pill" id="st-gemini">Gemini: ...</span><span class="pill" id="st-voz">Voz: ...</span></div></header>
+<div class="top"><div class="menu">≡</div><div class="logo">NEXUS <i>CORE</i><small>INNOVA XR</small></div><div class="right"><div class="bell">◉<span class="dot"></span></div><div class="avatar">AW</div></div></div>
+
+<div class="hero"><h1>Olá Senhor Josué,<br>O que vamos construir<br>em seguida<span>?</span></h1><p>Reunião com 3 vozes, projeto e e-mail — tudo junto, sem bagunça.</p></div>
+
+<div class="prompt">
+<textarea id="ideiaTopo" placeholder="Descreva a ideia, o código, a imagem ou o marketing que você quer criar..."></textarea>
+<div class="row"><div><button class="chipbtn" onclick="addAnexo()">+ Anexar</button> <button class="chipbtn primary" onclick="toggleAuto()">◎ Auto</button></div><div><button class="chipbtn" onclick="irPara('reuniao')">Criar ▾</button> <button class="chipbtn" onclick="usarMicTopo()">🎤</button> <button class="send on" id="btnTopo" onclick="criarDoTopo()">↑</button></div></div>
+</div>
+
+<div class="sug">Ou crie a sua ideia a partir de uma destas sugestões
+<div class="sug-row"><span class="sug-item active" onclick="irPara('reuniao')">◧ Reunião</span><span class="sug-item" onclick="irPara('projeto')">▭ Projeto</span><span class="sug-item" onclick="irPara('email')">✉ E-mail</span><span class="sug-item" onclick="irPara('criar')">✦ Criar ideia</span></div>
+</div>
+
 <div class="tabs">
-<button class="tab o" onclick="trocar('ORION')">O<small>Orion</small></button>
-<button class="tab f" onclick="trocar('FORJA')">F<small>Forja</small></button>
-<button class="tab l" onclick="trocar('LIA')">L<small>Lia</small></button>
-<button class="tab p" onclick="irProjeto()">+<small>Projeto</small></button>
+<button class="tab active" id="t-reuniao" onclick="mostrar('reuniao')">Reunião • 3 vozes</button>
+<button class="tab" id="t-projeto" onclick="mostrar('projeto')">Projeto</button>
+<button class="tab" id="t-email" onclick="mostrar('email')">E-mail • Orion lê primeiro</button>
+<button class="tab" id="t-criar" onclick="mostrar('criar')">Criar</button>
 </div>
-<div class="card mic-wrap">
-<div>VOZ ATIVA - NEXUS CORE</div>
-<button class="mic" id="btnMic" onclick="alternarMic()">🎤</button>
-<div id="ouvindoTxt">Ouvindo sempre... diga: inicia reunião</div>
-<div class="barra"></div>
-<div><b>Ouvindo... diga: inicia reunião</b><br><small>Elas falam uma por vez, sem interromper</small></div>
-<div><button class="btn btn-w" onclick="iniciarReuniao()">Iniciar Reunião</button><button class="btn btn-o" onclick="pedirPalavra('FORJA')">Forja pedir a palavra</button><button class="btn btn-l" onclick="pedirPalavra('LIA')">Lia pedir a palavra</button></div>
+
+<!-- REUNIAO -->
+<div class="panel show" id="p-reuniao">
+<h2>Reunião interna</h2><small>Elas falam uma por vez, sem interromper. Orion modera.</small>
+<div class="status"><span class="pill" id="st-meta">Meta: ...</span><span class="pill" id="st-gemini">Gemini: ...</span><span class="pill" id="st-voz">Voz: ...</span></div>
+<div class="voices">
+<div class="voice active" id="v-ORION" onclick="trocar('ORION')"><b>Orion</b><span>Moderador</span></div>
+<div class="voice" id="v-FORJA" onclick="trocar('FORJA')"><b>Forja</b><span>Técnico</span></div>
+<div class="voice" id="v-LIA" onclick="trocar('LIA')"><b>Lia</b><span>Marketing</span></div>
 </div>
-<div class="card">
-<div><b>Orion • Moderador <span style="color:#2ecc71">Online</span></b></div>
-<div id="chat"><div class="msg">Bom dia, Senhor Josué, reunião pronta. Aperte o microfone e diga: inicia reunião.</div></div>
-<div><button class="btn" onclick="falar('ORION')">Orion</button><button class="btn" onclick="falar('FORJA')">Forja</button><button class="btn" onclick="falar('LIA')">Lia</button><span id="falandoCom">Falando com: ORION</span></div>
-<div class="input-row"><input id="entrada" placeholder="Pergunte ao NEXUS..." onkeydown="if(event.key==='Enter')enviar()"><button class="send" onclick="enviar()">Enviar</button></div>
-<div><button class="btn" onclick="verEmail()">Ver ideias do e-mail</button><button class="btn" onclick="parar()">Para</button><button class="btn" onclick="encerrar()">Encerrar reunião</button></div>
+<div class="micbox"><button class="mic" id="btnMic" onclick="alternarMic()">🎤</button><div id="ouvindoTxt" style="font-size:13px;color:#9A9AA3;margin-top:8px">Ouvindo sempre... diga: inicia reunião</div></div>
+<div><button class="btn btn-w" onclick="iniciarReuniao()">Iniciar Reunião</button><button class="btn btn-o" onclick="pedirPalavra('FORJA')">Forja pedir a palavra</button><button class="btn btn-g" onclick="pedirPalavra('LIA')">Lia pedir a palavra</button></div>
+<div class="chat" id="chat"><div class="msg"><b>Orion:</b> Bom dia, Senhor Josué, reunião pronta. Aperte o microfone e diga: inicia reunião.</div></div>
+<div><small id="falandoCom">Falando com: ORION</small></div>
+<div class="input-row"><input id="entrada" placeholder="Pergunte ao NEXUS..." onkeydown="if(event.key==='Enter')enviar()"><button class="btn btn-o" onclick="enviar()">Enviar</button></div>
+<div><button class="btn btn-g" onclick="parar()">Para</button><button class="btn btn-g" onclick="encerrar()">Encerrar reunião</button></div>
 </div>
-<div style="height:60px"></div>
-<footer><span>Início</span><span>Reunião</span><span>Projeto</span><span>Criar</span></footer>
+
+<!-- PROJETO -->
+<div class="panel" id="p-projeto">
+<h2>Projeto — onde se desenvolve</h2><small>Ideias, códigos, imagens e marketing, tudo no mesmo lugar.</small>
+<div class="status"><span class="pill">Ideias: <b id="nIdeias">1</b></span><span class="pill">Códigos: <b id="nCodigos">0</b></span><span class="pill">Imagens: <b id="nImagens">0</b></span><span class="pill">Marketing: <b id="nMkt">0</b></span></div>
+<div>Progresso do projeto</div><div class="progress"><i id="barraProg"></i></div><small id="txtProg">33% — em andamento</small>
+<div style="display:flex;gap:8px;margin-top:10px"><select id="tipoProj" class="field" style="max-width:150px"><option>Ideia</option><option>Código</option><option>Imagem</option><option>Marketing</option></select><input id="novaTarefa" class="field" placeholder="Nova tarefa do projeto..."></div>
+<button class="btn btn-o" onclick="addTarefa()">+ Adicionar no projeto</button>
+<div class="kanban">
+<div class="col"><h3>A FAZER</h3><div id="colTodo"><div class="card-mini"><b>Idea:</b> NEXUS CORE v2 — tela alta gama</div></div></div>
+<div class="col"><h3>FAZENDO</h3><div id="colDoing"><div class="card-mini"><b>Reunião:</b> Voz das 3 IAs</div></div></div>
+<div class="col"><h3>PRONTO</h3><div id="colDone"><div class="card-mini"><b>E-mail:</b> Nexus Gmail criado</div></div></div>
+</div>
+<button class="btn btn-g" onclick="moverPrimeira()">Mover primeira tarefa → Fazendo / Pronto</button>
+</div>
+
+<!-- EMAIL -->
+<div class="panel" id="p-email">
+<h2>E-mail — Orion lê primeiro</h2><small>Você manda a ideia para nexuscore.innovaxr@gmail.com. Orion lê, resume e passa para Forja e Lia.</small>
+<div class="status"><span class="pill">Caixa: nexuscore.innovaxr@gmail.com</span><span class="pill" id="qtdEmail">Ideias novas: ...</span></div>
+<button class="btn btn-w" onclick="verEmail()">Ver ideias do e-mail</button>
+<button class="btn btn-o" onclick="pedirResumoEmail()">Orion resumir e passar para o time</button>
+<div id="listaEmail"></div>
+<input id="emailPara" class="field" placeholder="Para: quem vai receber o relatório?">
+<input id="emailAssunto" class="field" placeholder="Assunto:">
+<textarea id="emailTexto" class="field" placeholder="Escreva o e-mail para o time..." rows="3"></textarea>
+<button class="btn btn-w" onclick="enviarEmailSim()">Enviar e-mail</button>
+<small id="msgEmail"></small>
+</div>
+
+<!-- CRIAR -->
+<div class="panel" id="p-criar">
+<h2>Criar — nova ideia em 10 segundos</h2><small>Descreva, escolha o tipo e o time já começa.</small>
+<select id="tipoCriar" class="field"><option>Ideia</option><option>Código</option><option>Imagem</option><option>Marketing</option></select>
+<textarea id="textoCriar" class="field" rows="4" placeholder="Descreva o que você quer criar..."></textarea>
+<button class="btn btn-o" onclick="criarIdeia()">Criar com o time</button>
+<div id="resCriar"></div>
+</div>
+
+<div class="foot"><span onclick="mostrar('reuniao')">◉ <b>Reunião</b></span><span onclick="mostrar('projeto')">▭ Projeto</span><span onclick="mostrar('email')">✉ E-mail</span><span onclick="mostrar('criar')">+ Criar</span></div>
+
 <script>
 let quemAtual="ORION"; let ouvindo=false; let rec=null;
-function trocar(q){quemAtual=q; document.getElementById('falandoCom').innerText='Falando com: '+q;}
-function irProjeto(){addMsg('Projeto','Abra o painel de Projeto para ver ideias, códigos, imagens e marketing.');}
-function addMsg(quemm, texto){const d=document.createElement('div'); d.className='msg'; d.innerHTML='<b>'+quemm+':</b> '+texto; document.getElementById('chat').appendChild(d); d.scrollIntoView();}
+function mostrar(id){
+  ['reuniao','projeto','email','criar'].forEach(x=>{
+    document.getElementById('p-'+x).classList.toggle('show', x===id);
+    document.getElementById('t-'+x).classList.toggle('active', x===id);
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function irPara(id){ mostrar(id); }
+function trocar(q){
+  quemAtual=q;
+  document.getElementById('falandoCom').innerText='Falando com: '+q;
+  ['ORION','FORJA','LIA'].forEach(x=>document.getElementById('v-'+x).classList.toggle('active', x===q));
+}
+function addMsg(quemm, texto){const d=document.createElement('div'); d.className='msg'; d.innerHTML='<b>'+quemm+':</b> '+texto; const c=document.getElementById('chat'); c.appendChild(d); c.scrollTop=c.scrollHeight;}
 async function atualizarStatus(){try{const r=await fetch('/api/status'); const s=await r.json(); document.getElementById('st-meta').innerText='Meta: '+(s.meta?'Online':'Off'); document.getElementById('st-gemini').innerText='Gemini: '+(s.gemini?'Online':'Off'); document.getElementById('st-voz').innerText='Voz: '+(s.elevenlabs?'ElevenLabs On':'Navegador');}catch(e){}}
 function falarNavegador(texto){try{window.speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(texto); u.lang='pt-BR'; u.rate=1.0; window.speechSynthesis.speak(u);}catch(e){}}
 async function tocarVoz(quemm, texto){
   try{
     const r=await fetch('/api/voz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quem:quemm,texto:texto})});
     const d=await r.json();
-    if(d.audio_base64){
-      const a=new Audio('data:audio/mpeg;base64,'+d.audio_base64); a.play().catch(()=>falarNavegador(texto));
-    } else { falarNavegador(texto); }
-  }catch(e){ falarNavegador(texto); }
+    if(d.audio_base64){const a=new Audio('data:audio/mpeg;base64,'+d.audio_base64); a.play().catch(()=>falarNavegador(texto));}
+    else{falarNavegador(texto);}
+  }catch(e){falarNavegador(texto);}
 }
 async function enviarParaIA(quemm, mensagem){
   addMsg('Você', mensagem);
@@ -95,30 +206,42 @@ async function enviarParaIA(quemm, mensagem){
     addMsg(d.quem||quemm, d.texto||'Sem resposta');
     tocarVoz(d.quem||quemm, d.texto||'');
     atualizarStatus();
-  }catch(e){ addMsg('Erro','Sem conexão com o servidor.'); }
+  }catch(e){addMsg('Erro','Sem conexão com o servidor.');}
 }
 function enviar(){const i=document.getElementById('entrada'); const v=i.value.trim(); if(!v) return; i.value=''; enviarParaIA(quemAtual, v);}
-function falar(q){trocar(q); enviarParaIA(q, 'Fale comigo, '+q);}
 function iniciarReuniao(){enviarParaIA('ORION','inicia reunião');}
 function pedirPalavra(q){fetch('/api/reuniao/pedir-palavra',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quem:q})}); addMsg('Sistema','Pedido de '+q+' registrado. Orion vai passar a palavra.');}
-async function verEmail(){try{const r=await fetch('/api/email/ideias-novas'); const d=await r.json(); addMsg('E-mail','Ideias novas: '+(d.quantidade||0)); (d.ideias||[]).slice(0,3).forEach(x=>addMsg('Ideia', (x.assunto||'')+' - '+(x.texto||'').slice(0,120)));}catch(e){addMsg('E-mail','Não consegui abrir o e-mail agora.');}}
 function parar(){try{window.speechSynthesis.cancel(); if(rec) rec.stop();}catch(e){} ouvindo=false; document.getElementById('btnMic').classList.add('off');}
 function encerrar(){addMsg('Orion','Reunião encerrada, Senhor Josué. Obrigado.'); parar();}
 function alternarMic(){if(ouvindo){parar(); return;} iniciarEscuta();}
 async function iniciarEscuta(){
   try{
-    // Pede microfone com cancelamento de eco e ruído - isso trava o microfone ligado
     await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){addMsg('Sistema','Seu navegador não tem reconhecimento de voz. Use o botão Enviar e digite.'); return;}
     rec=new SR(); rec.lang='pt-BR'; rec.continuous=true; rec.interimResults=false;
-    rec.onresult=(ev)=>{const txt=ev.results[ev.results.length-1][0].transcript.trim(); addMsg('Você (voz)', txt); const baixo=txt.toLowerCase(); if(baixo.includes('inicia')&&baixo.includes('reuni')){enviarParaIA('ORION','inicia reunião');} else {enviarParaIA(quemAtual, txt);} };
+    rec.onresult=(ev)=>{const txt=ev.results[ev.results.length-1][0].transcript.trim(); const baixo=txt.toLowerCase(); if(baixo.includes('inicia')&&baixo.includes('reuni')){enviarParaIA('ORION','inicia reunião');} else {enviarParaIA(quemAtual, txt);} };
     rec.onend=()=>{if(ouvindo){try{rec.start();}catch(e){}}};
     rec.onerror=()=>{};
     rec.start(); ouvindo=true; document.getElementById('btnMic').classList.remove('off'); document.getElementById('ouvindoTxt').innerText='Microfone LIGADO - pode falar...';
   }catch(e){addMsg('Sistema','Permita o microfone no navegador para falar.');}
 }
-atualizarStatus();
+// Topo
+function addAnexo(){addMsg('Sistema','Anexo em breve. Por enquanto escreva a ideia.');}
+function toggleAuto(){addMsg('Sistema','Modo Auto ligado. Orion escolhe quem responde.');}
+function usarMicTopo(){alternarMic();}
+function criarDoTopo(){const v=document.getElementById('ideiaTopo').value.trim(); if(!v){mostrar('criar'); return;} document.getElementById('textoCriar').value=v; mostrar('criar'); criarIdeia();}
+// Projeto
+function addTarefa(){const t=document.getElementById('novaTarefa').value.trim(); const tipo=document.getElementById('tipoProj').value; if(!t) return; const d=document.createElement('div'); d.className='card-mini'; d.innerHTML='<b>'+tipo+':</b> '+t; document.getElementById('colTodo').appendChild(d); document.getElementById('novaTarefa').value=''; atualizarProg();}
+function moverPrimeira(){const todo=document.getElementById('colTodo'); const doing=document.getElementById('colDoing'); const done=document.getElementById('colDone'); if(todo.children.length){doing.appendChild(todo.children[0]);} else if(doing.children.length){done.appendChild(doing.children[0]);} atualizarProg();}
+function atualizarProg(){const total=document.querySelectorAll('.card-mini').length; const pronto=document.getElementById('colDone').children.length; const p=total?Math.round(pronto/total*100):33; document.getElementById('barraProg').style.width=p+'%'; document.getElementById('txtProg').innerText=p+'% - em andamento';}
+// Email
+async function verEmail(){try{const r=await fetch('/api/email/ideias-novas'); const d=await r.json(); document.getElementById('qtdEmail').innerText='Ideias novas: '+(d.quantidade||0); const lista=document.getElementById('listaEmail'); lista.innerHTML=''; (d.ideias||[]).slice(0,5).forEach(x=>{const el=document.createElement('div'); el.className='mail-item'; el.innerHTML='<b>Orion leu:</b> '+(x.assunto||'Ideia')+'<br>'+(x.texto||'').slice(0,180); lista.appendChild(el);}); if(!(d.ideias||[]).length){lista.innerHTML='<div class="mail-item">Nenhuma ideia nova. Mande um e-mail para nexuscore.innovaxr@gmail.com</div>';}}catch(e){document.getElementById('listaEmail').innerHTML='<div class="mail-item">Não consegui abrir o e-mail agora.</div>';}}
+function pedirResumoEmail(){enviarParaIA('ORION','Resuma as ideias novas do e-mail e passe para Forja e Lia, com tarefas para cada um.'); mostrar('reuniao');}
+function enviarEmailSim(){document.getElementById('msgEmail').innerText='Pronto, Senhor Josué. Orion vai ler e passar para o time. (Envio real pelo Gmail já configurado no Render)';}
+// Criar
+function criarIdeia(){const tipo=document.getElementById('tipoCriar').value; const txt=document.getElementById('textoCriar').value.trim(); if(!txt){document.getElementById('resCriar').innerText='Escreva a ideia primeiro.'; return;} document.getElementById('resCriar').innerText='Criando '+tipo+'... Orion vai organizar.'; enviarParaIA('ORION','Nova '+tipo+': '+txt+'. Organize em tarefas para Forja e Lia.'); const d=document.createElement('div'); d.className='card-mini'; d.innerHTML='<b>'+tipo+':</b> '+txt.slice(0,80); document.getElementById('colTodo').appendChild(d); atualizarProg(); mostrar('reuniao');}
+atualizarStatus(); verEmail();
 </script>
 <script>(function(){var loc=location.href.replace(/#.*$/,"");var ATTR_NAMES=["data-product-id","data-productid","data-product_id","product-id","productid","product_id","data-source-entity-id","source-entity-id","source_entity_id","data-product","data-metadata","data-meta"];var DATASET_KEYS=["productId","productid","product_id","sourceEntityId","sourceentityid","source_entity_id","product","metadata","meta"];function readProductId(value){if(typeof value!=="string"||value.length===0)return null;if(/^[0-9]{6,}$/.test(value))return value;var match=value.match(/(?:product(?:_|-)?id|source(?:_|-)?entity(?:_|-)?id)["'=:\s]+([0-9]{6,})/i);return match?match[1]:null}function extractProductId(start){for(var node=start;node&&node!==document.body;node=node.parentElement){for(var i=0;i<ATTR_NAMES.length;i++){var attrValue=node.getAttribute&&node.getAttribute(ATTR_NAMES[i]);var attrProductId=readProductId(attrValue);if(attrProductId)return attrProductId}var dataset=node.dataset||null;if(dataset){for(var j=0;j<DATASET_KEYS.length;j++){var dataValue=dataset[DATASET_KEYS[j]];var dataProductId=readProductId(dataValue);if(dataProductId)return dataProductId}}}return null}function isInlineMediaSlotElement(node){return !!(node&&node.getAttribute&&node.getAttribute("data-clippy-inline-media-slot")!==null)}function findInlineMediaSlot(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(isInlineMediaSlotElement(node))return node}return null}function readInlineMediaUrl(node){if(!node)return null;return node.getAttribute&&((node.getAttribute("data-clippy-inline-media-url")||node.getAttribute("data-url")||node.getAttribute("data_url")))||node.href||null}function stripHash(url){return String(url).replace(/#.*$/,"")}function urlsMatch(a,b){if(!a||!b)return false;try{return stripHash(new URL(a,loc).href)===stripHash(new URL(b,loc).href)}catch(_){return stripHash(a)===stripHash(b)}}function isFirstPartyReelUrl(value){try{var url=new URL(value,loc);if(url.protocol!=="https:")return false;var host=url.hostname.toLowerCase();var supported=host==="instagram.com"||host.endsWith(".instagram.com")||host==="facebook.com"||host.endsWith(".facebook.com");return supported&&/\/reels?\//i.test(url.pathname)}catch(_){return false}}function isInlineMediaUrlClick(node,href){var slot=findInlineMediaSlot(node);if(!slot)return false;var slotUrl=readInlineMediaUrl(slot);if(slotUrl)return urlsMatch(href,slotUrl);return isFirstPartyReelUrl(href)}function findDataHref(start){for(var node=start;node&&node!==document.body;node=node.parentElement){if(node.getAttribute){var href=node.getAttribute("data-href")||node.getAttribute("data-url");if(href)return{href:href,node:node}}}return null}var nativeOpen=window.open;window.open=function(url){if(parent!==window&&typeof url==="string"&&/^https?:\/\//.test(url)){parent.postMessage({type:"ecto:usercontent-link-click",href:url},"*");return null}return nativeOpen?nativeOpen.apply(window,arguments):null};document.addEventListener("click",function(e){var target=e.target instanceof Element?e.target:null;if(!target)return;if(parent===window)return;var a=target.closest?target.closest("a[href]"):null;if(a&&a.href&&/^https?:\/\//.test(a.href)&&a.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(a,a.href))return;var productId=extractProductId(target)||extractProductId(a);if(productId){e.preventDefault();parent.postMessage({type:"ecto-artifact-link-click",productId:productId},"*");return}e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:a.href},"*");return}var dataHref=findDataHref(target);if(dataHref&&/^https?:\/\//.test(dataHref.href)&&dataHref.href.replace(/#.*$/,"")!==loc){if(isInlineMediaUrlClick(dataHref.node,dataHref.href))return;e.preventDefault();parent.postMessage({type:"ecto:usercontent-link-click",href:dataHref.href},"*")}},true)})();</script><script>(function(){var FOCUS_TYPE="ecto:artifact-focus-request";var CLOSE_TYPE="ecto:artifact-close-request";function focusArtifactDocument(){var body=document.body;if(!body)return;try{window.focus();}catch(e){}if(!body.hasAttribute("tabindex"))body.setAttribute("tabindex","-1");try{body.focus({preventScroll:true});}catch(e){try{body.focus();}catch(e2){}}}window.addEventListener("message",function(event){if(event.source!==window.parent)return;var data=event.data;if(!data||typeof data!=="object"||data.type!==FOCUS_TYPE)return;if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",focusArtifactDocument,{once:true});return;}focusArtifactDocument();});window.addEventListener("keydown",function(event){if(event.key!=="Escape")return;window.setTimeout(function(){if(event.defaultPrevented)return;window.parent.postMessage({type:CLOSE_TYPE},"*");},0);});})();</script></body>
 </html>

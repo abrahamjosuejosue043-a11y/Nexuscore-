@@ -1,70 +1,80 @@
-# E-mail do NEXUS - manda relatório pra você, e recebe ideia pra Orion
-import os, smtplib, imaplib, email
+import os
+import smtplib
+import imaplib
+import email as email_lib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
-load_dotenv()
 
-# Esses dados vêm do Render, não do 【entity-GitHub¦canonical_name=GitHub】
-GMAIL_USER = os.getenv("GMAIL_USER", "")  # E-mail do app, ex: nexuscore.innovaxr@gmail.com
-GMAIL_SENHA_APP = os.getenv("GMAIL_APP_PASSWORD", "")  # Senha de app que você cria no Passo 2
-MEU_EMAIL = os.getenv("MEU_EMAIL_PESSOAL", "")  # Seu e-mail pessoal, pra receber relatório
+def _limpa(v):
+    # Tira espaco, quebra de linha e aspas que vem sem querer no Render
+    return (v or "").strip().replace(" ", "").replace('"', "").replace("'", "")
 
-def enviar_email(para, assunto, corpo):
-    """Manda e-mail. Retorna True se foi, False se não tem e-mail configurado."""
-    if not GMAIL_USER or not GMAIL_SENHA_APP:
-        print(f"[EMAIL] Não configurado. Para: {para} | Assunto: {assunto}")
-        return False
+GMAIL_USER = _limpa(os.getenv("GMAIL_USER", ""))
+GMAIL_PASS = _limpa(os.getenv("GMAIL_APP_PASSWORD", ""))
+MEU_EMAIL = os.getenv("MEU_EMAIL_PESSOAL", "").strip()
+
+def enviar_email(destino, assunto, texto):
+    destino = (destino or MEU_EMAIL or "").strip()
+    if not GMAIL_USER or not GMAIL_PASS:
+        return {"sucesso": False, "erro": "GMAIL_USER ou GMAIL_APP_PASSWORD vazio no Render. Confira Environment."}
+    if not destino:
+        return {"sucesso": False, "erro": "Sem destino. Preencha Para ou MEU_EMAIL_PESSOAL no Render."}
     try:
         msg = MIMEMultipart()
-        msg["From"] = f"NEXUS CORE <{GMAIL_USER}>"
-        msg["To"] = para
-        msg["Subject"] = assunto
-        msg.attach(MIMEText(corpo, "plain", "utf-8"))
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as s:
+        msg["From"] = GMAIL_USER
+        msg["To"] = destino
+        msg["Subject"] = assunto or "NEXUS CORE - Relatorio"
+        msg.attach(MIMEText(texto or "", "plain", "utf-8"))
+        # Gmail SMTP real
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as s:
             s.starttls()
-            s.login(GMAIL_USER, GMAIL_SENHA_APP)
+            s.login(GMAIL_USER, GMAIL_PASS)
             s.send_message(msg)
-        print(f"[EMAIL] Enviado para {para}")
-        return True
+        return {"sucesso": True, "para": destino}
     except Exception as e:
-        print(f"[EMAIL] Erro: {e}")
-        return False
+        err = str(e)
+        # Traduz os erros mais comuns
+        if "Username and Password not accepted" in err or "535" in err:
+            err = "Gmail recusou login. Senha de app errada ou com espaco. Gere outra senha de app de 16 letras no Google, sem espaco, e cole no Render em GMAIL_APP_PASSWORD."
+        elif "Application-specific password" in err:
+            err = "Precisa usar senha de app, nao a senha normal do Gmail. Ative 2 etapas e crie senha de app."
+        return {"sucesso": False, "erro": err[:500]}
 
-def enviar_relatorio_para_voce(resumo):
-    """Manda relatório diário pro seu e-mail pessoal."""
-    if not MEU_EMAIL:
-        return False
-    corpo = f"Olá Senhor Josué,\n\nRelatório do NEXUS CORE:\n\n{resumo}\n\nEquipe: Orion, Forja e Lia\nInnova XR"
-    return enviar_email(MEU_EMAIL, "Relatório NEXUS CORE - Innova XR", corpo)
-
-def verificar_ideias_novas():
-    """Olha a caixa de entrada do e-mail do app e pega as ideias que você mandou.
-    A ideia chega primeiro pro Orion, ele lê e passa pro time."""
-    ideias = []
-    if not GMAIL_USER or not GMAIL_SENHA_APP:
-        return ideias
+def listar_ideias_novas():
+    # Le a caixa nexuscore.innovaxr@gmail.com via IMAP
+    if not GMAIL_USER or not GMAIL_PASS:
+        return {"quantidade": 0, "ideias": [], "erro": "GMAIL_USER ou GMAIL_APP_PASSWORD vazio"}
     try:
-        mail = imaplib.IMAP4_SSL("imap.gmail.com")
-        mail.login(GMAIL_USER, GMAIL_SENHA_APP)
-        mail.select("INBOX")
-        _, dados = mail.search(None, "UNSEEN")
-        for num in dados[0].split():
-            _, msg_dados = mail.fetch(num, "(RFC822)")
-            msg = email.message_from_bytes(msg_dados[0][1])
-            assunto = msg.get("Subject", "Sem assunto")
-            remetente = msg.get("From", "")
-            corpo = ""
+        m = imaplib.IMAP4_SSL("imap.gmail.com")
+        m.login(GMAIL_USER, GMAIL_PASS)
+        m.select("INBOX")
+        _, dados = m.search(None, "UNSEEN")
+        ids = dados[0].split() if dados and dados[0] else []
+        ideias = []
+        for id_b in ids[-10:]:
+            _, dados_msg = m.fetch(id_b, "(RFC822)")
+            msg = email_lib.message_from_bytes(dados_msg[0][1])
+            assunto = str(msg.get("Subject", "Sem assunto"))
+            texto = ""
             if msg.is_multipart():
-                for parte in msg.walk():
-                    if parte.get_content_type() == "text/plain":
-                        corpo = parte.get_payload(decode=True).decode("utf-8", errors="ignore")
+                for part in msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        try:
+                            texto = part.get_payload(decode=True).decode("utf-8", errors="ignore")[:800]
+                        except Exception:
+                            pass
                         break
             else:
-                corpo = msg.get_payload(decode=True).decode("utf-8", errors="ignore") if msg.get_payload(decode=True) else ""
-            ideias.append({"de": remetente, "assunto": assunto, "texto": corpo[:1000]})
-            mail.store(num, "+FLAGS", "\\Seen")
-        mail.logout()
+                try:
+                    texto = msg.get_payload(decode=True).decode("utf-8", errors="ignore")[:800]
+                except Exception:
+                    texto = str(msg.get_payload())[:800]
+            ideias.append({"assunto": assunto, "texto": texto})
+        m.close()
+        m.logout()
+        return {"quantidade": len(ideias), "ideias": ideias}
     except Exception as e:
-        print(f"[EMAIL] Erro ao ler ideias: {e}")
-    return ideias
+        return {"quantidade": 0, "ideias": [], "erro": str(e)[:400]}
+
+def enviar_relatorio(texto_relatorio):
+    return enviar_email(MEU_EMAIL, "NEXUS CORE - Relatorio", texto_relatorio)

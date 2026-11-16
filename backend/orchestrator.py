@@ -1,7 +1,3 @@
-# Orquestrador - quem fala, quando fala, sem repetir, sem Orion falar sozinho
-# Esse arquivo TEM que ter: processar_mensagem + orchestrator
-# porque o main.py pede esses 2 nomes. Sem eles o Render cai com ImportError.
-
 from backend.ai_brain import gerar_resposta
 
 class Orquestrador:
@@ -38,8 +34,6 @@ class Orquestrador:
         return resp
 
     def processar_mensagem(self, quem="ORION", mensagem=None, **kwargs):
-        # Aceita os 2 jeitos que o main.py pode chamar:
-        # processar_mensagem("ORION", "ola")  ou  processar_mensagem("ola")
         if mensagem is None:
             if "mensagem" in kwargs:
                 mensagem = kwargs["mensagem"]
@@ -50,10 +44,8 @@ class Orquestrador:
                 quem = kwargs.get("quem", "ORION")
         return self.responder(quem, mensagem)
 
-# Instancia que o main.py importa
 orchestrator = Orquestrador()
 
-# Funcao que o main.py importa: from backend.orchestrator import processar_mensagem, orchestrator
 def processar_mensagem(quem="ORION", mensagem=None, **kwargs):
     if mensagem is None:
         if "mensagem" in kwargs:

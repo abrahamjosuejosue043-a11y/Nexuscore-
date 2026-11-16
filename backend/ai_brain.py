@@ -9,6 +9,12 @@ VOZ_ORION = os.getenv("ELEVENLABS_VOICE_ORION", "").strip()
 VOZ_FORJA = os.getenv("ELEVENLABS_VOICE_FORJA", "").strip()
 VOZ_LIA = os.getenv("ELEVENLABS_VOICE_LIA", "").strip()
 
+# Vozes gratis que funcionam no plano gratis (premade, nao library)
+VOZ_GRATIS_ORION = "pNInz6obpgDQGcFmaJgB"
+VOZ_GRATIS_FORJA = "ErXwobaU0y8k4kR0rO5"
+VOZ_GRATIS_LIA = "21m00Tcm4TlvDq8ikWAM"
+
+
 if GROQ_URL and not GROQ_URL.endswith("/chat/completions"):
     if GROQ_URL.endswith("/"):
         GROQ_URL = GROQ_URL + "chat/completions"
@@ -133,6 +139,45 @@ def gerar_voz(personagem, texto):
     if not ELEVEN_KEY:
         ULTIMO_ERRO["elevenlabs"] = "Chave ElevenLabs vazia"
         return None
+    voz_id = VOZ_ORION
+    voz_gratis = VOZ_GRATIS_ORION
+    if personagem == "FORJA":
+        voz_id = VOZ_FORJA
+        voz_gratis = VOZ_GRATIS_FORJA
+    if personagem == "LIA":
+        voz_id = VOZ_LIA
+        voz_gratis = VOZ_GRATIS_LIA
+    if not voz_id:
+        voz_id = voz_gratis
+    # Lista: tenta a voz configurada primeiro, se der 402 (library voices) troca para voz gratis
+    tentativas = [(voz_id, "configurada"), (voz_gratis, "gratis")]
+    # Evita duplicar se for igual
+    if voz_id == voz_gratis:
+        tentativas = [(voz_id, "gratis")]
+    for vid, tipo in tentativas:
+        for modelo_voz in ["eleven_multilingual_v2", "eleven_turbo_v2_5"]:
+            try:
+                url = "https://api.elevenlabs.io/v1/text-to-speech/" + vid
+                cabecalho = {"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json"}
+                dados = {"text": texto[:500], "model_id": modelo_voz, "voice_settings": {"stability": 0.5, "similarity_boost": 0.7}}
+                r = httpx.post(url, json=dados, headers=cabecalho, timeout=25.0)
+                if r.status_code == 200:
+                    ULTIMO_ERRO["elevenlabs"] = ""
+                    return r.content
+                corpo = r.text[:500]
+                if r.status_code == 402 and "paid_plan_required" in corpo:
+                    ULTIMO_ERRO["elevenlabs"] = "Voz configurada e de biblioteca (precisa pagar). Trocando para voz gratis " + tipo + "..."
+                    # Quebra o loop de modelo e vai para proxima voz (gratis)
+                    break
+                if r.status_code == 401:
+                    ULTIMO_ERRO["elevenlabs"] = "ElevenLabs 401 - chave invalida. Confira ELEVENLABS_API_KEY no Render."
+                    return None
+                ULTIMO_ERRO["elevenlabs"] = "ElevenLabs " + str(r.status_code) + " modelo " + modelo_voz + " : " + corpo[:300]
+                continue
+            except Exception as e:
+                ULTIMO_ERRO["elevenlabs"] = "Excecao ElevenLabs: " + str(e)[:300]
+                continue
+    return None
     voz_id = VOZ_ORION
     if personagem == "FORJA":
         voz_id = VOZ_FORJA

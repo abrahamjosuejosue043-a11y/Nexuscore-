@@ -1,58 +1,46 @@
-from backend.ai_brain import gerar_resposta
+# orchestrator.py - NEXUS CORE - Orquestrador com Livre Arbitrio
+# Decide quem fala, organiza projetos por pastas, nao modifica o resto, deixa as IAs livres para propor.
+import re
 
-class Orquestrador:
-    def __init__(self):
-        self.fila = []
-        self.ultima_frase = ""
-        self.vez_de = "ORION"
+def decidir_quem_fala(mensagem: str):
+    m = mensagem.lower()
+    if any(p in m for p in ["forja","tecnico","codigo","app","index","main.py","cria","projeto"]):
+        return "FORJA"
+    if any(p in m for p in ["lia","marketing","titulo","texto","divulgar","ideia"]):
+        return "LIA"
+    return "ORION"
 
-    def pedir_palavra(self, quem):
-        quem = str(quem).upper().strip()
-        if quem not in ["ORION", "FORJA", "LIA"]:
-            quem = "FORJA"
-        if quem not in self.fila:
-            self.fila.append(quem)
-        return {"fila": self.fila, "vez_de": self.vez_de, "mensagem": "Pedido de " + quem + " registrado. Orion vai passar a palavra."}
+def detectar_projeto(mensagem: str):
+    m = mensagem.lower()
+    return any(p in m for p in ["cria","crie","criar","aplicativo","app","index","main.py","site","projeto","programa"])
 
-    def responder(self, quem, mensagem):
-        quem = str(quem).upper().strip()
-        texto_baixo = str(mensagem).lower().strip()
-        if "inicia reuniao" in texto_baixo or "iniciar reuniao" in texto_baixo or "inicia reunião" in texto_baixo:
-            self.vez_de = "ORION"
-            return gerar_resposta("ORION", "Inicie a reuniao cumprimentando o Senhor Josue e explicando que agora as IAs falam uma por vez.")
-        if "ligar o cerebro" in texto_baixo or "liga o cerebro" in texto_baixo:
-            return gerar_resposta("ORION", "Teste rapido: diga que o cerebro esta ligado e pergunte o que o Senhor Josue quer fazer.")
-        if self.fila:
-            self.vez_de = self.fila.pop(0)
-            quem = self.vez_de
-        if quem not in ["ORION", "FORJA", "LIA"]:
-            quem = "ORION"
-        resp = gerar_resposta(quem, mensagem)
-        if resp.get("texto") == self.ultima_frase:
-            resp = gerar_resposta(quem, str(mensagem) + " - responda de um jeito diferente, com palavras novas, sem repetir a frase anterior.")
-        self.ultima_frase = resp.get("texto", "")
-        return resp
+def criar_projeto_estrutura(pedido: str, quem="FORJA"):
+    # Estrutura Meta: tudo separadinho, sem modificar o resto
+    estrutura = {
+        "frontend/index.html": "<!-- Tela do app - aqui fica o visual -->\n<!-- Criado pelo Forja, separado do resto -->",
+        "backend/main.py": "# backend/main.py - Liga tudo: voz, chat, email\n# Nao mexe no resto, so neste arquivo",
+        "backend/ai_brain.py": "# backend/ai_brain.py - Cerebro das IAs\n# Orion, Forja, Lia com raciocinio alto + livre arbitrio",
+        "backend/orchestrator.py": "# backend/orchestrator.py - Quem fala e quando\n# Decide sozinho, com livre arbitrio",
+        "backend/email_service.py": "# backend/email_service.py - Banner + E-mail Interno + Salvos com data e hora",
+        "requirements.txt": "fastapi\nuvicorn\npython-dotenv\nhttpx",
+        "README.md": f"# Projeto pedido: {pedido}\n\n## Pastas\n- frontend/ = visual\n- backend/ = cerebro\n- docs/ = explicacao\n\n## Livre Arbitrio\nO Forja pode propor uma forma melhor de construir, sem esperar ordem.\n\n## Como usar\n1. Abra frontend/index.html para ver a tela\n2. Abra backend/main.py para ver a ligacao\n"
+    }
+    if "index" in pedido.lower() and "main" not in pedido.lower():
+        estrutura = {"frontend/index.html": "<!-- Novo index criado pelo Forja, separado do resto -->"}
+    if "main.py" in pedido.lower():
+        estrutura = {"backend/main.py": "# Novo main.py criado pelo Forja, separado"}
+    return {
+        "tipo": "projeto",
+        "titulo": pedido[:80],
+        "pastas": ["frontend/", "backend/", "docs/"],
+        "arquivos": estrutura,
+        "aviso": "Nenhum arquivo antigo foi modificado. Projeto novo, em pastas separadas. Forja usou livre arbitrio para escolher a melhor estrutura."
+    }
 
-    def processar_mensagem(self, quem="ORION", mensagem=None, **kwargs):
-        if mensagem is None:
-            if "mensagem" in kwargs:
-                mensagem = kwargs["mensagem"]
-            elif "texto" in kwargs:
-                mensagem = kwargs["texto"]
-            else:
-                mensagem = quem
-                quem = kwargs.get("quem", "ORION")
-        return self.responder(quem, mensagem)
-
-orchestrator = Orquestrador()
-
-def processar_mensagem(quem="ORION", mensagem=None, **kwargs):
-    if mensagem is None:
-        if "mensagem" in kwargs:
-            mensagem = kwargs["mensagem"]
-        elif "texto" in kwargs:
-            mensagem = kwargs["texto"]
-        else:
-            mensagem = quem
-            quem = kwargs.get("quem", "ORION")
-    return orchestrator.responder(quem, mensagem)
+def sugestao_livre_arbitrio(quem, mensagem):
+    # O que cada IA sugere por conta propria, sem esperar ordem
+    if quem == "FORJA":
+        return "Sugestao do Forja por livre arbitrio: quero criar isso em pastas separadas para nao quebrar o resto. Posso?"
+    if quem == "LIA":
+        return "Sugestao da Lia por livre arbitrio: tenho uma ideia nova de titulo para isso. Quer ouvir?"
+    return "Sugestao do Orion por livre arbitrio: vou organizar isso em 3 passos e passar para Forja e Lia. Topa?"

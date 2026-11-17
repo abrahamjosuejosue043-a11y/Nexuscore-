@@ -97,30 +97,3 @@ async def api_email():
         return listar_ideias_novas()
     except Exception as e:
         return {"quantidade": 0, "ideias": [], "erro": str(e)}
-
-
-@app.post("/api/email/enviar")
-async def api_email_enviar(req: Request):
-    dados = await req.json()
-    destino = dados.get("para") or dados.get("destino") or ""
-    assunto = dados.get("assunto") or "NEXUS CORE - Relatorio"
-    texto = dados.get("texto") or dados.get("mensagem") or ""
-    try:
-        from backend.email_service import enviar_email
-        return enviar_email(destino, assunto, texto)
-    except Exception as e:
-        return {"sucesso": False, "erro": str(e)}
-
-@app.get("/api/elevenlabs/teste")
-async def api_eleven_teste():
-    # Mostra o erro real do ElevenLabs para diagnosticar
-    try:
-        from backend.ai_brain import status_brain, gerar_voz
-        s = status_brain()
-        # Tenta gerar 1 audio curto para ver o erro
-        audio = gerar_voz("ORION", "Teste de voz Nexus Core.")
-        if audio:
-            return {"ok": True, "mensagem": "ElevenLabs LIGADO - audio gerado", "status": s}
-        return {"ok": False, "mensagem": "ElevenLabs falhou - veja ultimo_erro_elevenlabs", "status": s}
-    except Exception as e:
-        return {"ok": False, "erro": str(e)}

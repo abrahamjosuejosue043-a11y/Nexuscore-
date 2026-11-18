@@ -16,15 +16,23 @@ import os, time
 app = FastAPI(title="NEXUS CORE")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# --- Importa o CEREBRO V3 ---
+# --- Importa o CEREBRO V3 - tenta 2 jeitos para nao cair no simples a toa ---
+_ERRO_CEREBRO = ""
 try:
     from backend.ai_brain import pensar, testar_ias, criar_ordem_servico, analisar_email_detalhado_brain, _BACKUP_GEMINI, _PERFIL_CEO
-except Exception as e:
-    print("ai_brain falhou, usando simples:", e)
-    _BACKUP_GEMINI = []
-    _PERFIL_CEO = {"nome": "Josue", "cargo": "CEO - Innova XR"}
-    async def testar_ias():
-        return {"meta": "Sem teste", "gemini": "Sem teste"}
+except Exception as e1:
+    print("ai_brain falhou no 1o jeito, tentando 2o jeito:", e1)
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend"))
+        from ai_brain import pensar, testar_ias, criar_ordem_servico, analisar_email_detalhado_brain, _BACKUP_GEMINI, _PERFIL_CEO
+    except Exception as e2:
+        print("ai_brain falhou nos 2 jeitos, usando simples:", e2)
+        _ERRO_CEREBRO = str(e2)[:200]
+        _BACKUP_GEMINI = []
+        _PERFIL_CEO = {"nome": "Josue", "cargo": "CEO - Innova XR"}
+        async def testar_ias():
+            return {"meta": f"ERRO IMPORT CEREBRO: {_ERRO_CEREBRO} - veja log do Render", "gemini": f"ERRO IMPORT CEREBRO: {_ERRO_CEREBRO} - veja log do Render"}
     async def pensar(quem, mensagem, historico=None):
         m = (mensagem or "").lower().strip()
         if m in ["oi", "oii", "ola"]:

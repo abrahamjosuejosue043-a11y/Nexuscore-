@@ -221,7 +221,7 @@ async def _groq(quem, mensagem, historico):
     try:
         async with httpx.AsyncClient(timeout=8.0) as c:
             r = await c.post(meta_url, headers={"Authorization": f"Bearer {meta_key}", "Content-Type": "application/json"},
-                json={"model": "llama-3.3-70b-versatile", "messages": msgs, "temperature": 0.75, "max_tokens": 1200})
+                json={"model": "llama-3.1-8b-instant", "messages": msgs, "temperature": 0.75, "max_tokens": 1200})
             if r.status_code == 200:
                 return r.json()["choices"][0]["message"]["content"].strip()
             return None
@@ -322,13 +322,13 @@ async def testar_ias():
         try:
             async with httpx.AsyncClient(timeout=8.0) as c:
                 r = await c.post(meta_url, headers={"Authorization": f"Bearer {meta_key}", "Content-Type": "application/json"},
-                    json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": "oi"}], "max_tokens": 5})
+                    json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": "oi"}], "max_tokens": 5})
                 if r.status_code == 200:
                     resultado["meta"] = "OK - funcionando"
                 elif r.status_code == 401:
                     resultado["meta"] = "401 - CHAVE ERRADA ou vencida. A chave do Groq tem que comecar com gsk_. Crie uma nova no Groq."
                 elif r.status_code == 404:
-                    resultado["meta"] = "404 - URL ERRADA. META_AI_API_URL tem que ser https://api.groq.com/openai/v1/chat/completions com S no final."
+                    resultado["meta"] = "404 - MODELO OU URL. Verifique META_AI_API_URL = https://api.groq.com/openai/v1/chat/completions com S no final e o modelo no cerebro."
                 elif r.status_code == 429:
                     resultado["meta"] = "429 - ACABOU A COTA do Groq. Espere um pouco ou crie outra chave."
                 else:
@@ -345,7 +345,7 @@ async def testar_ias():
                 if r.status_code == 200:
                     resultado["gemini"] = "OK - funcionando"
                 elif r.status_code == 400:
-                    resultado["gemini"] = "400 - CHAVE DO GEMINI ERRADA. A chave tem que comecar com AIza. Crie uma nova no Google AI Studio."
+                    resultado["gemini"] = "400 - CHAVE DO GEMINI ERRADA. A chave tem que comecar com AIza ou AQ. (AI Studio) ou AQ. (Google Cloud). Crie uma nova no Google AI Studio ou Google Cloud."
                 elif r.status_code == 429:
                     resultado["gemini"] = "429 - ACABOU A COTA do Gemini. Espere um pouco."
                 else:

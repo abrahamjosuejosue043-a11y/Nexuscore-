@@ -223,7 +223,7 @@ async def _groq(quem, mensagem, historico):
         msgs.append(h)
     msgs.append({"role": "user", "content": mensagem})
     try:
-        async with httpx.AsyncClient(timeout=8.0) as c:
+        async with httpx.AsyncClient(timeout=30.0) as c:
             r = await c.post(meta_url, headers={"Authorization": f"Bearer {meta_key}", "Content-Type": "application/json"},
                 json={"model": "openai/gpt-oss-120b", "messages": msgs, "temperature": 0.75, "max_tokens": 1200})
             if r.status_code == 200:
@@ -238,7 +238,7 @@ async def _gemini(quem, mensagem):
         return None
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
-        async with httpx.AsyncClient(timeout=8.0) as c:
+        async with httpx.AsyncClient(timeout=30.0) as c:
             r = await c.post(url, json={"contents": [{"parts": [{"text": PROMPTS.get(quem, "") + "\n\nPerfil CEO: " + json.dumps(_PERFIL_CEO, ensure_ascii=False)[:600] + "\n\nPergunta do Senhor Josue: " + mensagem}]}]})
             if r.status_code == 200:
                 return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
@@ -292,7 +292,7 @@ async def pensar(quem, mensagem, historico=None):
         elif not meta_key:
             texto = "Senhor Josue, estou online, mas a chave do Meta (Groq) nao esta chegando no Render. O Gemini tentou e tambem falhou. Veja se META_AI_API_KEY esta em Render > Environment, sem espaco, e aperte Manual Deploy > Deploy latest commit."
         else:
-            texto = "Senhor Josue, estou online e tentei o Meta e o Gemini, mas os dois demoraram agora. Nao perdi sua pergunta. Tente de novo em 10 segundos que eu respondo. Enquanto isso, uma ideia minha: vamos comecar pelo mais simples para voce ver resultado rapido?"
+            texto = "Senhor Josue, estou online e tentei o Meta e o Gemini, mas os dois demoraram agora. Nao perdi sua pergunta. Tente de novo, o servidor estava lento que eu respondo. Enquanto isso, uma ideia minha: vamos comecar pelo mais simples para voce ver resultado rapido?"
         fonte = "offline-explicado"
     texto = _limpar_repeticao(texto)
     _MEMORIA.append(texto)
@@ -324,7 +324,7 @@ async def testar_ias():
         resultado["meta"] = "SEM CHAVE - coloque META_AI_API_KEY no Render"
     else:
         try:
-            async with httpx.AsyncClient(timeout=8.0) as c:
+            async with httpx.AsyncClient(timeout=30.0) as c:
                 r = await c.post(meta_url, headers={"Authorization": f"Bearer {meta_key}", "Content-Type": "application/json"},
                     json={"model": "openai/gpt-oss-120b", "messages": [{"role": "user", "content": "oi"}], "max_tokens": 5})
                 if r.status_code == 200:
@@ -343,7 +343,7 @@ async def testar_ias():
         resultado["gemini"] = "SEM CHAVE - coloque GEMINI_API_KEY no Render"
     else:
         try:
-            async with httpx.AsyncClient(timeout=8.0) as c:
+            async with httpx.AsyncClient(timeout=30.0) as c:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}"
                 r = await c.post(url, json={"contents": [{"parts": [{"text": "oi"}]}]})
                 if r.status_code == 200:

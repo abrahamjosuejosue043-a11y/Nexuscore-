@@ -345,7 +345,7 @@ async def testar_ias():
                 if r.status_code == 200:
                     resultado["gemini"] = "OK - funcionando"
                 elif r.status_code == 400:
-                    resultado["gemini"] = "400 - CHAVE DO GEMINI ERRADA. A chave tem que comecar com AIza ou AQ. (AI Studio) ou AQ. (Google Cloud). Crie uma nova no Google AI Studio ou Google Cloud."
+                    resultado["gemini"] = "400 - CHAVE DO GEMINI ERRADA. A chave tem que comecar com AIza (AI Studio) ou AQ. (Google Cloud). Crie uma nova no Google AI Studio ou Google Cloud."
                 elif r.status_code == 429:
                     resultado["gemini"] = "429 - ACABOU A COTA do Gemini. Espere um pouco."
                 else:

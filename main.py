@@ -31,6 +31,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from backend.cerebro1_gemini import (
+    chamar_gemini as chamar_gemini_modulo,
+    GeminiError,
+)
+
 
 # ---------------------------------------------------------------------------
 # Configuração geral
@@ -140,68 +145,14 @@ def extract_provider_error(response: httpx.Response) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Integração Gemini
+# Integração Gemini — delegada ao módulo backend/cerebro1_gemini.py
 # ---------------------------------------------------------------------------
 
 async def chamar_gemini(prompt: str) -> str:
-    api_key = get_secret("GEMINI_API_KEY")
-    if not api_key:
-        raise ProviderError(
-            "Gemini",
-            "A variável GEMINI_API_KEY não está configurada no ambiente do serviço.",
-            503,
-        )
-
-    model = GEMINI_MODEL or "gemini-2.0-flash"
-    url = f"{GEMINI_API_URL}/{model}:generateContent"
-
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 4096,
-        },
-    }
-
     try:
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-            response = await client.post(
-                url,
-                params={"key": api_key},
-                json=payload,
-            )
-    except httpx.TimeoutException:
-        raise ProviderError("Gemini", "Tempo limite excedido ao consultar o Gemini.", 504)
-    except httpx.HTTPError as exc:
-        logger.warning("Falha de conexão com Gemini: %s", type(exc).__name__)
-        raise ProviderError("Gemini", "Não foi possível conectar ao Gemini.", 502)
-
-    if response.status_code != 200:
-        detail = extract_provider_error(response)
-        if response.status_code in (400, 401, 403):
-            message = f"Gemini recusou a solicitação (HTTP {response.status_code}). Verifique a chave e as permissões."
-        elif response.status_code == 404:
-            message = f"Modelo Gemini '{model}' não encontrado ou indisponível para esta chave."
-        elif response.status_code == 429:
-            message = "Limite de solicitações do Gemini atingido. Tente novamente mais tarde."
-        else:
-            message = f"Gemini retornou HTTP {response.status_code}."
-        logger.warning("Gemini HTTP %s: %s", response.status_code, detail)
-        raise ProviderError("Gemini", message, 502)
-
-    try:
-        data = response.json()
-        candidates = data.get("candidates") or []
-        parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
-        answer = "\n".join(
-            part.get("text", "") for part in parts if isinstance(part, dict)
-        ).strip()
-    except (ValueError, IndexError, AttributeError, TypeError):
-        answer = ""
-
-    if not answer:
-        raise ProviderError("Gemini", "O Gemini respondeu sem conteúdo de texto.", 502)
-    return answer
+        return await chamar_gemini_modulo(prompt)
+    except GeminiError as erro:
+        raise ProviderError("Gemini", str(erro), 502) from erro
 
 
 # ---------------------------------------------------------------------------

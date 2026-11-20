@@ -35,7 +35,7 @@ async def chamar_gemini(pergunta: str) -> str:
     if not chave:
         raise GeminiError("A variável GEMINI_API_KEY não está configurada.")
 
-    modelo = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+    modelo = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
     if not modelo:
         modelo = "gemini-3.8-flash"
 

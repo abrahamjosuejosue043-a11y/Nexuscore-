@@ -5,7 +5,7 @@ resumos, ordens de serviço, nomes, slogans e campanhas.
 
 Variáveis de ambiente:
 - GEMINI_API_KEY: chave da API Google Gemini.
-- GEMINI_MODEL: modelo utilizado (padrão: gemini-2.0-flash).
+- GEMINI_MODEL: modelo utilizado (padrão: gemini-3.8-flash).
 
 A chave deve ser configurada no ambiente do Render, nunca neste arquivo.
 """
@@ -37,7 +37,7 @@ async def chamar_gemini(pergunta: str) -> str:
 
     modelo = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
     if not modelo:
-        modelo = "gemini-2.0-flash"
+        modelo = "gemini-3.8-flash"
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/"

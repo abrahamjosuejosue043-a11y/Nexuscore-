@@ -1,220 +1,501 @@
 """
-NEXUS CORE - CEREBRO LIMPO - SEM LIXO
-Colar em: main.py na RAIZ do servico 7hdh
-CORRECOES:
-1. TIREI o gerador gratis Pollinations. Ele criava tabela lixo Meta EvalKit e imagem de circulo de metal com marca d'agua. Nunca mais.
-2. Se as 2 chaves falharem, NAO inventa resposta. Fala a verdade: qual chave falta no 7hdh e como resolver.
-3. Gemini: usa SO gemini-1.5-flash, que existe. O gemini-2.0-flash dava 404.
-4. Mostra os NOMES das variaveis que existem no 7hdh, sem mostrar valor, para provar se GROQ_API_KEY esta la ou nao.
-5. Imagem: sem chave valida, NAO cria imagem lixo. Avisa que precisa de chave valida para imagem em alta resolucao.
+NEXUSCORE AI — API CENTRAL
+Arquivo: main.py (raiz do repositório)
+
+Esta versão mantém as rotas principais do projeto e organiza:
+- Inicialização do FastAPI
+- Comunicação assíncrona com Gemini e Groq
+- Orquestração com fallback transparente
+- Diagnóstico administrativo protegido
+- Entrega do frontend/frontend index.html
+
+IMPORTANTE:
+- Groq é o provedor da API usada pelo módulo Llama; não é a API da Meta.
+- Esta versão ainda NÃO implementa colaboração real entre três agentes.
+- Os endpoints de e-mail respondem como não implementados até existir
+  integração real com backend/email_services.py.
 """
-import os, re, time, hashlib
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
+
+import os
+import re
+import time
+import hmac
+import logging
+from pathlib import Path
+from collections import OrderedDict
+from typing import Optional
+
 import httpx
+from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 
-app = FastAPI(title="Nexus Limpo")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-CACHE = {}
 
-SAUDACOES = ["ola","olá","oi","bom dia","boa tarde","boa noite"]
-CONFIRMACOES = ["ok","okay","sim","beleza","entendi"]
+# ---------------------------------------------------------------------------
+# Configuração geral
+# ---------------------------------------------------------------------------
 
-def pegar(nome):
-    v = os.environ.get(nome, "")
-    if not v: return None
-    # So tira espaco do comeco e do fim. Nao tira espaco do meio, nao modifica nada dentro.
-    v = v.strip().strip('"').strip("'")
-    return v if len(v) > 10 else None
+BASE_DIR = Path(__file__).resolve().parent
+FRONTEND_FILE = BASE_DIR / "frontend" / "index.html"
 
-def limpo(t):
-    t=(t or "").lower().strip()
-    t=re.sub(r"[^a-z0-9 ]","",t)
-    return " ".join(t.split())
-def e_saudacao(p):
-    t=limpo(p)
-    tem=any(x in t for x in ["cria","criar","app","codigo","campanha","ideia","projeto","index","python","imagem","foto","desenha"])
-    if tem: return False
-    return t in SAUDACOES or t.startswith("boa tarde") or t.startswith("bom dia")
-def e_confirmacao(p): return limpo(p) in CONFIRMACOES
-def corrigir(p): return p.replace("pytom","python").replace("Pytom","Python")
-def quer_imagem(p):
-    t=p.lower()
-    return any(x in t for x in ["imagem","foto","desenho","desenha","logo","banner","capa","ilustra"])
-def quer_codigo(p):
-    t=p.lower()
-    return any(x in t for x in ["codigo","código","html","css","javascript","python","app","site","pagina"])
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+logger = logging.getLogger("nexuscore")
 
-async def chamar_gemini(prompt):
-    chave = pegar("GEMINI_API_KEY")
-    if not chave:
-        raise Exception("GEMINI_SEM_CHAVE: No servico 7hdh nao tem variavel com nome GEMINI_API_KEY. Vai em Render > servico 7hdh > Environment e confere o NOME.")
-    # SO modelo que existe. O 2.0-flash dava 404.
-    for modelo in ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]:
+APP_NAME = "Nexuscore AI"
+APP_VERSION = "1.0.0"
+
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+
+REQUEST_TIMEOUT = float(os.getenv("AI_REQUEST_TIMEOUT", "45"))
+MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "8000"))
+CACHE_MAX_ITEMS = int(os.getenv("CACHE_MAX_ITEMS", "100"))
+
+# Cache temporário limitado. Não substitui o futuro banco de dados.
+_RESPONSE_CACHE: OrderedDict[str, dict] = OrderedDict()
+
+
+def get_secret(name: str) -> Optional[str]:
+    """Lê uma variável de ambiente sem expor seu valor nos logs ou respostas."""
+    value = os.getenv(name, "").strip()
+    if not value:
+        return None
+    return value.strip('"').strip("'")
+
+
+def get_cors_origins() -> list[str]:
+    """
+    CORS configurável.
+    Em produção, informe CORS_ORIGINS com as origens permitidas separadas por vírgula.
+    Exemplo: https://seu-dominio.onrender.com
+    """
+    raw = os.getenv("CORS_ORIGINS", "").strip()
+    if not raw:
+        return []
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+app = FastAPI(
+    title=APP_NAME,
+    version=APP_VERSION,
+    description="API central do Nexuscore AI.",
+)
+
+allowed_origins = get_cors_origins()
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "X-Admin-Token"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Modelos de entrada
+# ---------------------------------------------------------------------------
+
+class ChatRequest(BaseModel):
+    texto: str = Field(..., min_length=1, max_length=MAX_INPUT_CHARS)
+    tipo: str = Field(default="geral", max_length=40)
+
+
+class EmailRequest(BaseModel):
+    texto: str = Field(default="", max_length=MAX_INPUT_CHARS)
+    assunto: str = Field(default="", max_length=300)
+    destinatario: str = Field(default="", max_length=320)
+
+
+# ---------------------------------------------------------------------------
+# Erros controlados dos provedores
+# ---------------------------------------------------------------------------
+
+class ProviderError(Exception):
+    def __init__(self, provider: str, message: str, status_code: int = 502):
+        self.provider = provider
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
+
+
+def extract_provider_error(response: httpx.Response) -> str:
+    """Extrai uma mensagem curta de erro sem incluir cabeçalhos ou chaves."""
+    try:
+        data = response.json()
+        error = data.get("error", {})
+        if isinstance(error, dict):
+            message = error.get("message") or error.get("status")
+            if message:
+                return str(message)[:500]
+        if isinstance(error, str):
+            return error[:500]
+    except Exception:
+        pass
+    return response.text[:300] or f"HTTP {response.status_code}"
+
+
+# ---------------------------------------------------------------------------
+# Integração Gemini
+# ---------------------------------------------------------------------------
+
+async def chamar_gemini(prompt: str) -> str:
+    api_key = get_secret("GEMINI_API_KEY")
+    if not api_key:
+        raise ProviderError(
+            "Gemini",
+            "A variável GEMINI_API_KEY não está configurada no ambiente do serviço.",
+            503,
+        )
+
+    model = GEMINI_MODEL or "gemini-2.0-flash"
+    url = f"{GEMINI_API_URL}/{model}:generateContent"
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.7,
+            "maxOutputTokens": 4096,
+        },
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+            response = await client.post(
+                url,
+                params={"key": api_key},
+                json=payload,
+            )
+    except httpx.TimeoutException:
+        raise ProviderError("Gemini", "Tempo limite excedido ao consultar o Gemini.", 504)
+    except httpx.HTTPError as exc:
+        logger.warning("Falha de conexão com Gemini: %s", type(exc).__name__)
+        raise ProviderError("Gemini", "Não foi possível conectar ao Gemini.", 502)
+
+    if response.status_code != 200:
+        detail = extract_provider_error(response)
+        if response.status_code in (400, 401, 403):
+            message = f"Gemini recusou a solicitação (HTTP {response.status_code}). Verifique a chave e as permissões."
+        elif response.status_code == 404:
+            message = f"Modelo Gemini '{model}' não encontrado ou indisponível para esta chave."
+        elif response.status_code == 429:
+            message = "Limite de solicitações do Gemini atingido. Tente novamente mais tarde."
+        else:
+            message = f"Gemini retornou HTTP {response.status_code}."
+        logger.warning("Gemini HTTP %s: %s", response.status_code, detail)
+        raise ProviderError("Gemini", message, 502)
+
+    try:
+        data = response.json()
+        candidates = data.get("candidates") or []
+        parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
+        answer = "\n".join(
+            part.get("text", "") for part in parts if isinstance(part, dict)
+        ).strip()
+    except (ValueError, IndexError, AttributeError, TypeError):
+        answer = ""
+
+    if not answer:
+        raise ProviderError("Gemini", "O Gemini respondeu sem conteúdo de texto.", 502)
+    return answer
+
+
+# ---------------------------------------------------------------------------
+# Integração Groq (modelos Llama)
+# ---------------------------------------------------------------------------
+
+async def chamar_groq(prompt: str) -> str:
+    api_key = get_secret("GROQ_API_KEY")
+    if not api_key:
+        raise ProviderError(
+            "Groq",
+            "A variável GROQ_API_KEY não está configurada no ambiente do serviço.",
+            503,
+        )
+
+    payload = {
+        "model": GROQ_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
+        "max_tokens": 4096,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+            response = await client.post(
+                GROQ_API_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+    except httpx.TimeoutException:
+        raise ProviderError("Groq", "Tempo limite excedido ao consultar a Groq.", 504)
+    except httpx.HTTPError as exc:
+        logger.warning("Falha de conexão com Groq: %s", type(exc).__name__)
+        raise ProviderError("Groq", "Não foi possível conectar à Groq.", 502)
+
+    if response.status_code != 200:
+        detail = extract_provider_error(response)
+        if response.status_code in (400, 401, 403):
+            message = f"Groq recusou a solicitação (HTTP {response.status_code}). Verifique a chave, o modelo e as permissões."
+        elif response.status_code == 404:
+            message = f"Modelo Groq '{GROQ_MODEL}' não encontrado ou indisponível."
+        elif response.status_code == 429:
+            message = "Limite de solicitações da Groq atingido. Tente novamente mais tarde."
+        else:
+            message = f"Groq retornou HTTP {response.status_code}."
+        logger.warning("Groq HTTP %s: %s", response.status_code, detail)
+        raise ProviderError("Groq", message, 502)
+
+    try:
+        data = response.json()
+        choices = data.get("choices") or []
+        answer = choices[0].get("message", {}).get("content", "") if choices else ""
+        if isinstance(answer, list):
+            answer = "\n".join(
+                item.get("text", "") for item in answer if isinstance(item, dict)
+            )
+        answer = str(answer).strip()
+    except (ValueError, IndexError, AttributeError, TypeError):
+        answer = ""
+
+    if not answer:
+        raise ProviderError("Groq", "A Groq respondeu sem conteúdo de texto.", 502)
+    return answer
+
+
+# ---------------------------------------------------------------------------
+# Orquestração básica — fallback, ainda sem agentes colaborativos
+# ---------------------------------------------------------------------------
+
+def normalize_type(value: str) -> str:
+    value = (value or "geral").strip().lower()
+    aliases = {
+        "codigo": "programacao",
+        "código": "programacao",
+        "engenharia": "programacao",
+        "marketing": "publicidade",
+        "direcao": "diretoria",
+        "direção": "diretoria",
+    }
+    value = aliases.get(value, value)
+    if value not in {"geral", "diretoria", "programacao", "publicidade"}:
+        return "geral"
+    return value
+
+
+def build_prompt(text: str, agent_type: str) -> str:
+    instructions = {
+        "diretoria": (
+            "Você é o agente de Diretoria do Nexuscore AI. "
+            "Analise objetivos, riscos, prioridades e próximos passos. "
+            "Não afirme que executou tarefas que não realizou."
+        ),
+        "programacao": (
+            "Você é o agente de Engenharia de Software do Nexuscore AI. "
+            "Entregue soluções técnicas claras, seguras e testáveis. "
+            "Ao propor alterações, indique arquivos e passos de validação. "
+            "Não afirme que executou ou testou código sem realmente fazê-lo."
+        ),
+        "publicidade": (
+            "Você é o agente de Marketing do Nexuscore AI. "
+            "Analise público, proposta de valor, posicionamento e aquisição. "
+            "Diferencie hipóteses de fatos comprovados."
+        ),
+        "geral": (
+            "Você é o assistente central do Nexuscore AI. "
+            "Responda com clareza, precisão e transparência."
+        ),
+    }
+    return f"{instructions[agent_type]}\n\nSolicitação do usuário:\n{text}"
+
+
+def cache_get(key: str) -> Optional[dict]:
+    result = _RESPONSE_CACHE.get(key)
+    if result is not None:
+        _RESPONSE_CACHE.move_to_end(key)
+        return dict(result)
+    return None
+
+
+def cache_set(key: str, value: dict) -> None:
+    _RESPONSE_CACHE[key] = dict(value)
+    _RESPONSE_CACHE.move_to_end(key)
+    while len(_RESPONSE_CACHE) > max(1, CACHE_MAX_ITEMS):
+        _RESPONSE_CACHE.popitem(last=False)
+
+
+async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
+    started = time.perf_counter()
+    text = (pedido or "").strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="O texto da mensagem está vazio.")
+
+    agent_type = normalize_type(tipo)
+    cache_key = f"{agent_type}:{text.casefold()}"
+    cached = cache_get(cache_key)
+    if cached:
+        cached["origem"] = "cache_temporario"
+        cached["tempo_ms"] = int((time.perf_counter() - started) * 1000)
+        return cached
+
+    prompt = build_prompt(text, agent_type)
+
+    # Engenharia prefere Groq; os demais tipos preferem Gemini.
+    providers = (
+        [("Groq", chamar_groq), ("Gemini", chamar_gemini)]
+        if agent_type == "programacao"
+        else [("Gemini", chamar_gemini), ("Groq", chamar_groq)]
+    )
+
+    errors = []
+    for provider_name, provider_function in providers:
         try:
-            async with httpx.AsyncClient(timeout=35) as c:
-                r = await c.post(f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={chave}", json={"contents":[{"parts":[{"text":prompt}]}]})
-                if r.status_code==200:
-                    d=r.json()
-                    txt=d.get("candidates",[{}])[0].get("content",{}).get("parts",[{}])[0].get("text","")
-                    if txt: return txt
-                elif r.status_code==400:
-                    raise Exception("GEMINI_400: Chave invalida ou expirada. O Google disse 400. A chave no 7hdh nao e uma chave de API do Gemini valida.")
-                elif r.status_code==401:
-                    raise Exception("GEMINI_401: Chave invalida.")
-                elif r.status_code==404:
-                    continue # tenta proximo modelo, nao desiste
-                elif r.status_code==429:
-                    raise Exception("GEMINI_429: Limite atingido, espera 1 minuto.")
-                else:
-                    continue
-        except Exception as e:
-            if "GEMINI_" in str(e): raise
-            continue
-    raise Exception("GEMINI_404: Nenhum modelo Gemini respondeu. O modelo gemini-2.0-flash nao existe para essa chave. Ja troquei para gemini-1.5-flash.")
+            answer = await provider_function(prompt)
+            result = {
+                "resposta": answer,
+                "origem": provider_name.lower(),
+                "cerebro": provider_name,
+                "tempo_ms": int((time.perf_counter() - started) * 1000),
+            }
+            cache_set(cache_key, result)
+            return result
+        except ProviderError as exc:
+            errors.append(f"{exc.provider}: {exc.message}")
+            logger.info("%s indisponível: %s", exc.provider, exc.message)
 
-async def chamar_meta(prompt):
-    chave = pegar("GROQ_API_KEY")
-    if not chave:
-        raise Exception("GROQ_SEM_CHAVE: No servico 7hdh nao tem variavel com nome GROQ_API_KEY. Vai em Render > servico 7hdh > Environment e confere se o NOME esta exatamente GROQ_API_KEY. No seu print anterior, o 7hdh estava SEM CHAVE, mesmo voce tendo colocado a chave no outro servico.")
-    for modelo in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
-        try:
-            async with httpx.AsyncClient(timeout=35) as c:
-                r = await c.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization":f"Bearer {chave}","Content-Type":"application/json"}, json={"model":modelo,"messages":[{"role":"user","content":prompt}],"temperature":0.7,"max_tokens":4000})
-                if r.status_code==200:
-                    d=r.json()
-                    txt=d.get("choices",[{}])[0].get("message",{}).get("content","")
-                    if txt: return txt
-                elif r.status_code==401:
-                    raise Exception("GROQ_401: Chave invalida ou expirada no 7hdh.")
-                elif r.status_code==429:
-                    raise Exception("GROQ_429: Limite, espera 1 minuto.")
-                else: continue
-        except Exception as e:
-            if "GROQ_" in str(e): raise
-            continue
-    raise Exception("GROQ_FALHOU: Groq nao respondeu.")
+    raise HTTPException(
+        status_code=502,
+        detail={
+            "mensagem": "Nenhum provedor de IA conseguiu responder.",
+            "motivos": errors,
+            "orientacao": (
+                "Confira GEMINI_API_KEY e GROQ_API_KEY no ambiente do serviço "
+                "e confirme se os modelos configurados estão disponíveis."
+            ),
+        },
+    )
 
-async def orquestrador(pedido, tipo="geral"):
-    pedido = corrigir(pedido or "")
-    if e_saudacao(pedido):
-        return {"resposta":"Olá! Tudo bem? Pode falar de qualquer tema. Se pedir código, eu crio código. Se pedir imagem, eu crio imagem. Se pedir qualquer tema, eu respondo.","origem":"saudacao","cerebro":"Orquestrador","tempo_ms":5}
-    if e_confirmacao(pedido):
-        return {"resposta":"Ok! O que você quer agora? 1. Código, 2. Imagem, 3. OS, 4. Qualquer tema.","origem":"confirmacao","cerebro":"Orquestrador","tempo_ms":5}
-    k = hashlib.md5((pedido+tipo).lower().encode()).hexdigest()
-    if k in CACHE: return {"resposta":CACHE[k],"origem":"cache","cerebro":"memoria","tempo_ms":5}
-    # IMAGEM: sem chave valida, NAO cria lixo. Fala a verdade.
-    if quer_imagem(pedido):
-        # Tenta usar Gemini + Meta para descrever, mas se falhar, nao cria Pollinations
-        try:
-            prompt_img = f"Descreva em detalhes uma imagem para: {pedido}. Descreva cores, fundo, estilo, iluminação."
-            try:
-                desc = await chamar_gemini(prompt_img)
-            except Exception:
-                desc = await chamar_meta(prompt_img)
-            return {"resposta":f"Descrição em alta resolução, pronta para gerar imagem com chave válida:\n\n{desc}\n\nPara eu gerar a imagem de verdade em alta resolução, sem marca d'água, as chaves precisam estar OK no 7hdh. O gerador grátis que eu usava antes criava imagem lixo de círculo de metal, por isso eu tirei ele. Quando o teste mostrar OK nos 2, eu gero a imagem de verdade.","origem":"imagem-descricao-sem-lixo","cerebro":"Gemini+Meta","tempo_ms":100}
-        except Exception as e:
-            return {"resposta":f"Não vou criar imagem lixo. Para criar imagem em alta resolução sem marca d'água, preciso das chaves válidas no 7hdh.\n\nMotivo real: {str(e)[:300]}\n\nO que fazer: Vai no Render > serviço 7hdh > Environment, confere se tem GEMINI_API_KEY e GROQ_API_KEY com esses nomes exatos, e faz Manual Deploy > Clear build cache and deploy. Depois clica em Testar e tenta de novo.\n\nO gerador grátis anterior criava imagem de círculo de metal que não tinha nada a ver, por isso eu removi ele.","origem":"imagem-bloqueada-sem-lixo","cerebro":"Orquestrador","tempo_ms":10}
-    inicio = time.time()
-    # SUPERPROGRAMADOR LIMPO: tenta os 2, sem inventar
-    if quer_codigo(pedido):
-        prompt_g = f"Você é superprogramador Gemini. Crie código COMPLETO, funcional, pronto para copiar. Pedido: {pedido}. Entregue arquivo por arquivo."
-        prompt_m = f"Você é superprogramador Meta. Crie código COMPLETO, funcional, pronto para copiar, com design bonito. Pedido: {pedido}. Entregue arquivo por arquivo."
-        erros = []
-        res_g = None; res_m = None
-        try: res_g = await chamar_gemini(prompt_g)
-        except Exception as e: erros.append(str(e))
-        try: res_m = await chamar_meta(prompt_m)
-        except Exception as e: erros.append(str(e))
-        if res_g and res_m:
-            final = f"=== VERSÃO GEMINI ===\n{res_g}\n\n=== VERSÃO META ===\n{res_m}\n\n=== FINAL SUPERPROGRAMADOR ===\nUse a que você mais gostar. As 2 estão completas."
-            CACHE[k]=final
-            return {"resposta":final,"origem":"META+GEMINI","cerebro":"Meta + Gemini","tempo_ms":int((time.time()-inicio)*1000)}
-        if res_g: CACHE[k]=res_g; return {"resposta":res_g,"origem":"GEMINI","cerebro":"Gemini","tempo_ms":int((time.time()-inicio)*1000)}
-        if res_m: CACHE[k]=res_m; return {"resposta":res_m,"origem":"META","cerebro":"Meta","tempo_ms":int((time.time()-inicio)*1000)}
-        # SEM INVENTAR: fala a verdade
-        return {"resposta":f"Não consegui ligar no Gemini nem na Meta, e não vou inventar resposta lixo.\n\nMotivos reais:\n- {' | '.join(erros)}\n\nO que fazer agora, no serviço 7hdh:\n1. Vai no Render > serviço 7hdh > Environment\n2. Confere se tem GEMINI_API_KEY e GROQ_API_KEY com esses nomes exatos, sem espaço\n3. Clica em Manual Deploy > Clear build cache and deploy\n4. Clica em Testar e tenta de novo\n\nQuando as chaves estiverem OK, eu crio o código de verdade com Meta + Gemini.","origem":"erro-honesto","cerebro":"Orquestrador","tempo_ms":int((time.time()-inicio)*1000)}
-    # Qualquer tema: mesma logica, sem inventar
-    if tipo=="programacao": prompt_base = f"Você é Programação, Meta. Livre arbítrio, qualquer tema. Responda sobre: {pedido}"
-    elif tipo=="publicidade": prompt_base = f"Você é Publicidade, Gemini. Livre arbítrio, qualquer tema. Responda sobre: {pedido}"
-    elif tipo=="diretoria": prompt_base = f"Você é Diretoria, Gemini. Livre arbítrio, qualquer tema. Responda sobre: {pedido}"
-    else: prompt_base = f"Você é o Time, Meta + Gemini, livre arbítrio para qualquer tema. Responda sobre: {pedido}"
-    erros=[]
-    for nome, fn in [("GEMINI",chamar_gemini),("META",chamar_meta)]:
-        try:
-            resp = await fn(prompt_base)
-            CACHE[k]=resp
-            return {"resposta":resp,"origem":nome,"cerebro":nome,"tempo_ms":int((time.time()-inicio)*1000)}
-        except Exception as e: erros.append(f"{nome}: {str(e)[:200]}")
-    return {"resposta":f"Não consegui ligar no Gemini nem na Meta, e não vou inventar tabela lixo de Meta EvalKit.\n\nMotivos reais:\n- {' | '.join(erros)}\n\nO que fazer no 7hdh:\n1. Render > serviço 7hdh > Environment > confere se tem GEMINI_API_KEY e GROQ_API_KEY\n2. Manual Deploy > Clear build cache and deploy\n3. Clica em Testar\n\nQuando estiver OK, eu respondo de verdade.","origem":"erro-honesto","cerebro":"Orquestrador","tempo_ms":int((time.time()-inicio)*1000)}
 
-@app.exception_handler(Exception)
-async def erro_global(request: Request, exc: Exception):
-    return JSONResponse(status_code=200, content={"resposta":f"Erro controlado: {str(exc)[:300]}","origem":"erro-global","cerebro":"sistema","tempo_ms":0})
+# ---------------------------------------------------------------------------
+# Segurança administrativa
+# ---------------------------------------------------------------------------
+
+def require_admin_token(token: Optional[str]) -> None:
+    expected = get_secret("ADMIN_TOKEN")
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="Diagnóstico administrativo desativado: configure ADMIN_TOKEN no ambiente.",
+        )
+    if not token or not hmac.compare_digest(token, expected):
+        raise HTTPException(status_code=401, detail="Acesso administrativo não autorizado.")
+
+
+# ---------------------------------------------------------------------------
+# Rotas de API
+# ---------------------------------------------------------------------------
 
 @app.get("/api/saude")
 async def saude():
-    return {"status":"ok","sistema":"limpo-sem-lixo","gemini":"SIM" if pegar("GEMINI_API_KEY") else "NAO","groq":"SIM" if pegar("GROQ_API_KEY") else "NAO"}
+    """Verificação básica, sem revelar valores ou nomes de segredos."""
+    return {
+        "status": "ok",
+        "sistema": APP_NAME,
+        "versao": APP_VERSION,
+        "provedores_configurados": {
+            "gemini": bool(get_secret("GEMINI_API_KEY")),
+            "groq": bool(get_secret("GROQ_API_KEY")),
+        },
+    }
+
 
 @app.get("/api/diagnostico")
-async def diagnostico():
-    # Mostra SOMENTE os NOMES das variaveis que existem no 7hdh, sem valor, para provar o que esta la
-    nomes = sorted([k for k in os.environ.keys() if "GEMINI" in k or "GROQ" in k or "ELEVEN" in k or "GMAIL" in k or "MEU" in k])
-    g = pegar("GEMINI_API_KEY"); gr = pegar("GROQ_API_KEY")
-    teste_g="NAO TESTADO"; teste_gr="NAO TESTADO"
-    try:
-        if g:
-            async with httpx.AsyncClient(timeout=10) as c:
-                r=await c.post(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={g}", json={"contents":[{"parts":[{"text":"Ola"}]}]})
-                if r.status_code==200: teste_g="OK - funcionando"
-                elif r.status_code==400: teste_g="ERRO 400 - chave invalida"
-                elif r.status_code==404: teste_g="ERRO 404 - modelo nao existe para essa chave. Ja corrigi para gemini-1.5-flash."
-                elif r.status_code==429: teste_g="ERRO 429 - limite"
-                else: teste_g=f"ERRO {r.status_code}"
-        else: teste_g="SEM CHAVE - nao tem GEMINI_API_KEY no 7hdh"
-    except Exception as e: teste_g=f"ERRO {str(e)[:150]}"
-    try:
-        if gr:
-            async with httpx.AsyncClient(timeout=10) as c:
-                r=await c.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization":f"Bearer {gr}","Content-Type":"application/json"}, json={"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"Ola"}],"max_tokens":10})
-                if r.status_code==200: teste_gr="OK - funcionando"
-                elif r.status_code==401: teste_gr="ERRO 401 - chave invalida"
-                elif r.status_code==429: teste_gr="ERRO 429 - limite"
-                else: teste_gr=f"ERRO {r.status_code}"
-        else: teste_gr="SEM CHAVE - nao tem GROQ_API_KEY no 7hdh. No seu print, o 7hdh estava SEM CHAVE, mesmo voce tendo colocado no outro servico."
-    except Exception as e: teste_gr=f"ERRO {str(e)[:150]}"
-    return {"nomes_no_7hdh":nomes,"teste_gemini":teste_g,"teste_groq":teste_gr,"aviso":"Se GROQ_API_KEY nao aparecer em nomes_no_7hdh, e porque ela nao esta no 7hdh, esta no outro servico. Tem que estar no 7hdh."}
+async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
+    """Diagnóstico protegido pelo segredo ADMIN_TOKEN."""
+    require_admin_token(x_admin_token)
+
+    return {
+        "sistema": APP_NAME,
+        "variaveis": {
+            "GEMINI_API_KEY": "configurada" if get_secret("GEMINI_API_KEY") else "ausente",
+            "GROQ_API_KEY": "configurada" if get_secret("GROQ_API_KEY") else "ausente",
+            "GEMINI_MODEL": GEMINI_MODEL,
+            "GROQ_MODEL": GROQ_MODEL,
+        },
+        "observacao": (
+            "A presença de uma chave não garante que ela seja válida. "
+            "A validade é confirmada ao realizar uma chamada ao provedor."
+        ),
+    }
+
 
 @app.post("/api/chat")
-async def chat(req: Request):
-    try: dados=await req.json()
-    except: dados={}
-    texto=(dados.get("texto") or "").strip()
-    tipo=(dados.get("tipo") or "geral").strip().lower()
-    if not texto: return {"resposta":"Manda uma frase, qualquer tema.","origem":"vazio","cerebro":"Orquestrador","tempo_ms":0}
-    if len(texto)>4000: texto=texto[:4000]
-    tipo2="geral"
-    if tipo in ["diretoria"]: tipo2="diretoria"
-    elif tipo in ["programacao","codigo"]: tipo2="programacao"
-    elif tipo in ["publicidade"]: tipo2="publicidade"
-    return await orquestrador(texto, tipo2)
+async def chat(request: ChatRequest):
+    return await orquestrador(request.texto, request.tipo)
+
+
 @app.post("/api/email/enviar")
-async def email_enviar(req: Request):
-    try: dados=await req.json()
-    except: dados={}
-    return {"ok":True,"mensagem":"E-mail recebido."}
+async def email_enviar(request: EmailRequest):
+    raise HTTPException(
+        status_code=501,
+        detail=(
+            "Envio real de e-mail ainda não está integrado nesta versão. "
+            "O endpoint foi mantido para compatibilidade, sem simular sucesso."
+        ),
+    )
+
+
 @app.post("/api/email/analisar")
-async def email_analisar(req: Request):
-    try: dados=await req.json()
-    except: dados={}
-    texto=dados.get("texto","") or "Ideia"
-    return {"ok":True,"resumo":f"Resumo: {texto[:200]}"}
-@app.get("/")
+async def email_analisar(request: EmailRequest):
+    raise HTTPException(
+        status_code=501,
+        detail=(
+            "Análise de e-mails ainda não está integrada nesta versão. "
+            "Será conectada ao serviço de e-mail e aos agentes em uma etapa posterior."
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Interface web
+# ---------------------------------------------------------------------------
+
+@app.get("/", response_class=HTMLResponse)
 async def raiz():
-    try:
-        if os.path.exists("frontend/index.html"):
-            with open("frontend/index.html", encoding="utf-8") as f:
-                return HTMLResponse(content=f.read())
-    except Exception: pass
-    return HTMLResponse(content="<h1>Nexus Limpo</h1><p>main no ar</p>")
+    if FRONTEND_FILE.is_file():
+        try:
+            return HTMLResponse(
+                content=FRONTEND_FILE.read_text(encoding="utf-8")
+            )
+        except OSError:
+            logger.exception("Não foi possível ler frontend/index.html.")
+
+    return HTMLResponse(
+        content=(
+            "<!doctype html><html lang='pt-BR'><meta charset='utf-8'>"
+            "<title>Nexuscore AI</title><body>"
+            "<h1>Nexuscore AI — API online</h1>"
+            "<p>A interface frontend/index.html ainda não foi encontrada.</p>"
+            "</body></html>"
+        ),
+        status_code=200,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Inicialização local
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000")),
+        reload=False,
+    )

@@ -53,7 +53,7 @@ APP_VERSION = "1.0.0"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
 
 REQUEST_TIMEOUT = float(os.getenv("AI_REQUEST_TIMEOUT", "45"))

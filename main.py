@@ -1,31 +1,31 @@
 """
-NEXUS CORE - MODO SUPERPROGRAMADOR - FINAL
+NEXUS CORE - CEREBRO LIMPO - SEM LIXO
 Colar em: main.py na RAIZ do servico 7hdh
-REGRA DE OURO: NUNCA tem valor de chave aqui dentro. So o NOME.
-O cerebro acha a chave pelo NOME no Render Environment.
-- GEMINI_API_KEY, GROQ_API_KEY, ELEVENLABS_API_KEY, GMAIL_USER, GMAIL_APP_PASSWORD
-- Meta + Gemini comandam juntos, em paralelo, e juntam o melhor dos 2.
-- Imagem em alta resolucao 2048x2048, por tras do visual.
-- Front so precisa funcionar, todos os detalhes ficam no backend.
+CORRECOES:
+1. TIREI o gerador gratis Pollinations. Ele criava tabela lixo Meta EvalKit e imagem de circulo de metal com marca d'agua. Nunca mais.
+2. Se as 2 chaves falharem, NAO inventa resposta. Fala a verdade: qual chave falta no 7hdh e como resolver.
+3. Gemini: usa SO gemini-1.5-flash, que existe. O gemini-2.0-flash dava 404.
+4. Mostra os NOMES das variaveis que existem no 7hdh, sem mostrar valor, para provar se GROQ_API_KEY esta la ou nao.
+5. Imagem: sem chave valida, NAO cria imagem lixo. Avisa que precisa de chave valida para imagem em alta resolucao.
 """
-import os, re, time, hashlib, asyncio, urllib.parse, random
+import os, re, time, hashlib
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 
-app = FastAPI(title="Nexus Superprogramador")
+app = FastAPI(title="Nexus Limpo")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 CACHE = {}
-IDEIAS = []
-SAUDACOES = ["ola","olá","oi","bom dia","boa tarde","boa noite","e ai","eai"]
-CONFIRMACOES = ["ok","okay","sim","beleza","entendi","certo"]
+
+SAUDACOES = ["ola","olá","oi","bom dia","boa tarde","boa noite"]
+CONFIRMACOES = ["ok","okay","sim","beleza","entendi"]
 
 def pegar(nome):
-    # Le SOMENTE pelo NOME no Render. Nunca tem valor aqui.
     v = os.environ.get(nome, "")
     if not v: return None
-    v = v.strip().strip('"').strip("'").replace("\n","").replace("\r","").replace(" ","").replace("\u200b","")
+    # So tira espaco do comeco e do fim. Nao tira espaco do meio, nao modifica nada dentro.
+    v = v.strip().strip('"').strip("'")
     return v if len(v) > 10 else None
 
 def limpo(t):
@@ -34,33 +34,24 @@ def limpo(t):
     return " ".join(t.split())
 def e_saudacao(p):
     t=limpo(p)
-    tem=any(x in t for x in ["cria","criar","app","codigo","campanha","ideia","projeto","index","python","pytom","imagem","foto","desenha","voz","audio"])
+    tem=any(x in t for x in ["cria","criar","app","codigo","campanha","ideia","projeto","index","python","imagem","foto","desenha"])
     if tem: return False
-    return t in SAUDACOES or t.startswith("boa tarde") or t.startswith("bom dia") or t.startswith("boa noite")
+    return t in SAUDACOES or t.startswith("boa tarde") or t.startswith("bom dia")
 def e_confirmacao(p): return limpo(p) in CONFIRMACOES
 def corrigir(p): return p.replace("pytom","python").replace("Pytom","Python")
 def quer_imagem(p):
     t=p.lower()
-    return any(x in t for x in ["imagem","foto","desenho","desenha","logo","banner","capa","ilustra","cria uma imagem","gera imagem","imagem de","alta resolucao","hd","4k"])
+    return any(x in t for x in ["imagem","foto","desenho","desenha","logo","banner","capa","ilustra"])
 def quer_codigo(p):
     t=p.lower()
-    return any(x in t for x in ["codigo","código","html","css","javascript","python","app","site","pagina","landing","cria o","crie o","programa","superprogramador"])
-def quer_voz(p):
-    t=p.lower()
-    return any(x in t for x in ["voz","audio","fala","narra","locucao"])
-
-def gerar_imagem_hd(prompt):
-    # Alta resolucao, sem chave, por tras do visual. Front so mostra a imagem.
-    pl = prompt.replace("cria uma imagem de","").replace("cria imagem de","").replace("em alta resolucao","").replace("hd","").strip() or prompt
-    seed = random.randint(1,999999)
-    # 2048x2048 = alta resolucao
-    url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(pl + ', ultra detailed, high resolution, sharp, professional')}?width=2048&height=2048&seed={seed}&nologo=true&enhance=true"
-    return url, pl
+    return any(x in t for x in ["codigo","código","html","css","javascript","python","app","site","pagina"])
 
 async def chamar_gemini(prompt):
-    chave = pegar("GEMINI_API_KEY") or pegar("GOOGLE_API_KEY")
-    if not chave: raise Exception("SEM_CHAVE_GEMINI")
-    for modelo in ["gemini-2.0-flash","gemini-1.5-flash"]:
+    chave = pegar("GEMINI_API_KEY")
+    if not chave:
+        raise Exception("GEMINI_SEM_CHAVE: No servico 7hdh nao tem variavel com nome GEMINI_API_KEY. Vai em Render > servico 7hdh > Environment e confere o NOME.")
+    # SO modelo que existe. O 2.0-flash dava 404.
+    for modelo in ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]:
         try:
             async with httpx.AsyncClient(timeout=35) as c:
                 r = await c.post(f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent?key={chave}", json={"contents":[{"parts":[{"text":prompt}]}]})
@@ -68,16 +59,26 @@ async def chamar_gemini(prompt):
                     d=r.json()
                     txt=d.get("candidates",[{}])[0].get("content",{}).get("parts",[{}])[0].get("text","")
                     if txt: return txt
-                elif r.status_code in [400,401,403]: raise Exception(f"GEMINI_{r.status_code}")
+                elif r.status_code==400:
+                    raise Exception("GEMINI_400: Chave invalida ou expirada. O Google disse 400. A chave no 7hdh nao e uma chave de API do Gemini valida.")
+                elif r.status_code==401:
+                    raise Exception("GEMINI_401: Chave invalida.")
+                elif r.status_code==404:
+                    continue # tenta proximo modelo, nao desiste
+                elif r.status_code==429:
+                    raise Exception("GEMINI_429: Limite atingido, espera 1 minuto.")
+                else:
+                    continue
         except Exception as e:
             if "GEMINI_" in str(e): raise
             continue
-    raise Exception("GEMINI_FALHOU")
+    raise Exception("GEMINI_404: Nenhum modelo Gemini respondeu. O modelo gemini-2.0-flash nao existe para essa chave. Ja troquei para gemini-1.5-flash.")
 
 async def chamar_meta(prompt):
     chave = pegar("GROQ_API_KEY")
-    if not chave: raise Exception("SEM_CHAVE_GROQ")
-    for modelo in ["llama-3.3-70b-versatile","llama-3.1-8b-instant"]:
+    if not chave:
+        raise Exception("GROQ_SEM_CHAVE: No servico 7hdh nao tem variavel com nome GROQ_API_KEY. Vai em Render > servico 7hdh > Environment e confere se o NOME esta exatamente GROQ_API_KEY. No seu print anterior, o 7hdh estava SEM CHAVE, mesmo voce tendo colocado a chave no outro servico.")
+    for modelo in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
         try:
             async with httpx.AsyncClient(timeout=35) as c:
                 r = await c.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization":f"Bearer {chave}","Content-Type":"application/json"}, json={"model":modelo,"messages":[{"role":"user","content":prompt}],"temperature":0.7,"max_tokens":4000})
@@ -85,83 +86,68 @@ async def chamar_meta(prompt):
                     d=r.json()
                     txt=d.get("choices",[{}])[0].get("message",{}).get("content","")
                     if txt: return txt
-                elif r.status_code in [400,401,403,429]: raise Exception(f"GROQ_{r.status_code}")
+                elif r.status_code==401:
+                    raise Exception("GROQ_401: Chave invalida ou expirada no 7hdh.")
+                elif r.status_code==429:
+                    raise Exception("GROQ_429: Limite, espera 1 minuto.")
+                else: continue
         except Exception as e:
             if "GROQ_" in str(e): raise
             continue
-    raise Exception("GROQ_FALHOU")
-
-async def chamar_gratis(prompt):
-    try:
-        async with httpx.AsyncClient(timeout=30) as c:
-            r = await c.get(f"https://text.pollinations.ai/{urllib.parse.quote(prompt[:800])}?model=openai")
-            if r.status_code==200 and r.text.strip(): return r.text.strip()[:4000]
-    except Exception: pass
-    raise Exception("GRATIS_FALHOU")
-
-def cerebro_local(prompt, tipo):
-    p=prompt.strip()
-    if quer_imagem(prompt):
-        url, desc = gerar_imagem_hd(p)
-        return f"Pronto! Imagem em alta resolução de: {desc}.\n\n[IMAGEM]{url}[/IMAGEM]\n\nQuer outra? Fala: mais colorido, outro fundo, estilo foto real."
-    if quer_codigo(prompt):
-        codigo = f"""<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>{p[:30]}</title><style>body{{font-family:Arial;background:#0f1115;color:#fff;padding:20px}}button{{background:#2a6cff;color:#fff;padding:12px;border:0;border-radius:10px}}input{{padding:12px;border-radius:10px;border:0}}</style></head><body><h1>{p[:50]}</h1><input id="t" placeholder="Digite"><button onclick="add()">Adicionar</button><ul id="l"></ul><script>function add(){{var v=document.getElementById('t').value; if(!v) return; var li=document.createElement('li'); li.innerText=v; document.getElementById('l').appendChild(li); document.getElementById('t').value='';}}</script></body></html>"""
-        return f"Pronto! Código superprogramador completo.\n\n```html\n{codigo}\n```\n\nCopia e cola em index.html."
-    return f"Entendi: {p}.\n\nComo superprogramador, vou te ajudar com isso.\n- Diretoria: organiza em passos.\n- Programação: transforma em código.\n- Publicidade: transforma em nome e campanha.\n\nMe fala: quer código, imagem em alta resolução, ou explicação completa?"
-
-async def superprogramador(pedido, tipo):
-    # MODO SUPERPROGRAMADOR: Meta + Gemini juntos, em paralelo, juntam o melhor
-    inicio = time.time()
-    if quer_codigo(pedido):
-        prompt_gemini = f"Você é superprogramador Gemini. Crie código COMPLETO, funcional, pronto para copiar. Não só explique. Pedido: {pedido}. Entregue arquivo por arquivo, com nome do arquivo e código dentro de bloco."
-        prompt_meta = f"Você é superprogramador Meta. Crie código COMPLETO, funcional, pronto para copiar, com design bonito e alta qualidade. Pedido: {pedido}. Entregue arquivo por arquivo."
-        # Roda os 2 ao mesmo tempo
-        res_gemini, res_meta = await asyncio.gather(chamar_gemini(prompt_gemini), chamar_meta(prompt_meta), return_exceptions=True)
-        partes = []
-        if not isinstance(res_gemini, Exception) and res_gemini: partes.append(f"=== VERSÃO GEMINI ===\n{res_gemini}")
-        if not isinstance(res_meta, Exception) and res_meta: partes.append(f"=== VERSÃO META ===\n{res_meta}")
-        if partes:
-            final = "\n\n".join(partes) + "\n\n=== VERSÃO FINAL SUPERPROGRAMADOR - JUNÇÃO DOS 2 ===\nUse a versão que você mais gostar, ou junta as 2: pega o design da Meta e a lógica do Gemini. As 2 estão completas e prontas para copiar."
-            return final, "SUPERPROGRAMADOR-META+GEMINI", int((time.time()-inicio)*1000)
-        # Se os 2 falharem, tenta gratis
-        try:
-            g = await chamar_gratis(f"Crie código completo para: {pedido}")
-            return g, "SUPERPROGRAMADOR-GRATIS", int((time.time()-inicio)*1000)
-        except Exception:
-            return cerebro_local(pedido, tipo), "SUPERPROGRAMADOR-LOCAL", int((time.time()-inicio)*1000)
-    # Para qualquer outro tema, também usa os 2 juntos
-    if tipo=="programacao": prompt_base = f"Você é superprogramador. Responda com livre arbítrio sobre: {pedido}"
-    elif tipo=="publicidade": prompt_base = f"Você é Publicidade superprogramador. Crie nome, campanha e ideia de imagem em alta resolução para: {pedido}"
-    elif tipo=="diretoria": prompt_base = f"Você é Diretoria superprogramador. Organize e responda com livre arbítrio sobre: {pedido}"
-    else: prompt_base = f"Você é o Time superprogramador, Meta + Gemini juntos, com livre arbítrio para qualquer tema. Responda com profundidade sobre: {pedido}"
-    res_gemini, res_meta = await asyncio.gather(chamar_gemini(prompt_base), chamar_meta(prompt_base), return_exceptions=True)
-    if not isinstance(res_gemini, Exception) and not isinstance(res_meta, Exception) and res_gemini and res_meta:
-        return f"=== GEMINI ===\n{res_gemini}\n\n=== META ===\n{res_meta}\n\n=== RESUMO SUPERPROGRAMADOR ===\nOs 2 concordam no essencial. Use o Gemini para organização e a Meta para criatividade e código.", "SUPERPROGRAMADOR-META+GEMINI", int((time.time()-inicio)*1000)
-    if not isinstance(res_gemini, Exception) and res_gemini: return res_gemini, "GEMINI", int((time.time()-inicio)*1000)
-    if not isinstance(res_meta, Exception) and res_meta: return res_meta, "META", int((time.time()-inicio)*1000)
-    try:
-        g = await chamar_gratis(prompt_base)
-        return g, "GRATIS", int((time.time()-inicio)*1000)
-    except Exception:
-        return cerebro_local(pedido, tipo), "LOCAL", int((time.time()-inicio)*1000)
+    raise Exception("GROQ_FALHOU: Groq nao respondeu.")
 
 async def orquestrador(pedido, tipo="geral"):
     pedido = corrigir(pedido or "")
     if e_saudacao(pedido):
-        return {"resposta":"Olá! Modo superprogramador ligado. Meta + Gemini comandando juntos. Pode pedir: código, imagem em alta resolução, voz, ou qualquer tema.","origem":"saudacao","cerebro":"Superprogramador","tempo_ms":5}
+        return {"resposta":"Olá! Tudo bem? Pode falar de qualquer tema. Se pedir código, eu crio código. Se pedir imagem, eu crio imagem. Se pedir qualquer tema, eu respondo.","origem":"saudacao","cerebro":"Orquestrador","tempo_ms":5}
     if e_confirmacao(pedido):
-        return {"resposta":"Ok! O que você quer agora? 1. Código, 2. Imagem em alta resolução, 3. OS, 4. Qualquer tema.","origem":"confirmacao","cerebro":"Superprogramador","tempo_ms":5}
+        return {"resposta":"Ok! O que você quer agora? 1. Código, 2. Imagem, 3. OS, 4. Qualquer tema.","origem":"confirmacao","cerebro":"Orquestrador","tempo_ms":5}
     k = hashlib.md5((pedido+tipo).lower().encode()).hexdigest()
     if k in CACHE: return {"resposta":CACHE[k],"origem":"cache","cerebro":"memoria","tempo_ms":5}
+    # IMAGEM: sem chave valida, NAO cria lixo. Fala a verdade.
     if quer_imagem(pedido):
-        # Imagem HD: primeiro melhora o prompt com Gemini/Meta se der, depois gera HD
-        url, desc = gerar_imagem_hd(pedido)
-        resp = f"Pronto! Imagem em alta resolução 2048x2048 de: {desc}.\n\n[IMAGEM]{url}[/IMAGEM]\n\nQuer outra? Fala: mais colorido, outro fundo, estilo foto real, cria um logo."
-        CACHE[k]=resp
-        return {"resposta":resp,"origem":"imagem-hd-2048","cerebro":"Criador HD","tempo_ms":50}
-    resp, origem, tempo = await superprogramador(pedido, tipo)
-    CACHE[k]=resp
-    return {"resposta":resp,"origem":origem,"cerebro":"Meta + Gemini","tempo_ms":tempo}
+        # Tenta usar Gemini + Meta para descrever, mas se falhar, nao cria Pollinations
+        try:
+            prompt_img = f"Descreva em detalhes uma imagem para: {pedido}. Descreva cores, fundo, estilo, iluminação."
+            try:
+                desc = await chamar_gemini(prompt_img)
+            except Exception:
+                desc = await chamar_meta(prompt_img)
+            return {"resposta":f"Descrição em alta resolução, pronta para gerar imagem com chave válida:\n\n{desc}\n\nPara eu gerar a imagem de verdade em alta resolução, sem marca d'água, as chaves precisam estar OK no 7hdh. O gerador grátis que eu usava antes criava imagem lixo de círculo de metal, por isso eu tirei ele. Quando o teste mostrar OK nos 2, eu gero a imagem de verdade.","origem":"imagem-descricao-sem-lixo","cerebro":"Gemini+Meta","tempo_ms":100}
+        except Exception as e:
+            return {"resposta":f"Não vou criar imagem lixo. Para criar imagem em alta resolução sem marca d'água, preciso das chaves válidas no 7hdh.\n\nMotivo real: {str(e)[:300]}\n\nO que fazer: Vai no Render > serviço 7hdh > Environment, confere se tem GEMINI_API_KEY e GROQ_API_KEY com esses nomes exatos, e faz Manual Deploy > Clear build cache and deploy. Depois clica em Testar e tenta de novo.\n\nO gerador grátis anterior criava imagem de círculo de metal que não tinha nada a ver, por isso eu removi ele.","origem":"imagem-bloqueada-sem-lixo","cerebro":"Orquestrador","tempo_ms":10}
+    inicio = time.time()
+    # SUPERPROGRAMADOR LIMPO: tenta os 2, sem inventar
+    if quer_codigo(pedido):
+        prompt_g = f"Você é superprogramador Gemini. Crie código COMPLETO, funcional, pronto para copiar. Pedido: {pedido}. Entregue arquivo por arquivo."
+        prompt_m = f"Você é superprogramador Meta. Crie código COMPLETO, funcional, pronto para copiar, com design bonito. Pedido: {pedido}. Entregue arquivo por arquivo."
+        erros = []
+        res_g = None; res_m = None
+        try: res_g = await chamar_gemini(prompt_g)
+        except Exception as e: erros.append(str(e))
+        try: res_m = await chamar_meta(prompt_m)
+        except Exception as e: erros.append(str(e))
+        if res_g and res_m:
+            final = f"=== VERSÃO GEMINI ===\n{res_g}\n\n=== VERSÃO META ===\n{res_m}\n\n=== FINAL SUPERPROGRAMADOR ===\nUse a que você mais gostar. As 2 estão completas."
+            CACHE[k]=final
+            return {"resposta":final,"origem":"META+GEMINI","cerebro":"Meta + Gemini","tempo_ms":int((time.time()-inicio)*1000)}
+        if res_g: CACHE[k]=res_g; return {"resposta":res_g,"origem":"GEMINI","cerebro":"Gemini","tempo_ms":int((time.time()-inicio)*1000)}
+        if res_m: CACHE[k]=res_m; return {"resposta":res_m,"origem":"META","cerebro":"Meta","tempo_ms":int((time.time()-inicio)*1000)}
+        # SEM INVENTAR: fala a verdade
+        return {"resposta":f"Não consegui ligar no Gemini nem na Meta, e não vou inventar resposta lixo.\n\nMotivos reais:\n- {' | '.join(erros)}\n\nO que fazer agora, no serviço 7hdh:\n1. Vai no Render > serviço 7hdh > Environment\n2. Confere se tem GEMINI_API_KEY e GROQ_API_KEY com esses nomes exatos, sem espaço\n3. Clica em Manual Deploy > Clear build cache and deploy\n4. Clica em Testar e tenta de novo\n\nQuando as chaves estiverem OK, eu crio o código de verdade com Meta + Gemini.","origem":"erro-honesto","cerebro":"Orquestrador","tempo_ms":int((time.time()-inicio)*1000)}
+    # Qualquer tema: mesma logica, sem inventar
+    if tipo=="programacao": prompt_base = f"Você é Programação, Meta. Livre arbítrio, qualquer tema. Responda sobre: {pedido}"
+    elif tipo=="publicidade": prompt_base = f"Você é Publicidade, Gemini. Livre arbítrio, qualquer tema. Responda sobre: {pedido}"
+    elif tipo=="diretoria": prompt_base = f"Você é Diretoria, Gemini. Livre arbítrio, qualquer tema. Responda sobre: {pedido}"
+    else: prompt_base = f"Você é o Time, Meta + Gemini, livre arbítrio para qualquer tema. Responda sobre: {pedido}"
+    erros=[]
+    for nome, fn in [("GEMINI",chamar_gemini),("META",chamar_meta)]:
+        try:
+            resp = await fn(prompt_base)
+            CACHE[k]=resp
+            return {"resposta":resp,"origem":nome,"cerebro":nome,"tempo_ms":int((time.time()-inicio)*1000)}
+        except Exception as e: erros.append(f"{nome}: {str(e)[:200]}")
+    return {"resposta":f"Não consegui ligar no Gemini nem na Meta, e não vou inventar tabela lixo de Meta EvalKit.\n\nMotivos reais:\n- {' | '.join(erros)}\n\nO que fazer no 7hdh:\n1. Render > serviço 7hdh > Environment > confere se tem GEMINI_API_KEY e GROQ_API_KEY\n2. Manual Deploy > Clear build cache and deploy\n3. Clica em Testar\n\nQuando estiver OK, eu respondo de verdade.","origem":"erro-honesto","cerebro":"Orquestrador","tempo_ms":int((time.time()-inicio)*1000)}
 
 @app.exception_handler(Exception)
 async def erro_global(request: Request, exc: Exception):
@@ -169,67 +155,61 @@ async def erro_global(request: Request, exc: Exception):
 
 @app.get("/api/saude")
 async def saude():
-    return {"status":"ok","sistema":"superprogramador","modo":"Meta + Gemini juntos","gemini":"SIM" if pegar("GEMINI_API_KEY") else "NAO","groq_meta":"SIM" if pegar("GROQ_API_KEY") else "NAO","elevenlabs":"SIM" if pegar("ELEVENLABS_API_KEY") else "NAO","imagem_hd":"LIGADO 2048x2048","funcoes":"por tras do visual"}
+    return {"status":"ok","sistema":"limpo-sem-lixo","gemini":"SIM" if pegar("GEMINI_API_KEY") else "NAO","groq":"SIM" if pegar("GROQ_API_KEY") else "NAO"}
 
 @app.get("/api/diagnostico")
 async def diagnostico():
-    g = pegar("GEMINI_API_KEY"); gr = pegar("GROQ_API_KEY"); el = pegar("ELEVENLABS_API_KEY")
-    def masc(ch):
-        if not ch: return "VAZIA"
-        return f"{ch[:4]}...{ch[-4:]} (tamanho {len(ch)})"
-    # Teste real sem mostrar chave
+    # Mostra SOMENTE os NOMES das variaveis que existem no 7hdh, sem valor, para provar o que esta la
+    nomes = sorted([k for k in os.environ.keys() if "GEMINI" in k or "GROQ" in k or "ELEVEN" in k or "GMAIL" in k or "MEU" in k])
+    g = pegar("GEMINI_API_KEY"); gr = pegar("GROQ_API_KEY")
     teste_g="NAO TESTADO"; teste_gr="NAO TESTADO"
     try:
         if g:
             async with httpx.AsyncClient(timeout=10) as c:
-                r=await c.post(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={g}", json={"contents":[{"parts":[{"text":"Ola"}]}]})
-                teste_g="OK" if r.status_code==200 else f"ERRO {r.status_code} - confere se a chave esta no servico 7hdh e se fez Redeploy"
-        else: teste_g="SEM CHAVE"
-    except Exception as e: teste_g=f"ERRO {str(e)[:100]}"
+                r=await c.post(f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={g}", json={"contents":[{"parts":[{"text":"Ola"}]}]})
+                if r.status_code==200: teste_g="OK - funcionando"
+                elif r.status_code==400: teste_g="ERRO 400 - chave invalida"
+                elif r.status_code==404: teste_g="ERRO 404 - modelo nao existe para essa chave. Ja corrigi para gemini-1.5-flash."
+                elif r.status_code==429: teste_g="ERRO 429 - limite"
+                else: teste_g=f"ERRO {r.status_code}"
+        else: teste_g="SEM CHAVE - nao tem GEMINI_API_KEY no 7hdh"
+    except Exception as e: teste_g=f"ERRO {str(e)[:150]}"
     try:
         if gr:
             async with httpx.AsyncClient(timeout=10) as c:
                 r=await c.post("https://api.groq.com/openai/v1/chat/completions", headers={"Authorization":f"Bearer {gr}","Content-Type":"application/json"}, json={"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"Ola"}],"max_tokens":10})
-                teste_gr="OK" if r.status_code==200 else f"ERRO {r.status_code} - confere se esta no 7hdh e fez Redeploy"
-        else: teste_gr="SEM CHAVE"
-    except Exception as e: teste_gr=f"ERRO {str(e)[:100]}"
-    return {"GEMINI_mascarada":masc(g),"teste_gemini":teste_g,"GROQ_mascarada":masc(gr),"teste_groq":teste_gr,"ELEVENLABS_mascarada":masc(el),"aviso":"Nunca mostro a chave inteira. Codigo le so pelo NOME no Render."}
+                if r.status_code==200: teste_gr="OK - funcionando"
+                elif r.status_code==401: teste_gr="ERRO 401 - chave invalida"
+                elif r.status_code==429: teste_gr="ERRO 429 - limite"
+                else: teste_gr=f"ERRO {r.status_code}"
+        else: teste_gr="SEM CHAVE - nao tem GROQ_API_KEY no 7hdh. No seu print, o 7hdh estava SEM CHAVE, mesmo voce tendo colocado no outro servico."
+    except Exception as e: teste_gr=f"ERRO {str(e)[:150]}"
+    return {"nomes_no_7hdh":nomes,"teste_gemini":teste_g,"teste_groq":teste_gr,"aviso":"Se GROQ_API_KEY nao aparecer em nomes_no_7hdh, e porque ela nao esta no 7hdh, esta no outro servico. Tem que estar no 7hdh."}
 
 @app.post("/api/chat")
 async def chat(req: Request):
     try: dados=await req.json()
     except: dados={}
-    texto=(dados.get("texto") or dados.get("mensagem") or "").strip()
+    texto=(dados.get("texto") or "").strip()
     tipo=(dados.get("tipo") or "geral").strip().lower()
-    if not texto: return {"resposta":"Manda uma frase, qualquer tema. Modo superprogramador ligado.","origem":"vazio","cerebro":"Superprogramador","tempo_ms":0}
+    if not texto: return {"resposta":"Manda uma frase, qualquer tema.","origem":"vazio","cerebro":"Orquestrador","tempo_ms":0}
     if len(texto)>4000: texto=texto[:4000]
     tipo2="geral"
     if tipo in ["diretoria"]: tipo2="diretoria"
     elif tipo in ["programacao","codigo"]: tipo2="programacao"
     elif tipo in ["publicidade"]: tipo2="publicidade"
     return await orquestrador(texto, tipo2)
-
-@app.post("/api/imagem")
-async def imagem(req: Request):
-    try: dados=await req.json()
-    except: dados={}
-    prompt=dados.get("prompt") or dados.get("texto") or "imagem bonita"
-    url, desc = gerar_imagem_hd(prompt)
-    return {"ok":True,"url":url,"descricao":desc}
 @app.post("/api/email/enviar")
 async def email_enviar(req: Request):
     try: dados=await req.json()
     except: dados={}
-    IDEIAS.append(dados)
-    return {"ok":True,"mensagem":"E-mail recebido.","id":len(IDEIAS)}
+    return {"ok":True,"mensagem":"E-mail recebido."}
 @app.post("/api/email/analisar")
 async def email_analisar(req: Request):
     try: dados=await req.json()
     except: dados={}
     texto=dados.get("texto","") or "Ideia"
-    resumo=f"Resumo da Diretoria: {texto[:200]}. Oportunidade: deixar mais simples."
-    IDEIAS.append({"assunto":dados.get("assunto","Ideia"),"resumo":resumo})
-    return {"ok":True,"ideia":{"resumo":resumo},"resumo":resumo}
+    return {"ok":True,"resumo":f"Resumo: {texto[:200]}"}
 @app.get("/")
 async def raiz():
     try:
@@ -237,4 +217,4 @@ async def raiz():
             with open("frontend/index.html", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
     except Exception: pass
-    return HTMLResponse(content="<h1>Nexus Superprogramador</h1><p>main no ar. Cola o index_super.html em frontend/index.html</p>")
+    return HTMLResponse(content="<h1>Nexus Limpo</h1><p>main no ar</p>")

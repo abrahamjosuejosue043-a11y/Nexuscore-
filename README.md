@@ -32,7 +32,7 @@ Recebimento IMAP manual (rota administrativa `GET /api/email/receber`):
 Persistência:
 
 - `DATABASE_PATH`: caminho do arquivo SQLite. Padrão local: `data/nexuscore.db`.
-- Em Render, configure um Persistent Disk e defina `DATABASE_PATH` para um caminho dentro do ponto de montagem, por exemplo `/var/data/nexuscore.db`. Sem disco persistente, os dados locais podem ser perdidos em novo deploy/reinicialização.
+- No plano gratuito do Render, não há disco persistente incluído. O banco SQLite funciona como armazenamento temporário e os dados podem ser perdidos em reinicializações, suspensão ou novos deploys. O projeto não contratará recursos pagos sem autorização.
 
 Segurança e rede:
 
@@ -57,6 +57,6 @@ Segurança e rede:
 - Build command: `pip install -r requirements.txt`.
 - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`.
 - Configure as variáveis de ambiente no painel do Render.
-- Configure um Persistent Disk e `DATABASE_PATH=/var/data/nexuscore.db` antes de usar o banco em produção.
+- No plano gratuito, aceite que o banco SQLite é temporário; exporte periodicamente os dados importantes antes de novos deploys. Não há garantia de retenção permanente.
 
 O envio SMTP depende das credenciais do provedor de e-mail. O recebimento IMAP está disponível sob demanda pela rota protegida; leitura automática em segundo plano e processamento de anexos ainda não fazem parte desta etapa. Não configure segredos no GitHub nem os envie pelo chat.

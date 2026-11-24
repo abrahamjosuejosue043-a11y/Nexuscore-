@@ -399,15 +399,18 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
 
 
 @app.get("/api/conversas")
-async def listar_conversas(limit: int = 50):
+async def listar_conversas(limit: int = 50, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
     return {"items": storage.messages(limit)}
 
 @app.get("/api/ideias")
-async def listar_ideias(limit: int = 100):
+async def listar_ideias(limit: int = 100, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
     return {"items": storage.ideas(limit)}
 
 @app.post("/api/ideias")
-async def criar_ideia(request: dict):
+async def criar_ideia(request: dict, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
     titulo = str(request.get("titulo", "")).strip()
     resumo = str(request.get("resumo", "")).strip()
     prioridade = str(request.get("prioridade", "media")).lower()
@@ -421,7 +424,8 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/api/email/enviar")
-async def email_enviar(request: EmailRequest):
+async def email_enviar(request: EmailRequest, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
     import smtplib
     from email.message import EmailMessage
     recipient = request.destinatario.strip() or get_secret("EMAIL_DESTINATARIO")
@@ -449,7 +453,8 @@ async def email_enviar(request: EmailRequest):
 
 
 @app.post("/api/email/analisar")
-async def email_analisar(request: EmailRequest):
+async def email_analisar(request: EmailRequest, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
     result = await orquestrador(
         "Analise este e-mail. Gere título, resumo, oportunidade, prioridade e próxima ação.\n"
         + "Assunto: " + request.assunto + "\nConteúdo: " + request.texto,

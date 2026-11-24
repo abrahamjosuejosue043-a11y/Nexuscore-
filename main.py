@@ -301,12 +301,9 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
 
     prompt = build_prompt(text, agent_type)
 
-    # Engenharia prefere Groq; os demais tipos preferem Gemini.
-    providers = (
-        [("Groq", chamar_groq), ("Gemini", chamar_gemini)]
-        if agent_type == "programacao"
-        else [("Gemini", chamar_gemini), ("Groq", chamar_groq)]
-    )
+    # Groq é o provedor principal para todos os perfis; Gemini fica como contingência.
+    # Isso evita que uma indisponibilidade do Gemini atrase o chat geral e a Diretoria.
+    providers = [("Groq", chamar_groq), ("Gemini", chamar_gemini)]
 
     errors = []
     for provider_name, provider_function in providers:

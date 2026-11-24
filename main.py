@@ -3,17 +3,16 @@ NEXUSCORE AI — API CENTRAL
 Arquivo: main.py (raiz do repositório)
 
 Esta versão mantém as rotas principais do projeto e organiza:
-- Inicialização do FastAPI
+- Inicialização do FastAPI e armazenamento SQLite
 - Comunicação assíncrona com Gemini e Groq
-- Orquestração com fallback transparente
-- Diagnóstico administrativo protegido
-- Entrega do frontend/frontend index.html
+- Seleção de perfil de agente e fallback entre provedores
+- Histórico, ideias e rotas administrativas protegidas
+- Integrações SMTP/IMAP sob demanda
 
 IMPORTANTE:
-- Groq é o provedor da API usada pelo módulo Llama; não é a API da Meta.
-- Esta versão ainda NÃO implementa colaboração real entre três agentes.
-- Os endpoints de e-mail respondem como não implementados até existir
-  integração real com backend/email_services.py.
+- Os três perfis são instruções especializadas; ainda não existe colaboração multiagente encadeada.
+- SMTP e IMAP dependem de credenciais válidas no ambiente do serviço.
+- SQLite exige armazenamento persistente para conservar dados entre deploys.
 """
 
 import os
@@ -56,7 +55,7 @@ GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip()
 
 REQUEST_TIMEOUT = float(os.getenv("AI_REQUEST_TIMEOUT", "45"))
 MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "8000"))

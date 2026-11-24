@@ -1,6 +1,6 @@
 # Nexuscore AI
 
-API central FastAPI com agentes de Diretoria, Engenharia e Marketing.
+API central FastAPI com três perfis especializados (Diretoria, Engenharia e Marketing), fallback entre provedores e persistência local SQLite. Os perfis ainda não executam uma cadeia colaborativa entre si.
 
 ## Execução
 
@@ -16,8 +16,8 @@ Obrigatórias conforme os recursos utilizados:
 - `GEMINI_API_KEY`: chave do Google Gemini.
 - `GROQ_API_KEY`: chave da Groq para modelos Llama.
 - `ADMIN_TOKEN`: token forte para rotas administrativas.
-- `GEMINI_MODEL`: modelo Gemini disponível para sua conta/projeto.
-- `GROQ_MODEL`: padrão `llama-3.3-70b-versatile`.
+- `GEMINI_MODEL`: padrão `gemini-3.8-flash`; confirme a disponibilidade para seu projeto Google.
+- `GROQ_MODEL`: padrão `openai/gpt-oss-120b` (modelo de produção recomendado atualmente pela Groq após a descontinuação do Llama 3.3 70B para planos developer).
 
 E-mail de saída (SMTP):
 

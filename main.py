@@ -46,6 +46,9 @@ BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_FILE = BASE_DIR / "frontend" / "index.html"
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+# Evita registrar URLs de requisição do Gemini, que carregam a chave na query string.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("nexuscore")
 
 APP_NAME = "Nexuscore AI"

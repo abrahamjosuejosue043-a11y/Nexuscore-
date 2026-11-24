@@ -47,6 +47,6 @@ jobs:
 
           parser = Scripts()
           parser.feed(Path("frontend/index.html").read_text(encoding="utf-8"))
-          Path("/tmp/nexuscore-inline.js").write_text("\\n;".join(parser.parts), encoding="utf-8")
+          Path("/tmp/nexuscore-inline.js").write_text("\n;".join(parser.parts), encoding="utf-8")
           PY
           node --check /tmp/nexuscore-inline.js

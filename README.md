@@ -31,7 +31,7 @@ Recebimento IMAP manual (rota administrativa `GET /api/email/receber`):
 
 Persistência:
 
-- `DATABASE_PATH`: caminho do arquivo SQLite. Padrão local: `data/nexuscore.db`.
+- `DATABASE_PATH`: caminho do arquivo SQLite. Padrão local: `data/nexuscore.db`. O código também reconhece `DB_PATH` como alias compatível.
 - No plano gratuito do Render, não há disco persistente incluído. O banco SQLite funciona como armazenamento temporário e os dados podem ser perdidos em reinicializações, suspensão ou novos deploys. O projeto não contratará recursos pagos sem autorização.
 
 Segurança e rede:

@@ -31,6 +31,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from backend import storage
+
 from backend.cerebro1_gemini import (
     chamar_gemini as chamar_gemini_modulo,
     GeminiError,
@@ -48,7 +50,7 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("nexuscore")
 
 APP_NAME = "Nexuscore AI"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -291,6 +293,8 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
     if cached:
         cached["origem"] = "cache_temporario"
         cached["tempo_ms"] = int((time.perf_counter() - started) * 1000)
+        storage.save_message("user", agent_type, text)
+        storage.save_message("assistant", agent_type, cached["resposta"], cached.get("cerebro"))
         return cached
 
     prompt = build_prompt(text, agent_type)
@@ -313,6 +317,8 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
                 "tempo_ms": int((time.perf_counter() - started) * 1000),
             }
             cache_set(cache_key, result)
+            storage.save_message("user", agent_type, text)
+            storage.save_message("assistant", agent_type, answer, provider_name)
             return result
         except ProviderError as exc:
             errors.append(f"{exc.provider}: {exc.message}")
@@ -350,6 +356,12 @@ def require_admin_token(token: Optional[str]) -> None:
 # Rotas de API
 # ---------------------------------------------------------------------------
 
+
+
+@app.on_event("startup")
+async def initialize_persistent_storage():
+    storage.initialize()
+
 @app.get("/api/saude")
 async def saude():
     """Verificação básica, sem revelar valores ou nomes de segredos."""
@@ -384,6 +396,25 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
     }
 
 
+
+
+@app.get("/api/conversas")
+async def listar_conversas(limit: int = 50):
+    return {"items": storage.messages(limit)}
+
+@app.get("/api/ideias")
+async def listar_ideias(limit: int = 100):
+    return {"items": storage.ideas(limit)}
+
+@app.post("/api/ideias")
+async def criar_ideia(request: dict):
+    titulo = str(request.get("titulo", "")).strip()
+    resumo = str(request.get("resumo", "")).strip()
+    prioridade = str(request.get("prioridade", "media")).lower()
+    if not titulo or not resumo or prioridade not in {"alta", "media", "baixa"}:
+        raise HTTPException(status_code=422, detail="Informe título, resumo e prioridade alta, media ou baixa.")
+    return {"id": storage.save_idea(titulo[:200], resumo[:10000], prioridade), "status": "salva"}
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     return await orquestrador(request.texto, request.tipo)
@@ -391,24 +422,41 @@ async def chat(request: ChatRequest):
 
 @app.post("/api/email/enviar")
 async def email_enviar(request: EmailRequest):
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "Envio real de e-mail ainda não está integrado nesta versão. "
-            "O endpoint foi mantido para compatibilidade, sem simular sucesso."
-        ),
-    )
+    import smtplib
+    from email.message import EmailMessage
+    recipient = request.destinatario.strip() or get_secret("EMAIL_DESTINATARIO")
+    if not recipient or not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", recipient):
+        raise HTTPException(status_code=422, detail="Informe um destinatário válido em destinatario ou EMAIL_DESTINATARIO.")
+    host, user, password = get_secret("SMTP_HOST"), get_secret("SMTP_USER"), get_secret("SMTP_PASSWORD")
+    sender = get_secret("SMTP_FROM") or user
+    if not all([host, user, password, sender]):
+        raise HTTPException(status_code=503, detail="Configure SMTP_HOST, SMTP_USER, SMTP_PASSWORD e SMTP_FROM no Render.")
+    message = EmailMessage()
+    message["From"], message["To"], message["Subject"] = sender, recipient, request.assunto or "Mensagem do Nexuscore"
+    message.set_content(request.texto)
+    try:
+        with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=25) as server:
+            server.starttls()
+            server.login(user, password)
+            server.send_message(message)
+    except Exception as exc:
+        logger.exception("Falha no envio SMTP")
+        raise HTTPException(status_code=502, detail="Falha no envio SMTP. Verifique as configurações de e-mail.") from exc
+    with storage.connection() as db:
+        db.execute("INSERT INTO email_log(direction,recipient,subject,body,status) VALUES('outgoing',?,?,?,'sent')",
+                   (recipient, request.assunto, request.texto))
+    return {"status": "enviado", "destinatario": recipient}
 
 
 @app.post("/api/email/analisar")
 async def email_analisar(request: EmailRequest):
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "Análise de e-mails ainda não está integrada nesta versão. "
-            "Será conectada ao serviço de e-mail e aos agentes em uma etapa posterior."
-        ),
+    result = await orquestrador(
+        "Analise este e-mail. Gere título, resumo, oportunidade, prioridade e próxima ação.\\n"
+        + "Assunto: " + request.assunto + "\\nConteúdo: " + request.texto,
+        "diretoria",
     )
+    idea_id = storage.save_idea(request.assunto or "E-mail analisado", result["resposta"], "media")
+    return {"status": "analisado", "ideia_id": idea_id, "analise": result["resposta"]}
 
 
 # ---------------------------------------------------------------------------

@@ -29,6 +29,11 @@ def initialize():
             summary TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'media',
             status TEXT NOT NULL DEFAULT 'nova',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+            summary TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'planejado',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         db.execute("""CREATE TABLE IF NOT EXISTS email_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT, direction TEXT NOT NULL,
             sender TEXT, recipient TEXT, subject TEXT, body TEXT,
@@ -56,3 +61,21 @@ def ideas(limit=100):
         rows = db.execute("SELECT * FROM ideas ORDER BY id DESC LIMIT ?",
                           (max(1, min(int(limit), 300)),)).fetchall()
     return [dict(row) for row in rows]
+
+def save_project(title, summary, status="planejado"):
+    with connection() as db:
+        cur = db.execute("INSERT INTO projects(title,summary,status) VALUES(?,?,?)",
+                         (title, summary, status))
+        return cur.lastrowid
+
+def projects(limit=100):
+    with connection() as db:
+        rows = db.execute("SELECT * FROM projects ORDER BY id DESC LIMIT ?",
+                          (max(1, min(int(limit), 300)),)).fetchall()
+    return [dict(row) for row in rows]
+
+def update_project(project_id, status):
+    with connection() as db:
+        cur = db.execute("UPDATE projects SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                         (status, int(project_id)))
+        return cur.rowcount > 0

@@ -6,7 +6,7 @@ async def chamar_meta(pergunta: str) -> str:
     key = os.getenv("GROQ_API_KEY", "").strip()
     if not key:
         raise RuntimeError("GROQ_API_KEY não está configurada.")
-    model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
     async with httpx.AsyncClient(timeout=45) as client:
         response = await client.post(
             "https://api.groq.com/openai/v1/chat/completions",

@@ -3,17 +3,16 @@ NEXUSCORE AI — API CENTRAL
 Arquivo: main.py (raiz do repositório)
 
 Esta versão mantém as rotas principais do projeto e organiza:
-- Inicialização do FastAPI
+- Inicialização do FastAPI e armazenamento SQLite
 - Comunicação assíncrona com Gemini e Groq
-- Orquestração com fallback transparente
-- Diagnóstico administrativo protegido
-- Entrega do frontend/frontend index.html
+- Seleção de perfil de agente e fallback entre provedores
+- Histórico, ideias e rotas administrativas protegidas
+- Integrações SMTP/IMAP sob demanda
 
 IMPORTANTE:
-- Groq é o provedor da API usada pelo módulo Llama; não é a API da Meta.
-- Esta versão ainda NÃO implementa colaboração real entre três agentes.
-- Os endpoints de e-mail respondem como não implementados até existir
-  integração real com backend/email_services.py.
+- Os três perfis são instruções especializadas; ainda não existe colaboração multiagente encadeada.
+- SMTP e IMAP dependem de credenciais válidas no ambiente do serviço.
+- SQLite exige armazenamento persistente para conservar dados entre deploys.
 """
 
 import os
@@ -30,6 +29,8 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+
+from backend import storage
 
 from backend.cerebro1_gemini import (
     chamar_gemini as chamar_gemini_modulo,
@@ -48,13 +49,13 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 logger = logging.getLogger("nexuscore")
 
 APP_NAME = "Nexuscore AI"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip()
 
 REQUEST_TIMEOUT = float(os.getenv("AI_REQUEST_TIMEOUT", "45"))
 MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "8000"))
@@ -156,7 +157,7 @@ async def chamar_gemini(prompt: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Integração Groq (modelos Llama)
+# Integração Groq (modelo configurado por variável de ambiente)
 # ---------------------------------------------------------------------------
 
 async def chamar_groq(prompt: str) -> str:
@@ -291,6 +292,8 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
     if cached:
         cached["origem"] = "cache_temporario"
         cached["tempo_ms"] = int((time.perf_counter() - started) * 1000)
+        storage.save_message("user", agent_type, text)
+        storage.save_message("assistant", agent_type, cached["resposta"], cached.get("cerebro"))
         return cached
 
     prompt = build_prompt(text, agent_type)
@@ -313,6 +316,8 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
                 "tempo_ms": int((time.perf_counter() - started) * 1000),
             }
             cache_set(cache_key, result)
+            storage.save_message("user", agent_type, text)
+            storage.save_message("assistant", agent_type, answer, provider_name)
             return result
         except ProviderError as exc:
             errors.append(f"{exc.provider}: {exc.message}")
@@ -350,6 +355,12 @@ def require_admin_token(token: Optional[str]) -> None:
 # Rotas de API
 # ---------------------------------------------------------------------------
 
+
+
+@app.on_event("startup")
+async def initialize_persistent_storage():
+    storage.initialize()
+
 @app.get("/api/saude")
 async def saude():
     """Verificação básica, sem revelar valores ou nomes de segredos."""
@@ -357,6 +368,7 @@ async def saude():
         "status": "ok",
         "sistema": APP_NAME,
         "versao": APP_VERSION,
+        "persistencia": "temporaria_no_plano_gratuito",
         "provedores_configurados": {
             "gemini": bool(get_secret("GEMINI_API_KEY")),
             "groq": bool(get_secret("GROQ_API_KEY")),
@@ -384,31 +396,138 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
     }
 
 
+
+
+@app.get("/api/conversas")
+async def listar_conversas(limit: int = 50, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    return {"items": storage.messages(limit)}
+
+@app.get("/api/ideias")
+async def listar_ideias(limit: int = 100, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    return {"items": storage.ideas(limit)}
+
+@app.post("/api/ideias")
+async def criar_ideia(request: dict, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    titulo = str(request.get("titulo", "")).strip()
+    resumo = str(request.get("resumo", "")).strip()
+    prioridade = str(request.get("prioridade", "media")).lower()
+    if not titulo or not resumo or prioridade not in {"alta", "media", "baixa"}:
+        raise HTTPException(status_code=422, detail="Informe título, resumo e prioridade alta, media ou baixa.")
+    return {"id": storage.save_idea(titulo[:200], resumo[:10000], prioridade), "status": "salva"}
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     return await orquestrador(request.texto, request.tipo)
 
 
 @app.post("/api/email/enviar")
-async def email_enviar(request: EmailRequest):
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "Envio real de e-mail ainda não está integrado nesta versão. "
-            "O endpoint foi mantido para compatibilidade, sem simular sucesso."
-        ),
-    )
+async def email_enviar(request: EmailRequest, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    import smtplib
+    from email.message import EmailMessage
+    recipient = request.destinatario.strip() or get_secret("EMAIL_DESTINATARIO")
+    if not recipient or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", recipient):
+        raise HTTPException(status_code=422, detail="Informe um destinatário válido em destinatario ou EMAIL_DESTINATARIO.")
+    host, user, password = get_secret("SMTP_HOST"), get_secret("SMTP_USER"), get_secret("SMTP_PASSWORD")
+    sender = get_secret("SMTP_FROM") or user
+    if not all([host, user, password, sender]):
+        raise HTTPException(status_code=503, detail="Configure SMTP_HOST, SMTP_USER, SMTP_PASSWORD e SMTP_FROM no Render.")
+    message = EmailMessage()
+    message["From"], message["To"], message["Subject"] = sender, recipient, request.assunto or "Mensagem do Nexuscore"
+    message.set_content(request.texto)
+    try:
+        with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=25) as server:
+            server.starttls()
+            server.login(user, password)
+            server.send_message(message)
+    except Exception as exc:
+        logger.exception("Falha no envio SMTP")
+        raise HTTPException(status_code=502, detail="Falha no envio SMTP. Verifique as configurações de e-mail.") from exc
+    with storage.connection() as db:
+        db.execute("INSERT INTO email_log(direction,recipient,subject,body,status) VALUES('outgoing',?,?,?,'sent')",
+                   (recipient, request.assunto, request.texto))
+    return {"status": "enviado", "destinatario": recipient}
 
 
 @app.post("/api/email/analisar")
-async def email_analisar(request: EmailRequest):
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "Análise de e-mails ainda não está integrada nesta versão. "
-            "Será conectada ao serviço de e-mail e aos agentes em uma etapa posterior."
-        ),
+async def email_analisar(request: EmailRequest, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = await orquestrador(
+        "Analise este e-mail. Gere título, resumo, oportunidade, prioridade e próxima ação.\n"
+        + "Assunto: " + request.assunto + "\nConteúdo: " + request.texto,
+        "diretoria",
     )
+    idea_id = storage.save_idea(request.assunto or "E-mail analisado", result["resposta"], "media")
+    return {"status": "analisado", "ideia_id": idea_id, "analise": result["resposta"]}
+
+
+@app.get("/api/email/receber")
+async def email_receber(
+    limit: int = 10,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    """Busca mensagens não lidas via IMAP e registra o conteúdo textual."""
+    import imaplib
+    import email
+    from email.header import decode_header
+
+    require_admin_token(x_admin_token)
+    host = get_secret("IMAP_HOST")
+    user = get_secret("IMAP_USER")
+    password = get_secret("IMAP_PASSWORD")
+    if not all([host, user, password]):
+        raise HTTPException(status_code=503, detail="Configure IMAP_HOST, IMAP_USER e IMAP_PASSWORD no Render.")
+    def decode_mime(value: str) -> str:
+        pieces = []
+        for part, encoding in decode_header(value or ""):
+            pieces.append(part.decode(encoding or "utf-8", errors="replace") if isinstance(part, bytes) else part)
+        return "".join(pieces)
+    mailbox = None
+    received = []
+    try:
+        mailbox = imaplib.IMAP4_SSL(host, int(os.getenv("IMAP_PORT", "993")))
+        mailbox.login(user, password)
+        mailbox.select(os.getenv("IMAP_FOLDER", "INBOX"))
+        status, data = mailbox.search(None, "UNSEEN")
+        if status != "OK":
+            raise RuntimeError("Falha ao consultar mensagens não lidas.")
+        message_ids = (data[0].split() if data and data[0] else [])[-max(1, min(limit, 30)):]
+        for message_id in message_ids:
+            status, payload = mailbox.fetch(message_id, "(RFC822)")
+            if status != "OK" or not payload or not payload[0]:
+                continue
+            message = email.message_from_bytes(payload[0][1])
+            body = ""
+            if message.is_multipart():
+                for part in message.walk():
+                    if part.get_content_type() == "text/plain" and not part.get_filename():
+                        raw = part.get_payload(decode=True) or b""
+                        body += raw.decode(part.get_content_charset() or "utf-8", errors="replace")
+            else:
+                raw = message.get_payload(decode=True) or b""
+                body = raw.decode(message.get_content_charset() or "utf-8", errors="replace")
+            item = {"de": decode_mime(message.get("From", "")),
+                    "assunto": decode_mime(message.get("Subject", "")),
+                    "texto": body[:12000]}
+            with storage.connection() as db:
+                db.execute("INSERT INTO email_log(direction,sender,subject,body,status) VALUES('incoming',?,?,?,'received')",
+                           (item["de"], item["assunto"], item["texto"]))
+            received.append(item)
+        return {"items": received, "count": len(received)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Falha na recepção IMAP")
+        raise HTTPException(status_code=502, detail="Não foi possível receber e-mails. Verifique as configurações IMAP.") from exc
+    finally:
+        if mailbox is not None:
+            try:
+                mailbox.logout()
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------

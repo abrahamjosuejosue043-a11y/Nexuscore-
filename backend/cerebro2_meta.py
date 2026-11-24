@@ -1,33 +1,25 @@
+"""Cliente assíncrono legado para Groq (Llama). O uso principal está em main.py."""
+import os
+import httpx
 
-"""
-CEREBRO 2 - META (Llama via Groq)
-Usado por: Programacao
-Faz: criar codigo por pastas, arquivo por arquivo, sem modificar antigos
-Chave no Render: GROQ_API_KEY - essa e a chave da Meta, que mora no Groq
-Porta certa: api.groq.com
-"""
-import os, requests
-
-def chamar_meta(pergunta):
-    chave = os.getenv("GROQ_API_KEY", "").strip()
-    if not chave:
-        return "[META] Sem chave. Coloca GROQ_API_KEY no Render."
-    modelo = os.getenv("META_MODEL", "llama-3.1-8b-instant")
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    cabecalho = {"Authorization": f"Bearer {chave}", "Content-Type": "application/json"}
-    corpo = {
-        "model": modelo,
-        "messages": [
-            {"role": "system", "content": "Voce e a Programacao do Nexus Core. Responda em portugues simples, com codigo separado por pastas, arquivo por arquivo, sem modificar arquivos antigos."},
-            {"role": "user", "content": pergunta}
-        ],
-        "temperature": 0.3
-    }
-    r = requests.post(url, headers=cabecalho, json=corpo, timeout=30)
-    if r.status_code != 200:
-        raise Exception(f"Meta via Groq erro {r.status_code}: {r.text[:300]}")
-    dados = r.json()
-    return dados["choices"][0]["message"]["content"]
-
-if __name__ == "__main__":
-    print(chamar_meta("Crie o index.html de um app de lista de tarefas"))
+async def chamar_meta(pergunta: str) -> str:
+    key = os.getenv("GROQ_API_KEY", "").strip()
+    if not key:
+        raise RuntimeError("GROQ_API_KEY não está configurada.")
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    async with httpx.AsyncClient(timeout=45) as client:
+        response = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"model": model, "messages": [
+                {"role": "system", "content": "Você é o agente de Engenharia do Nexuscore AI. Responda em português."},
+                {"role": "user", "content": str(pergunta)}
+            ], "temperature": 0.4, "max_tokens": 4096}
+        )
+    if response.status_code != 200:
+        raise RuntimeError(f"Groq retornou HTTP {response.status_code}.")
+    choices = response.json().get("choices") or []
+    answer = choices[0].get("message", {}).get("content", "") if choices else ""
+    if not answer:
+        raise RuntimeError("Groq retornou resposta vazia.")
+    return answer.strip()

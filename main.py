@@ -421,6 +421,32 @@ async def criar_ideia(request: dict, x_admin_token: Optional[str] = Header(defau
         raise HTTPException(status_code=422, detail="Informe título, resumo e prioridade alta, media ou baixa.")
     return {"id": storage.save_idea(titulo[:200], resumo[:10000], prioridade), "status": "salva"}
 
+
+@app.get("/api/projetos")
+async def listar_projetos(limit: int = 100, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    return {"items": storage.projects(limit)}
+
+@app.post("/api/projetos")
+async def criar_projeto(request: dict, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    titulo = str(request.get("titulo", "")).strip()
+    resumo = str(request.get("resumo", "")).strip()
+    if not titulo or not resumo:
+        raise HTTPException(status_code=422, detail="Informe nome e descrição do projeto.")
+    project_id = storage.save_project(titulo[:200], resumo[:10000])
+    return {"id": project_id, "status": "criado"}
+
+@app.patch("/api/projetos/{project_id}")
+async def atualizar_projeto(project_id: int, request: dict, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    status = str(request.get("status", "")).strip().lower()
+    if status not in {"planejado", "em_andamento", "concluido", "pausado"}:
+        raise HTTPException(status_code=422, detail="Status inválido.")
+    if not storage.update_project(project_id, status):
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    return {"id": project_id, "status": status}
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     return await orquestrador(request.texto, request.tipo)

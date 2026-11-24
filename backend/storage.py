@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from contextlib import contextmanager
 
-DB_PATH = os.getenv("DATABASE_PATH", str(Path(__file__).resolve().parent.parent / "data" / "nexuscore.db"))
+DB_PATH = os.getenv("DATABASE_PATH") or os.getenv("DB_PATH") or str(Path(__file__).resolve().parent.parent / "data" / "nexuscore.db")
 
 @contextmanager
 def connection():

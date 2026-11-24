@@ -464,6 +464,72 @@ async def email_analisar(request: EmailRequest, x_admin_token: Optional[str] = H
     return {"status": "analisado", "ideia_id": idea_id, "analise": result["resposta"]}
 
 
+@app.get("/api/email/receber")
+async def email_receber(
+    limit: int = 10,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    """Busca mensagens não lidas via IMAP e registra o conteúdo textual."""
+    import imaplib
+    import email
+    from email.header import decode_header
+
+    require_admin_token(x_admin_token)
+    host = get_secret("IMAP_HOST")
+    user = get_secret("IMAP_USER")
+    password = get_secret("IMAP_PASSWORD")
+    if not all([host, user, password]):
+        raise HTTPException(status_code=503, detail="Configure IMAP_HOST, IMAP_USER e IMAP_PASSWORD no Render.")
+    def decode_mime(value: str) -> str:
+        pieces = []
+        for part, encoding in decode_header(value or ""):
+            pieces.append(part.decode(encoding or "utf-8", errors="replace") if isinstance(part, bytes) else part)
+        return "".join(pieces)
+    mailbox = None
+    received = []
+    try:
+        mailbox = imaplib.IMAP4_SSL(host, int(os.getenv("IMAP_PORT", "993")))
+        mailbox.login(user, password)
+        mailbox.select(os.getenv("IMAP_FOLDER", "INBOX"))
+        status, data = mailbox.search(None, "UNSEEN")
+        if status != "OK":
+            raise RuntimeError("Falha ao consultar mensagens não lidas.")
+        message_ids = (data[0].split() if data and data[0] else [])[-max(1, min(limit, 30)):]
+        for message_id in message_ids:
+            status, payload = mailbox.fetch(message_id, "(RFC822)")
+            if status != "OK" or not payload or not payload[0]:
+                continue
+            message = email.message_from_bytes(payload[0][1])
+            body = ""
+            if message.is_multipart():
+                for part in message.walk():
+                    if part.get_content_type() == "text/plain" and not part.get_filename():
+                        raw = part.get_payload(decode=True) or b""
+                        body += raw.decode(part.get_content_charset() or "utf-8", errors="replace")
+            else:
+                raw = message.get_payload(decode=True) or b""
+                body = raw.decode(message.get_content_charset() or "utf-8", errors="replace")
+            item = {"de": decode_mime(message.get("From", "")),
+                    "assunto": decode_mime(message.get("Subject", "")),
+                    "texto": body[:12000]}
+            with storage.connection() as db:
+                db.execute("INSERT INTO email_log(direction,sender,subject,body,status) VALUES('incoming',?,?,?,'received')",
+                           (item["de"], item["assunto"], item["texto"]))
+            received.append(item)
+        return {"items": received, "count": len(received)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Falha na recepção IMAP")
+        raise HTTPException(status_code=502, detail="Não foi possível receber e-mails. Verifique as configurações IMAP.") from exc
+    finally:
+        if mailbox is not None:
+            try:
+                mailbox.logout()
+            except Exception:
+                pass
+
+
 # ---------------------------------------------------------------------------
 # Interface web
 # ---------------------------------------------------------------------------

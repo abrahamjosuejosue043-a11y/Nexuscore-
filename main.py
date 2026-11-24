@@ -157,7 +157,7 @@ async def chamar_gemini(prompt: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Integração Groq (modelos Llama)
+# Integração Groq (modelo configurado por variável de ambiente)
 # ---------------------------------------------------------------------------
 
 async def chamar_groq(prompt: str) -> str:
@@ -368,6 +368,7 @@ async def saude():
         "status": "ok",
         "sistema": APP_NAME,
         "versao": APP_VERSION,
+        "persistencia": "temporaria_no_plano_gratuito",
         "provedores_configurados": {
             "gemini": bool(get_secret("GEMINI_API_KEY")),
             "groq": bool(get_secret("GROQ_API_KEY")),

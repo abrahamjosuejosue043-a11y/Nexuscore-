@@ -425,7 +425,7 @@ async def email_enviar(request: EmailRequest):
     import smtplib
     from email.message import EmailMessage
     recipient = request.destinatario.strip() or get_secret("EMAIL_DESTINATARIO")
-    if not recipient or not re.fullmatch(r"[^@\\s]+@[^@\\s]+\\.[^@\\s]+", recipient):
+    if not recipient or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", recipient):
         raise HTTPException(status_code=422, detail="Informe um destinatário válido em destinatario ou EMAIL_DESTINATARIO.")
     host, user, password = get_secret("SMTP_HOST"), get_secret("SMTP_USER"), get_secret("SMTP_PASSWORD")
     sender = get_secret("SMTP_FROM") or user
@@ -451,8 +451,8 @@ async def email_enviar(request: EmailRequest):
 @app.post("/api/email/analisar")
 async def email_analisar(request: EmailRequest):
     result = await orquestrador(
-        "Analise este e-mail. Gere título, resumo, oportunidade, prioridade e próxima ação.\\n"
-        + "Assunto: " + request.assunto + "\\nConteúdo: " + request.texto,
+        "Analise este e-mail. Gere título, resumo, oportunidade, prioridade e próxima ação.\n"
+        + "Assunto: " + request.assunto + "\nConteúdo: " + request.texto,
         "diretoria",
     )
     idea_id = storage.save_idea(request.assunto or "E-mail analisado", result["resposta"], "media")

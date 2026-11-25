@@ -28,7 +28,7 @@ jobs:
           from pathlib import Path
           path = Path("www/index.html")
           html = path.read_text()
-          html = html.replace("</body>", '<script src="/nexuscore-speech.js"></script>\\n</body>')
+          html = html.replace("</body>", '<script src="/nexuscore-speech.js"></script>\n</body>')
           path.write_text(html)
           PY
       - name: Generate Android project

@@ -46,7 +46,7 @@ class _PostgresConnection:
 
     def execute(self, sql, params=()):
         statement = sql.strip()
-        match = re.match(r"INSERT\\s+INTO\\s+([a-zA-Z_][a-zA-Z0-9_]*)", statement, re.I)
+        match = re.match(r"INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)", statement, re.I)
         wants_id = bool(match and match.group(1).lower() in _ID_TABLES
                         and "RETURNING" not in statement.upper())
         if wants_id:

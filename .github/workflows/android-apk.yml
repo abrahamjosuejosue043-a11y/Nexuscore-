@@ -63,7 +63,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: nexuscore-android-latest
+          tag_name: nexuscore-android-${{ github.run_number }}
           name: Nexuscore AI — APK mais recente
           body: APK Android gerado automaticamente para o Nexuscore AI. A aplicação conecta-se ao serviço online.
           files: android/app/build/outputs/apk/debug/app-debug.apk

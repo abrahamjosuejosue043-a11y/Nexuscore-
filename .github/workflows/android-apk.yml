@@ -21,6 +21,23 @@ jobs:
         run: npm install
       - name: Generate Android project
         run: npx cap add android
+      - name: Add Android media and microphone permissions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          content = manifest.read_text()
+          permissions = """    <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+              <uses-feature android:name="android.hardware.camera" android:required="false" />
+          """
+          if "android.permission.RECORD_AUDIO" not in content:
+              content = content.replace("    <application", permissions + "    <application", 1)
+              manifest.write_text(content)
+          PY
       - name: Apply Nexuscore launcher icon
         run: |
           pip install pillow

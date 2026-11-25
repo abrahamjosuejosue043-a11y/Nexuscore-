@@ -17,6 +17,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Prepare current web interface for APK
+        run: cp frontend/index.html www/index.html
       - name: Install Capacitor
         run: npm install
       - name: Generate Android project

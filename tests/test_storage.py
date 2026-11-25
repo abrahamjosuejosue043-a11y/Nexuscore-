@@ -46,6 +46,33 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(health["journal_mode"], "wal")
         self.assertGreaterEqual(health["table_count"], 5)
 
+    def test_postgres_insert_returns_created_id(self):
+        class FakeCursor:
+            rowcount = 1
+
+            def fetchone(self):
+                return {"id": 123}
+
+        class FakeConnection:
+            def __init__(self):
+                self.statement = None
+                self.params = None
+
+            def execute(self, statement, params):
+                self.statement = statement
+                self.params = params
+                return FakeCursor()
+
+        raw = FakeConnection()
+        db = self.storage._PostgresConnection(raw)
+        cursor = db.execute(
+            "INSERT INTO ideas(title, summary, priority) VALUES(?,?,?)",
+            ("Ideia", "Resumo", "media"),
+        )
+        self.assertIn("RETURNING id", raw.statement)
+        self.assertEqual(cursor.lastrowid, 123)
+        self.assertEqual(raw.params, ("Ideia", "Resumo", "media"))
+
     def test_postgres_placeholder_adapter_preserves_legacy_queries(self):
         self.assertEqual(
             self.storage._qmark_to_pyformat(

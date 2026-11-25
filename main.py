@@ -219,7 +219,8 @@ async def chamar_groq(prompt: str) -> str:
 
     if not answer:
         raise ProviderError("Groq", "A Groq respondeu sem conteúdo de texto.", 502)
-    return answer
+    actual_model = str(data.get("model") or GROQ_MODEL)
+    return answer, actual_model
 
 
 # ---------------------------------------------------------------------------
@@ -301,18 +302,25 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
 
     prompt = build_prompt(text, agent_type)
 
-    # Groq é o provedor principal para todos os perfis; Gemini fica como contingência.
-    # Isso evita que uma indisponibilidade do Gemini atrase o chat geral e a Diretoria.
-    providers = [("Groq", chamar_groq), ("Gemini", chamar_gemini)]
+    # Groq é o provedor principal. Gemini só entra como contingência se houver
+    # uma chave explicitamente configurada; não tenta credenciais removidas.
+    providers = [("Groq", chamar_groq)]
+    if get_secret("GEMINI_API_KEY"):
+        providers.append(("Gemini", chamar_gemini))
 
     errors = []
     for provider_name, provider_function in providers:
         try:
-            answer = await provider_function(prompt)
+            provider_result = await provider_function(prompt)
+            if provider_name == "Groq":
+                answer, actual_model = provider_result
+            else:
+                answer, actual_model = provider_result, GEMINI_MODEL
             result = {
                 "resposta": answer,
                 "origem": provider_name.lower(),
                 "cerebro": provider_name,
+                "modelo": actual_model,
                 "tempo_ms": int((time.perf_counter() - started) * 1000),
             }
             cache_set(cache_key, result)
@@ -329,8 +337,8 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
             "mensagem": "Nenhum provedor de IA conseguiu responder.",
             "motivos": errors,
             "orientacao": (
-                "Confira GEMINI_API_KEY e GROQ_API_KEY no ambiente do serviço "
-                "e confirme se os modelos configurados estão disponíveis."
+                "Confira GROQ_API_KEY e GROQ_MODEL no ambiente do serviço. "
+                "A contingência Gemini só é usada quando GEMINI_API_KEY estiver configurada."
             ),
         },
     )
@@ -373,6 +381,9 @@ async def saude():
             "gemini": bool(get_secret("GEMINI_API_KEY")),
             "groq": bool(get_secret("GROQ_API_KEY")),
         },
+        "provedor_principal": "groq",
+        "modelo_principal": GROQ_MODEL,
+        "modelo_groq_confirmado_por_resposta": False,
     }
 
 
@@ -388,6 +399,7 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
             "GROQ_API_KEY": "configurada" if get_secret("GROQ_API_KEY") else "ausente",
             "GEMINI_MODEL": GEMINI_MODEL,
             "GROQ_MODEL": GROQ_MODEL,
+            "GEMINI_FALLBACK": "ativo" if get_secret("GEMINI_API_KEY") else "desativado",
         },
         "observacao": (
             "A presença de uma chave não garante que ela seja válida. "

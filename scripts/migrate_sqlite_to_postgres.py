@@ -13,7 +13,8 @@ from pathlib import Path
 import sqlite3
 import sys
 
-TABLES = ("conversations", "ideas", "projects", "artifacts", "email_log")
+TABLES = ("chat_sessions", "conversations", "ideas", "projects", "artifacts", "email_log")
+SERIAL_TABLES = ("conversations", "ideas", "projects", "artifacts", "email_log")
 
 
 def create_backup(source: Path) -> Path:
@@ -51,13 +52,35 @@ def migrate(source: Path, database_url: str) -> dict:
 
     try:
         with psycopg.connect(database_url, connect_timeout=20, row_factory=dict_row) as target:
-            # Confere todas as tabelas antes de gravar qualquer registro.
+            # A origem pode ser de uma versão anterior, sem chat_sessions/conversation_id.
+            source_tables = {
+                row["name"] for row in source_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
+            required_tables = set(TABLES) - {"chat_sessions"}
+            missing = required_tables - source_tables
+            if missing:
+                raise RuntimeError(
+                    "Tabelas obrigatórias ausentes no SQLite: " + ", ".join(sorted(missing))
+                )
+
+            source_message_columns = {
+                row["name"] for row in source_conn.execute(
+                    "PRAGMA table_info(conversations)"
+                ).fetchall()
+            }
+            source_message_count = source_conn.execute(
+                "SELECT COUNT(*) FROM conversations"
+            ).fetchone()[0]
+            legacy_id = "legacy-import"
+            needs_legacy_session = (
+                "chat_sessions" not in source_tables
+                and source_message_count > 0
+            )
+
+            # Confere todas as tabelas do destino antes de copiar.
             for table in TABLES:
-                exists = source_conn.execute(
-                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-                ).fetchone()
-                if not exists:
-                    raise RuntimeError(f"A tabela obrigatória '{table}' não existe no SQLite.")
                 target_count = target.execute(
                     sql.SQL("SELECT COUNT(*) AS n FROM {}").format(sql.Identifier(table))
                 ).fetchone()["n"]
@@ -69,21 +92,36 @@ def migrate(source: Path, database_url: str) -> dict:
 
             with target.transaction():
                 for table in TABLES:
-                    # table vem da lista fixa TABLES, não de entrada externa.
-                    rows = source_conn.execute(f"SELECT * FROM {table}").fetchall()
-                    if rows:
+                    if table == "chat_sessions" and table not in source_tables:
+                        rows = (
+                            [{"id": legacy_id, "title": "Histórico anterior", "agent": "geral"}]
+                            if needs_legacy_session else []
+                        )
+                    else:
+                        rows = source_conn.execute(f"SELECT * FROM {table}").fetchall()
+
+                    if table == "conversations" and "conversation_id" not in source_message_columns:
+                        # A versão SQLite antiga não tinha agrupamento por conversa.
+                        columns = list(rows[0].keys()) + ["conversation_id"] if rows else []
+                        values = [tuple(row) + (legacy_id,) for row in rows]
+                    elif rows:
                         columns = list(rows[0].keys())
+                        values = [tuple(row) for row in rows]
+                    else:
+                        columns, values = [], []
+
+                    if values:
                         insert = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
                             sql.Identifier(table),
                             sql.SQL(", ").join(map(sql.Identifier, columns)),
                             sql.SQL(", ").join(sql.Placeholder() for _ in columns),
                         )
                         with target.cursor() as cursor:
-                            cursor.executemany(insert, [tuple(row) for row in rows])
+                            cursor.executemany(insert, values)
                     copied[table] = len(rows)
 
                 # Mantém os próximos IDs acima dos IDs que foram copiados.
-                for table in TABLES:
+                for table in SERIAL_TABLES:
                     target.execute(
                         sql.SQL(
                             "SELECT setval(pg_get_serial_sequence(%s, 'id'), "

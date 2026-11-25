@@ -19,6 +19,7 @@ import os
 import re
 import time
 import hmac
+import uuid
 import logging
 from pathlib import Path
 from io import BytesIO
@@ -114,6 +115,11 @@ class ChatRequest(BaseModel):
     texto: str = Field(..., min_length=1, max_length=MAX_INPUT_CHARS)
     tipo: str = Field(default="geral", max_length=40)
     imagens: list[str] = Field(default_factory=list, max_length=3)
+    conversa_id: Optional[str] = Field(default=None, max_length=36)
+
+
+class ConversationTitleRequest(BaseModel):
+    titulo: str = Field(..., min_length=1, max_length=100)
 
 
 class ArtifactRequest(BaseModel):
@@ -297,20 +303,59 @@ def cache_set(key: str, value: dict) -> None:
         _RESPONSE_CACHE.popitem(last=False)
 
 
-async def orquestrador(pedido: str, tipo: str = "geral", imagens: Optional[list[str]] = None) -> dict:
+def build_conversation_title(text: str) -> str:
+    """Cria um título curto a partir da primeira mensagem, sem uma chamada extra à IA."""
+    value = re.sub(r"\s+", " ", (text or "")).strip()
+    value = re.sub(
+        r"^(?:oi|olá|ola|bom dia|boa tarde|boa noite)[,!.\s-]*",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(
+        r"^(?:por favor|me ajude a|me ajuda a|quero|preciso|gostaria de)\s+",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if not value:
+        return "Nova conversa"
+    words = value.split()
+    title = " ".join(words[:8])
+    if len(title) > 64:
+        title = title[:61].rsplit(" ", 1)[0] + "..."
+    elif len(words) > 8:
+        title += "..."
+    return title[:1].upper() + title[1:]
+
+
+async def orquestrador(
+    pedido: str,
+    tipo: str = "geral",
+    imagens: Optional[list[str]] = None,
+    conversa_id: Optional[str] = None,
+) -> dict:
     started = time.perf_counter()
     text = (pedido or "").strip()
     if not text:
         raise HTTPException(status_code=422, detail="O texto da mensagem está vazio.")
 
     agent_type = normalize_type(tipo)
+    conversation_id = str(conversa_id or uuid.uuid4())
+    conversation_title = build_conversation_title(text)
     cache_key = f"{agent_type}:{text.casefold()}"
     cached = cache_get(cache_key) if not imagens else None
     if cached:
         cached["origem"] = "cache_temporario"
         cached["tempo_ms"] = int((time.perf_counter() - started) * 1000)
-        storage.save_message("user", agent_type, text)
-        storage.save_message("assistant", agent_type, cached["resposta"], cached.get("cerebro"))
+        session = storage.ensure_conversation(conversation_id, conversation_title, agent_type)
+        storage.save_message("user", agent_type, text, conversation_id=conversation_id)
+        storage.save_message(
+            "assistant", agent_type, cached["resposta"], cached.get("cerebro"),
+            conversation_id=conversation_id,
+        )
+        cached["conversa_id"] = conversation_id
+        cached["titulo_conversa"] = session["title"] if session else conversation_title
         return cached
 
     prompt = build_prompt(text, agent_type)
@@ -340,8 +385,14 @@ async def orquestrador(pedido: str, tipo: str = "geral", imagens: Optional[list[
     }
     if not imagens:
         cache_set(cache_key, result)
-    storage.save_message("user", agent_type, text)
-    storage.save_message("assistant", agent_type, answer, provider_name)
+    session = storage.ensure_conversation(conversation_id, conversation_title, agent_type)
+    storage.save_message("user", agent_type, text, conversation_id=conversation_id)
+    storage.save_message(
+        "assistant", agent_type, answer, provider_name,
+        conversation_id=conversation_id,
+    )
+    result["conversa_id"] = conversation_id
+    result["titulo_conversa"] = session["title"] if session else conversation_title
     return result
 
 
@@ -413,9 +464,37 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
 
 
 @app.get("/api/conversas")
-async def listar_conversas(limit: int = 50, x_admin_token: Optional[str] = Header(default=None)):
+async def listar_conversas(limit: int = 100, x_admin_token: Optional[str] = Header(default=None)):
     require_admin_token(x_admin_token)
-    return {"items": storage.messages(limit)}
+    return {"items": storage.list_conversations(limit)}
+
+
+@app.get("/api/conversas/{conversa_id}")
+async def abrir_conversa(conversa_id: str, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    item = storage.get_conversation(conversa_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    return {
+        "conversation": item,
+        "messages": storage.conversation_messages(conversa_id),
+    }
+
+
+@app.patch("/api/conversas/{conversa_id}")
+async def renomear_conversa(
+    conversa_id: str,
+    request: ConversationTitleRequest,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    title = request.titulo.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Informe um título para a conversa.")
+    if not storage.rename_conversation(conversa_id, title):
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    return {"id": conversa_id, "titulo": title[:100], "status": "renomeada"}
+
 
 @app.get("/api/ideias")
 async def listar_ideias(limit: int = 100, x_admin_token: Optional[str] = Header(default=None)):
@@ -576,7 +655,11 @@ async def chat(request: ChatRequest):
             raise HTTPException(status_code=422, detail="Formato não permitido. Use PNG, JPEG ou WebP.")
     if sum(len(item) for item in request.imagens) > 19_000_000:
         raise HTTPException(status_code=413, detail="O conjunto de imagens excede o limite visual de 20 MB. Envie menos imagens.")
-    return await orquestrador(request.texto, request.tipo, request.imagens)
+    try:
+        conversa_id = str(uuid.UUID(request.conversa_id)) if request.conversa_id else str(uuid.uuid4())
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=422, detail="Identificador de conversa inválido.")
+    return await orquestrador(request.texto, request.tipo, request.imagens, conversa_id)
 
 
 @app.post("/api/email/enviar")

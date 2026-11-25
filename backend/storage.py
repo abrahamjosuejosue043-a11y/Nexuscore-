@@ -104,14 +104,38 @@ def connection():
         db.close()
 
 
+def _backfill_legacy_messages(db):
+    """Agrupa mensagens preexistentes sem conversa em um histórico legado único."""
+    count = db.execute(
+        "SELECT COUNT(*) AS count FROM conversations WHERE conversation_id IS NULL"
+    ).fetchone()["count"]
+    if count:
+        db.execute(
+            """INSERT INTO chat_sessions(id, title, agent)
+               VALUES('legacy', 'Histórico anterior', 'geral')
+               ON CONFLICT(id) DO NOTHING"""
+        )
+        db.execute(
+            "UPDATE conversations SET conversation_id='legacy' WHERE conversation_id IS NULL"
+        )
+        db.execute(
+            "UPDATE chat_sessions SET updated_at=CURRENT_TIMESTAMP WHERE id='legacy'"
+        )
+
+
 def initialize():
     """Cria o esquema no mecanismo selecionado, sem migrar dados implicitamente."""
     if _database_url():
         statements = [
+            """CREATE TABLE IF NOT EXISTS chat_sessions (
+                id TEXT PRIMARY KEY, title TEXT NOT NULL, agent TEXT NOT NULL DEFAULT 'geral',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
             """CREATE TABLE IF NOT EXISTS conversations (
                 id BIGSERIAL PRIMARY KEY, role TEXT NOT NULL, agent TEXT NOT NULL,
-                content TEXT NOT NULL, provider TEXT,
+                content TEXT NOT NULL, provider TEXT, conversation_id TEXT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+            "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS conversation_id TEXT",
             """CREATE TABLE IF NOT EXISTS ideas (
                 id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, summary TEXT NOT NULL,
                 priority TEXT NOT NULL DEFAULT 'media', status TEXT NOT NULL DEFAULT 'nova',
@@ -130,6 +154,8 @@ def initialize():
                 recipient TEXT, subject TEXT, body TEXT, status TEXT NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
             "CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)",
+            "CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)",
             "CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status)",
             "CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)",
             "CREATE INDEX IF NOT EXISTS idx_email_log_created_at ON email_log(created_at)",
@@ -137,14 +163,23 @@ def initialize():
         with connection() as db:
             for statement in statements:
                 db.execute(statement)
+            _backfill_legacy_messages(db)
         return
 
     with connection() as db:
         db.execute("PRAGMA journal_mode=WAL")
+        db.execute("""CREATE TABLE IF NOT EXISTS chat_sessions (
+            id TEXT PRIMARY KEY, title TEXT NOT NULL, agent TEXT NOT NULL DEFAULT 'geral',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         db.execute("""CREATE TABLE IF NOT EXISTS conversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT NOT NULL,
             agent TEXT NOT NULL, content TEXT NOT NULL, provider TEXT,
+            conversation_id TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        columns = {row["name"] for row in db.execute("PRAGMA table_info(conversations)").fetchall()}
+        if "conversation_id" not in columns:
+            db.execute("ALTER TABLE conversations ADD COLUMN conversation_id TEXT")
         db.execute("""CREATE TABLE IF NOT EXISTS ideas (
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
             summary TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'media',
@@ -164,6 +199,9 @@ def initialize():
             sender TEXT, recipient TEXT, subject TEXT, body TEXT,
             status TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)")
+        _backfill_legacy_messages(db)
         db.execute("CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_email_log_created_at ON email_log(created_at)")
@@ -205,10 +243,32 @@ def health():
     }
 
 
-def save_message(role, agent, content, provider=None):
+def ensure_conversation(conversation_id, title, agent):
+    """Cria uma conversa uma única vez; mensagens posteriores preservam o título."""
     with connection() as db:
-        db.execute("INSERT INTO conversations(role,agent,content,provider) VALUES(?,?,?,?)",
-                   (role, agent, content, provider))
+        db.execute(
+            """INSERT INTO chat_sessions(id, title, agent) VALUES(?,?,?)
+               ON CONFLICT(id) DO NOTHING""",
+            (str(conversation_id), str(title)[:100] or "Nova conversa", str(agent)[:40]),
+        )
+        row = db.execute(
+            "SELECT * FROM chat_sessions WHERE id=?", (str(conversation_id),)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def save_message(role, agent, content, provider=None, conversation_id=None):
+    with connection() as db:
+        db.execute(
+            """INSERT INTO conversations(role,agent,content,provider,conversation_id)
+               VALUES(?,?,?,?,?)""",
+            (role, agent, content, provider, conversation_id),
+        )
+        if conversation_id:
+            db.execute(
+                "UPDATE chat_sessions SET updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (conversation_id,),
+            )
 
 
 def messages(limit=50):
@@ -216,6 +276,49 @@ def messages(limit=50):
         rows = db.execute("SELECT * FROM conversations ORDER BY id DESC LIMIT ?",
                           (max(1, min(int(limit), 200)),)).fetchall()
     return [dict(row) for row in reversed(rows)]
+
+
+def list_conversations(limit=100):
+    with connection() as db:
+        rows = db.execute(
+            """SELECT s.id, s.title, s.agent, s.created_at, s.updated_at,
+                      COUNT(m.id) AS message_count
+               FROM chat_sessions s
+               LEFT JOIN conversations m ON m.conversation_id=s.id
+               GROUP BY s.id, s.title, s.agent, s.created_at, s.updated_at
+               ORDER BY s.updated_at DESC
+               LIMIT ?""",
+            (max(1, min(int(limit), 200)),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_conversation(conversation_id):
+    with connection() as db:
+        row = db.execute(
+            "SELECT * FROM chat_sessions WHERE id=?", (str(conversation_id),)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def conversation_messages(conversation_id, limit=500):
+    with connection() as db:
+        rows = db.execute(
+            """SELECT * FROM conversations
+               WHERE conversation_id=? ORDER BY id ASC LIMIT ?""",
+            (str(conversation_id), max(1, min(int(limit), 1000))),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def rename_conversation(conversation_id, title):
+    with connection() as db:
+        cur = db.execute(
+            """UPDATE chat_sessions SET title=?, updated_at=CURRENT_TIMESTAMP
+               WHERE id=?""",
+            (str(title).strip()[:100], str(conversation_id)),
+        )
+        return cur.rowcount > 0
 
 
 def save_idea(title, summary, priority="media"):

@@ -22,6 +22,18 @@ class StorageTests(unittest.TestCase):
         items = self.storage.messages(10)
         self.assertTrue(any(item["content"] == "Teste de persistência" for item in items))
 
+    def test_save_and_download_artifact(self):
+        artifact_id = self.storage.save_artifact("Relatório", "relatorio.txt", "txt", "text/plain", b"conteudo")
+        item = self.storage.artifact(artifact_id)
+        self.assertEqual(item["content"], b"conteudo")
+        self.assertEqual(item["filename"], "relatorio.txt")
+
+    def test_list_artifacts_hides_binary_content(self):
+        self.storage.save_artifact("Arquivo", "arquivo.md", "md", "text/markdown", b"# teste")
+        items = self.storage.artifacts(10)
+        self.assertTrue(any(item["filename"] == "arquivo.md" for item in items))
+        self.assertNotIn("content", items[0])
+
     def test_save_and_read_idea(self):
         idea_id = self.storage.save_idea("Ideia de teste", "Resumo de teste", "alta")
         items = self.storage.ideas(10)

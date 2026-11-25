@@ -21,6 +21,8 @@ import time
 import hmac
 import logging
 from pathlib import Path
+from io import BytesIO
+from html import escape as html_escape
 from collections import OrderedDict
 from typing import Optional
 
@@ -47,7 +49,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("nexuscore")
 
 APP_NAME = "Nexuscore AI"
-APP_VERSION = "1.5.1"
+APP_VERSION = "1.6.0"
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip()
@@ -112,6 +114,12 @@ class ChatRequest(BaseModel):
     texto: str = Field(..., min_length=1, max_length=MAX_INPUT_CHARS)
     tipo: str = Field(default="geral", max_length=40)
     imagens: list[str] = Field(default_factory=list, max_length=3)
+
+
+class ArtifactRequest(BaseModel):
+    titulo: str = Field(..., min_length=1, max_length=160)
+    instrucoes: str = Field(..., min_length=1, max_length=12000)
+    formato: str = Field(default="docx", max_length=10)
 
 
 class EmailRequest(BaseModel):
@@ -263,7 +271,15 @@ def build_prompt(text: str, agent_type: str) -> str:
             "Responda com clareza, precisão e transparência."
         ),
     }
-    return f"{instructions[agent_type]}\n\nSolicitação do usuário:\n{text}"
+    common = (
+        "Estilo de conversa natural, como um assistente moderno. Seja direto e agradável de ler. "
+        "Para perguntas simples, responda em 1 a 3 frases, preferencialmente até 80 palavras. "
+        "Use parágrafos curtos e evite introduções, repetições, avisos genéricos e listas desnecessárias. "
+        "Só aprofunde quando o usuário pedir detalhes, quando a tarefa exigir ou quando houver risco relevante. "
+        "Se a solicitação for ampla, comece pelo resultado principal e ofereça o próximo passo. "
+        "Não diga que criou, salvou, enviou ou executou algo se isso não tiver sido feito pela ferramenta."
+    )
+    return f"{common}\n\n{instructions[agent_type]}\n\nSolicitação do usuário:\n{text}"
 
 
 def cache_get(key: str) -> Optional[dict]:
@@ -440,6 +456,115 @@ async def atualizar_projeto(project_id: int, request: dict, x_admin_token: Optio
     if not storage.update_project(project_id, status):
         raise HTTPException(status_code=404, detail="Projeto não encontrado.")
     return {"id": project_id, "status": status}
+
+@app.get("/api/arquivos")
+async def listar_arquivos(limit: int = 50, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    return {"items": storage.artifacts(limit)}
+
+
+@app.post("/api/arquivos/gerar")
+async def gerar_arquivo(request: ArtifactRequest, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    formato = request.formato.strip().lower().lstrip(".")
+    formatos = {"docx", "pdf", "md", "txt", "csv", "json"}
+    if formato not in formatos:
+        raise HTTPException(status_code=422, detail="Formato não suportado. Use DOCX, PDF, Markdown, TXT, CSV ou JSON.")
+    titulo = request.titulo.strip()
+    if not titulo or not request.instrucoes.strip():
+        raise HTTPException(status_code=422, detail="Informe o título e o conteúdo desejado.")
+    fmt_prompt = {
+        "json": "Entregue somente JSON válido, sem bloco markdown.",
+        "csv": "Entregue somente CSV válido com cabeçalho, sem bloco markdown.",
+        "txt": "Entregue texto simples, sem cercas de código.",
+        "md": "Entregue Markdown limpo, sem cercas de código externas.",
+        "docx": "Entregue o conteúdo em Markdown estruturado, que será convertido em DOCX.",
+        "pdf": "Entregue o conteúdo em Markdown estruturado, que será convertido em PDF.",
+    }[formato]
+    prompt = (
+        "Você é o redator e analista documental do Nexuscore. Crie um artefato pronto para uso. "
+        "Seja claro, organizado e objetivo. Não invente dados, fontes, números, nomes ou fatos. "
+        "Quando faltar informação, sinalize como 'A confirmar'. Não inclua comentários sobre o processo. "
+        + fmt_prompt + "\n\nTítulo: " + titulo
+        + "\n\nInstruções e contexto do usuário:\n" + request.instrucoes.strip()
+    )
+    try:
+        generated, model = await chamar_groq(prompt)
+    except ProviderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"mensagem": "Não foi possível gerar o arquivo.", "motivos": [exc.message]}) from exc
+    if not generated.strip():
+        raise HTTPException(status_code=502, detail="A IA retornou um documento vazio.")
+    if len(generated.encode("utf-8")) > 2_000_000:
+        raise HTTPException(status_code=413, detail="O conteúdo gerado excede 2 MB.")
+    safe_title = re.sub(r"[^a-zA-Z0-9_-]+", "-", titulo).strip("-_").lower()[:70] or "documento"
+    filename = f"{safe_title}.{formato}"
+    mime_types = {
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "pdf": "application/pdf", "md": "text/markdown; charset=utf-8",
+        "txt": "text/plain; charset=utf-8", "csv": "text/csv; charset=utf-8",
+        "json": "application/json; charset=utf-8",
+    }
+    content = generated.encode("utf-8")
+    if formato == "docx":
+        from docx import Document
+        document = Document()
+        document.add_heading(titulo, 0)
+        for line in generated.splitlines():
+            line = line.rstrip()
+            if not line:
+                continue
+            if line.startswith("### "):
+                document.add_heading(line[4:], level=3)
+            elif line.startswith("## "):
+                document.add_heading(line[3:], level=2)
+            elif line.startswith("# "):
+                document.add_heading(line[2:], level=1)
+            elif line.startswith(("- ", "* ")):
+                document.add_paragraph(line[2:], style="List Bullet")
+            elif re.match(r"^\d+[.)]\s+", line):
+                document.add_paragraph(re.sub(r"^\d+[.)]\s+", "", line), style="List Number")
+            else:
+                document.add_paragraph(line.replace("**", "").replace("`", ""))
+        buffer = BytesIO()
+        document.save(buffer)
+        content = buffer.getvalue()
+    elif formato == "pdf":
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        buffer = BytesIO()
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle("NexusTitle", parent=styles["Title"], spaceAfter=16)
+        story = [Paragraph(html_escape(titulo), title_style)]
+        for line in generated.splitlines():
+            line = line.strip()
+            if not line:
+                story.append(Spacer(1, 6))
+            elif line.startswith("# "):
+                story.append(Paragraph(html_escape(line[2:]), styles["Heading1"]))
+            elif line.startswith("## "):
+                story.append(Paragraph(html_escape(line[3:]), styles["Heading2"]))
+            elif line.startswith("### "):
+                story.append(Paragraph(html_escape(line[4:]), styles["Heading3"]))
+            else:
+                story.append(Paragraph(html_escape(line.lstrip("-* ").replace("**", "")), styles["BodyText"]))
+                story.append(Spacer(1, 4))
+        SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm).build(story)
+        content = buffer.getvalue()
+    artifact_id = storage.save_artifact(titulo, filename, formato, mime_types[formato], content)
+    return {"id": artifact_id, "titulo": titulo, "filename": filename, "formato": formato, "modelo": model, "bytes": len(content), "status": "criado"}
+
+
+@app.get("/api/arquivos/{artifact_id}/download")
+async def baixar_arquivo(artifact_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    item = storage.artifact(artifact_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
+    return Response(content=item["content"], media_type=item["mime_type"],
+        headers={"Content-Disposition": f'attachment; filename="{item["filename"]}"', "Cache-Control": "no-store"})
+
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):

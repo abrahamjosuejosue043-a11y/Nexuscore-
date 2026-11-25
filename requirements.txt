@@ -3,3 +3,5 @@ uvicorn
 python-dotenv
 httpx
 pydantic
+python-docx
+reportlab

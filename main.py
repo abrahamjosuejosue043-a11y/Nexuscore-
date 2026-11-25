@@ -163,7 +163,7 @@ async def chamar_gemini(prompt: str) -> str:
 # Integração Groq (modelo configurado por variável de ambiente)
 # ---------------------------------------------------------------------------
 
-async def chamar_groq(prompt: str) -> str:
+async def chamar_groq(prompt: str) -> tuple[str, str]:
     api_key = get_secret("GROQ_API_KEY")
     if not api_key:
         raise ProviderError(

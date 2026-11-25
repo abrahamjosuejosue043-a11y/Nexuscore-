@@ -13,13 +13,10 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 Obrigatórias conforme os recursos utilizados:
 
-- `GEMINI_API_KEY`: chave do Google Gemini.
 - `GROQ_API_KEY`: chave da Groq para modelos compatíveis.\n- `OPENAI_API_KEY`: chave opcional da OpenAI API; quando configurada, passa a ser o provedor principal e habilita análise de imagens. A API é cobrada separadamente da assinatura ChatGPT. Nunca envie essa chave pelo chat nem a grave no GitHub.\n- `OPENAI_MODEL`: modelo de API OpenAI com suporte a visão; padrão `gpt-4o-mini`.
 - `ADMIN_TOKEN`: token forte para rotas administrativas.
 - `GROQ_MODEL`: padrão `openai/gpt-oss-120b`, com raciocínio avançado ativado.
 - `GROQ_VISION_MODEL`: padrão `qwen/qwen3.8-27b`, modelo multimodal para OCR, leitura de capturas de tela e análise visual (até 3 imagens por requisição).
-- `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN`: opcionais, necessários para gerar imagens via Cloudflare Workers AI. Crie um token com permissão Workers AI Read/Write e guarde-o somente nas variáveis do Render.
-- `CLOUDFLARE_IMAGE_MODEL`: padrão `@cf/leonardo/lucid-origin`, com saída padrão 1536×1536 e 40 passos. A cota gratuita do Workers AI é limitada por dia; o consumo depende do modelo e da resolução.
 
 E-mail de saída (SMTP):
 
@@ -47,7 +44,6 @@ Segurança e rede:
 - `GET /api/saude`: saúde pública sem expor segredos.
 - `GET /api/diagnostico`: diagnóstico protegido pelo cabeçalho `X-Admin-Token`.
 - `POST /api/chat`: chat com seleção de agente, raciocínio avançado e análise de até três imagens.
-- `POST /api/imagens/gerar`: geração de imagem 1536×1536 via Cloudflare Workers AI (requer `ADMIN_TOKEN` e as duas variáveis Cloudflare).
 - `GET /api/conversas`: histórico persistido.
 - `GET/POST /api/ideias`: banco de ideias persistido.
 - `POST /api/email/enviar`: envio SMTP real; retorna erro se SMTP não estiver configurado.
@@ -73,6 +69,6 @@ O envio SMTP depende das credenciais do provedor de e-mail. O recebimento IMAP e
 - Ações de galeria e câmera pelo seletor de mídia do Android. A compilação APK declara permissões de câmera, microfone e imagens.
 - Até três imagens por mensagem, normalizadas no aparelho para JPEG antes do envio e analisadas pelo modelo visual da Groq.
 - Raciocínio avançado configurado no modelo principal e no modelo visual.
-- Geração de imagens via Cloudflare Workers AI, quando as credenciais opcionais forem configuradas.
+- Análise de imagens, OCR e interpretação visual via Groq. A API Groq não oferece geração de imagens; nenhum provedor externo foi adicionado.
 
-A interface web é servida pelo Render e pode atualizar sem reinstalar o invólucro Android. Alterações em permissões nativas exigem uma nova compilação e instalação do APK. A geração de imagens usa um provedor separado (Cloudflare Workers AI); Groq continua sendo o núcleo de linguagem e raciocínio.
+A interface web é servida pelo Render e pode atualizar sem reinstalar o invólucro Android. Alterações em permissões nativas exigem uma nova compilação e instalação do APK. A Groq é o provedor único de linguagem, raciocínio e análise visual. Geração de imagens não está disponível pela API Groq.

@@ -87,15 +87,21 @@ app = FastAPI(
     description="API central do Nexuscore AI.",
 )
 
-allowed_origins = get_cors_origins()
-if allowed_origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=allowed_origins,
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "X-Admin-Token"],
-    )
+# Origens locais usadas pelo WebView do Capacitor no APK Android.
+# CORS_ORIGINS pode acrescentar domínios web sem remover as origens nativas.
+allowed_origins = list(dict.fromkeys([
+    "capacitor://localhost",
+    "http://localhost",
+    "https://localhost",
+    *get_cors_origins(),
+]))
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------------------------------------------------------------------------

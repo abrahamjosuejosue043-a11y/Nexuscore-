@@ -1,6 +1,6 @@
 # Nexuscore AI
 
-API central FastAPI com três perfis especializados (Diretoria, Engenharia e Marketing), fallback entre provedores e persistência local SQLite. Os perfis ainda não executam uma cadeia colaborativa entre si.
+API central FastAPI com três perfis especializados (Diretoria, Engenharia e Marketing), Groq como núcleo de linguagem e persistência local SQLite. Os perfis ainda não executam uma cadeia colaborativa entre si.
 
 ## Execução
 
@@ -16,7 +16,6 @@ Obrigatórias conforme os recursos utilizados:
 - `GEMINI_API_KEY`: chave do Google Gemini.
 - `GROQ_API_KEY`: chave da Groq para modelos compatíveis.\n- `OPENAI_API_KEY`: chave opcional da OpenAI API; quando configurada, passa a ser o provedor principal e habilita análise de imagens. A API é cobrada separadamente da assinatura ChatGPT. Nunca envie essa chave pelo chat nem a grave no GitHub.\n- `OPENAI_MODEL`: modelo de API OpenAI com suporte a visão; padrão `gpt-4o-mini`.
 - `ADMIN_TOKEN`: token forte para rotas administrativas.
-- `GEMINI_MODEL`: padrão `gemini-3.8-flash`; confirme a disponibilidade para seu projeto Google.
 - `GROQ_MODEL`: padrão `openai/gpt-oss-120b`, com raciocínio avançado ativado.
 - `GROQ_VISION_MODEL`: padrão `qwen/qwen3.8-27b`, modelo multimodal para OCR, leitura de capturas de tela e análise visual (até 3 imagens por requisição).
 - `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN`: opcionais, necessários para gerar imagens via Cloudflare Workers AI. Crie um token com permissão Workers AI Read/Write e guarde-o somente nas variáveis do Render.
@@ -76,4 +75,4 @@ O envio SMTP depende das credenciais do provedor de e-mail. O recebimento IMAP e
 - Raciocínio avançado configurado no modelo principal e no modelo visual.
 - Geração de imagens via Cloudflare Workers AI, quando as credenciais opcionais forem configuradas.
 
-A interface web é servida pelo Render e pode atualizar sem reinstalar o invólucro Android. Alterações em permissões nativas exigem uma nova compilação e instalação do APK. O uso da OpenAI API tem cobrança própria por consumo e não é incluído no ChatGPT Plus/Free.
+A interface web é servida pelo Render e pode atualizar sem reinstalar o invólucro Android. Alterações em permissões nativas exigem uma nova compilação e instalação do APK. A geração de imagens usa um provedor separado (Cloudflare Workers AI); Groq continua sendo o núcleo de linguagem e raciocínio.

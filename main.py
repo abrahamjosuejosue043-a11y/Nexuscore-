@@ -382,6 +382,12 @@ async def orquestrador(pedido: str, tipo: str = "geral", imagens: Optional[list[
         except ProviderError as exc:
             errors.append(f"{exc.provider}: {exc.message}")
             logger.info("%s indisponível: %s", exc.provider, exc.message)
+            # Não enviar imagens para um fallback de texto que não as processa.
+            if imagens and provider_name == "OpenAI":
+                raise HTTPException(
+                    status_code=502,
+                    detail={"mensagem": "A análise visual pela OpenAI não foi concluída.", "motivos": errors},
+                ) from exc
 
     raise HTTPException(
         status_code=502,

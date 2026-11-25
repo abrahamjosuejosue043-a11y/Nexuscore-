@@ -20,7 +20,7 @@ Obrigatórias conforme os recursos utilizados:
 - `GROQ_MODEL`: padrão `openai/gpt-oss-120b`, com raciocínio avançado ativado.
 - `GROQ_VISION_MODEL`: padrão `qwen/qwen3.8-27b`, modelo multimodal para OCR, leitura de capturas de tela e análise visual (até 3 imagens por requisição).
 - `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN`: opcionais, necessários para gerar imagens via Cloudflare Workers AI. Crie um token com permissão Workers AI Read/Write e guarde-o somente nas variáveis do Render.
-- `CLOUDFLARE_IMAGE_MODEL`: padrão `@cf/leonardo/lucid-origin`, com saída padrão 1024×1024 e 30 passos. A cota gratuita do Workers AI é limitada por dia; o consumo depende do modelo e da resolução.
+- `CLOUDFLARE_IMAGE_MODEL`: padrão `@cf/leonardo/lucid-origin`, com saída padrão 1536×1536 e 40 passos. A cota gratuita do Workers AI é limitada por dia; o consumo depende do modelo e da resolução.
 
 E-mail de saída (SMTP):
 
@@ -48,7 +48,7 @@ Segurança e rede:
 - `GET /api/saude`: saúde pública sem expor segredos.
 - `GET /api/diagnostico`: diagnóstico protegido pelo cabeçalho `X-Admin-Token`.
 - `POST /api/chat`: chat com seleção de agente, raciocínio avançado e análise de até três imagens.
-- `POST /api/imagens/gerar`: geração de imagem 1024×1024 via Cloudflare Workers AI (requer as duas variáveis Cloudflare).
+- `POST /api/imagens/gerar`: geração de imagem 1536×1536 via Cloudflare Workers AI (requer as duas variáveis Cloudflare).
 - `GET /api/conversas`: histórico persistido.
 - `GET/POST /api/ideias`: banco de ideias persistido.
 - `POST /api/email/enviar`: envio SMTP real; retorna erro se SMTP não estiver configurado.

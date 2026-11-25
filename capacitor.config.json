@@ -2,13 +2,6 @@
   "appId": "com.nexuscore.ai",
   "appName": "Nexuscore AI",
   "webDir": "www",
-  "server": {
-    "url": "https://nexuscore-1-ljbi.onrender.com",
-    "cleartext": false,
-    "allowNavigation": [
-      "nexuscore-1-ljbi.onrender.com"
-    ]
-  },
   "android": {
     "allowMixedContent": false
   }

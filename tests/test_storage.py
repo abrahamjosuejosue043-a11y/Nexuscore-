@@ -46,6 +46,14 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(health["journal_mode"], "wal")
         self.assertGreaterEqual(health["table_count"], 5)
 
+    def test_postgres_placeholder_adapter_preserves_legacy_queries(self):
+        self.assertEqual(
+            self.storage._qmark_to_pyformat(
+                "INSERT INTO email_log(direction, recipient) VALUES(?,?)"
+            ),
+            "INSERT INTO email_log(direction, recipient) VALUES(%s,%s)",
+        )
+
     def test_connection_rolls_back_failed_transaction(self):
         with self.assertRaises(RuntimeError):
             with self.storage.connection() as db:

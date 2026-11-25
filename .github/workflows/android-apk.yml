@@ -51,7 +51,18 @@ jobs:
               im.save(d/"ic_launcher_round.png")
           PY
       - name: Build debug APK
-        run: cd android && ./gradlew assembleDebug --no-daemon
+        run: |
+          for attempt in 1 2 3 4; do
+            echo "Gradle build attempt ${attempt}/4"
+            if (cd android && ./gradlew assembleDebug --no-daemon --max-workers=2); then
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "Dependency server temporarily unavailable; retrying in 25 seconds."
+              sleep 25
+            fi
+          done
+          exit 1
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

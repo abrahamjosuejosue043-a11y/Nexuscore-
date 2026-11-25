@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from main import build_conversation_title
+
 
 class StorageTests(unittest.TestCase):
     @classmethod
@@ -139,6 +141,20 @@ class StorageTests(unittest.TestCase):
                 raise RuntimeError("forçar rollback")
         items = self.storage.ideas(300)
         self.assertFalse(any(item["title"] == "Não salvar" for item in items))
+
+
+class ConversationTitleTests(unittest.TestCase):
+    def test_title_is_derived_from_first_message(self):
+        title = build_conversation_title(
+            "Bom dia! Quero organizar conversas por assunto e agente no Nexuscore"
+        )
+        self.assertEqual(
+            title,
+            "Organizar conversas por assunto e agente no Nexuscore",
+        )
+
+    def test_empty_conversation_title_has_safe_fallback(self):
+        self.assertEqual(build_conversation_title("  "), "Nova conversa")
 
 
 if __name__ == "__main__":

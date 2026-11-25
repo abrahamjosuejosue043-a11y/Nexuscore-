@@ -27,7 +27,7 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from backend import storage
@@ -52,7 +52,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("nexuscore")
 
 APP_NAME = "Nexuscore AI"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -163,7 +163,7 @@ async def chamar_gemini(prompt: str) -> str:
 # Integração Groq (modelo configurado por variável de ambiente)
 # ---------------------------------------------------------------------------
 
-async def chamar_groq(prompt: str) -> str:
+async def chamar_groq(prompt: str) -> tuple[str, str]:
     api_key = get_secret("GROQ_API_KEY")
     if not api_key:
         raise ProviderError(
@@ -571,6 +571,64 @@ async def email_receber(
 # ---------------------------------------------------------------------------
 # Interface web
 # ---------------------------------------------------------------------------
+
+
+@app.get("/manifest.webmanifest")
+async def pwa_manifest():
+    return {
+        "id": "/",
+        "name": "Nexuscore AI",
+        "short_name": "Nexuscore",
+        "description": "Central de inteligência e operações",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "orientation": "portrait-primary",
+        "background_color": "#080d18",
+        "theme_color": "#0b1020",
+        "icons": [
+            {"src": "/assets/nexuscore-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+            {"src": "/assets/nexuscore-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable"}
+        ]
+    }
+
+
+@app.get("/assets/nexuscore-icon.svg")
+async def pwa_icon():
+    svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#21c5d5"/><stop offset=".55" stop-color="#365fe8"/><stop offset="1" stop-color="#8559ed"/></linearGradient><filter id="s"><feGaussianBlur stdDeviation="16"/></filter></defs>
+    <rect x="22" y="22" width="468" height="468" rx="118" fill="#091426"/>
+    <circle cx="256" cy="250" r="170" fill="#315fe8" opacity=".22" filter="url(#s)"/>
+    <rect x="78" y="78" width="356" height="356" rx="92" fill="url(#g)"/>
+    <path d="M154 348V164h48l108 119V164h48v184h-47L202 226v122z" fill="#fff"/>
+    <circle cx="365" cy="145" r="19" fill="#b7fff4"/><circle cx="147" cy="368" r="12" fill="#b7fff4" opacity=".8"/>
+    </svg>"""
+    return Response(content=svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/service-worker.js")
+async def service_worker():
+    script = """
+    const CACHE = "nexuscore-shell-v1";
+    self.addEventListener("install", event => {
+      event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(["/", "/manifest.webmanifest", "/assets/nexuscore-icon.svg"])));
+      self.skipWaiting();
+    });
+    self.addEventListener("activate", event => {
+      event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))));
+      self.clients.claim();
+    });
+    self.addEventListener("fetch", event => {
+      const url = new URL(event.request.url);
+      if (event.request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+      event.respondWith(fetch(event.request).then(response => {
+        if (response.ok) { const copy = response.clone(); caches.open(CACHE).then(cache => cache.put(event.request, copy)); }
+        return response;
+      }).catch(() => caches.match(event.request).then(cached => cached || caches.match("/"))));
+    });
+    """
+    return Response(content=script, media_type="application/javascript", headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
+
 
 @app.get("/", response_class=HTMLResponse)
 async def raiz():

@@ -396,6 +396,7 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
 
     return {
         "sistema": APP_NAME,
+        "armazenamento": storage.health(),
         "variaveis": {
             "GROQ_API_KEY": "configurada" if get_secret("GROQ_API_KEY") else "ausente",
             "GROQ_MODEL": GROQ_MODEL,

@@ -52,7 +52,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("nexuscore")
 
 APP_NAME = "Nexuscore AI"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
@@ -61,6 +61,7 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip()
+GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.8-27b").strip()
 
 REQUEST_TIMEOUT = float(os.getenv("AI_REQUEST_TIMEOUT", "45"))
 MAX_INPUT_CHARS = int(os.getenv("MAX_INPUT_CHARS", "8000"))
@@ -166,7 +167,7 @@ async def chamar_gemini(prompt: str) -> str:
 # Integração Groq (modelo configurado por variável de ambiente)
 # ---------------------------------------------------------------------------
 
-async def chamar_groq(prompt: str) -> tuple[str, str]:
+async def chamar_groq(prompt: str, imagens: Optional[list[str]] = None) -> tuple[str, str]:
     api_key = get_secret("GROQ_API_KEY")
     if not api_key:
         raise ProviderError(
@@ -175,9 +176,15 @@ async def chamar_groq(prompt: str) -> tuple[str, str]:
             503,
         )
 
+    content = [{"type": "text", "text": prompt}]
+    for image_data in (imagens or []):
+        if not isinstance(image_data, str) or not image_data.startswith("data:image/"):
+            raise ProviderError("Groq", "Formato de imagem inválido.", 422)
+        content.append({"type": "image_url", "image_url": {"url": image_data}})
+    selected_model = GROQ_VISION_MODEL if imagens else GROQ_MODEL
     payload = {
-        "model": GROQ_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
+        "model": selected_model,
+        "messages": [{"role": "user", "content": content if imagens else prompt}],
         "temperature": 0.7,
         "max_tokens": 4096,
     }
@@ -222,7 +229,7 @@ async def chamar_groq(prompt: str) -> tuple[str, str]:
 
     if not answer:
         raise ProviderError("Groq", "A Groq respondeu sem conteúdo de texto.", 502)
-    actual_model = str(data.get("model") or GROQ_MODEL)
+    actual_model = str(data.get("model") or selected_model)
     return answer, actual_model
 
 
@@ -348,58 +355,34 @@ async def orquestrador(pedido: str, tipo: str = "geral", imagens: Optional[list[
 
     prompt = build_prompt(text, agent_type)
 
-    # Groq é o provedor principal. Gemini só entra como contingência se houver
-    # uma chave explicitamente configurada; não tenta credenciais removidas.
-    providers = []
-    if get_secret("OPENAI_API_KEY"):
-        providers.append(("OpenAI", lambda p: chamar_openai(p, imagens)))
-    if imagens and not get_secret("OPENAI_API_KEY"):
-        raise HTTPException(status_code=503, detail="A análise de imagens requer OPENAI_API_KEY configurada no Render. O Groq permanece disponível para mensagens de texto.")
-    providers.append(("Groq", chamar_groq))
-    if get_secret("GEMINI_API_KEY"):
-        providers.append(("Gemini", chamar_gemini))
+    # Groq é o único provedor de inteligência do Nexuscore.
+    # Para imagens, usa o modelo multimodal dedicado da própria Groq.
+    provider_name = "Groq"
+    try:
+        answer, actual_model = await chamar_groq(prompt, imagens)
+    except ProviderError as exc:
+        logger.warning("Groq indisponível: %s", exc.message)
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={
+                "mensagem": "A Groq não conseguiu concluir a solicitação.",
+                "motivos": [exc.message],
+                "orientacao": "Confira GROQ_API_KEY e os modelos GROQ_MODEL / GROQ_VISION_MODEL no Render.",
+            },
+        ) from exc
 
-    errors = []
-    for provider_name, provider_function in providers:
-        try:
-            provider_result = await provider_function(prompt)
-            if provider_name in {"Groq", "OpenAI"}:
-                answer, actual_model = provider_result
-            else:
-                answer, actual_model = provider_result, GEMINI_MODEL
-            result = {
-                "resposta": answer,
-                "origem": provider_name.lower(),
-                "cerebro": provider_name,
-                "modelo": actual_model,
-                "tempo_ms": int((time.perf_counter() - started) * 1000),
-            }
-            if not imagens:
-                cache_set(cache_key, result)
-            storage.save_message("user", agent_type, text)
-            storage.save_message("assistant", agent_type, answer, provider_name)
-            return result
-        except ProviderError as exc:
-            errors.append(f"{exc.provider}: {exc.message}")
-            logger.info("%s indisponível: %s", exc.provider, exc.message)
-            # Não enviar imagens para um fallback de texto que não as processa.
-            if imagens and provider_name == "OpenAI":
-                raise HTTPException(
-                    status_code=502,
-                    detail={"mensagem": "A análise visual pela OpenAI não foi concluída.", "motivos": errors},
-                ) from exc
-
-    raise HTTPException(
-        status_code=502,
-        detail={
-            "mensagem": "Nenhum provedor de IA conseguiu responder.",
-            "motivos": errors,
-            "orientacao": (
-                "Confira GROQ_API_KEY e GROQ_MODEL no ambiente do serviço. "
-                "A contingência Gemini só é usada quando GEMINI_API_KEY estiver configurada."
-            ),
-        },
-    )
+    result = {
+        "resposta": answer,
+        "origem": "groq",
+        "cerebro": "Groq",
+        "modelo": actual_model,
+        "tempo_ms": int((time.perf_counter() - started) * 1000),
+    }
+    if not imagens:
+        cache_set(cache_key, result)
+    storage.save_message("user", agent_type, text)
+    storage.save_message("assistant", agent_type, answer, provider_name)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -436,12 +419,12 @@ async def saude():
         "versao": APP_VERSION,
         "persistencia": "temporaria_no_plano_gratuito",
         "provedores_configurados": {
-            "openai": bool(get_secret("OPENAI_API_KEY")),
-            "gemini": bool(get_secret("GEMINI_API_KEY")),
             "groq": bool(get_secret("GROQ_API_KEY")),
+            "groq_vision": bool(get_secret("GROQ_API_KEY")),
         },
-        "provedor_principal": "openai" if get_secret("OPENAI_API_KEY") else "groq",
-        "modelo_principal": OPENAI_MODEL if get_secret("OPENAI_API_KEY") else GROQ_MODEL,
+        "provedor_principal": "groq",
+        "modelo_principal": GROQ_MODEL,
+        "modelo_vision": GROQ_VISION_MODEL,
         "modelo_groq_confirmado_por_resposta": False,
     }
 
@@ -454,13 +437,10 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
     return {
         "sistema": APP_NAME,
         "variaveis": {
-            "GEMINI_API_KEY": "configurada" if get_secret("GEMINI_API_KEY") else "ausente",
             "GROQ_API_KEY": "configurada" if get_secret("GROQ_API_KEY") else "ausente",
-            "GEMINI_MODEL": GEMINI_MODEL,
             "GROQ_MODEL": GROQ_MODEL,
-            "OPENAI_API_KEY": "configurada" if get_secret("OPENAI_API_KEY") else "ausente",
-            "OPENAI_MODEL": OPENAI_MODEL,
-            "GEMINI_FALLBACK": "ativo" if get_secret("GEMINI_API_KEY") else "desativado",
+            "GROQ_VISION_MODEL": GROQ_VISION_MODEL,
+            "PROVEDOR_PRINCIPAL": "Groq",
         },
         "observacao": (
             "A presença de uma chave não garante que ela seja válida. "

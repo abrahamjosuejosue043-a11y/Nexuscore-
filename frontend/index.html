@@ -219,5 +219,4 @@ window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();ins
 $("install-app").addEventListener("click",async()=>{if(!installPrompt){alert("No Chrome, abra o menu ⋮ e escolha Instalar aplicativo ou Adicionar à tela inicial.");return;}installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$("install-banner").classList.remove("show");});
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/service-worker.js").catch(()=>{}));}
 </script>
-<script src="/nexuscore-speech.js"></script>
 </body></html>

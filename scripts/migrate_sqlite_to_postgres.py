@@ -10,7 +10,6 @@ import argparse
 from datetime import datetime, timezone
 import os
 from pathlib import Path
-import shutil
 import sqlite3
 import sys
 
@@ -63,11 +62,8 @@ def migrate(source: Path, database_url: str) -> dict:
 
             with target.transaction():
                 for table in TABLES:
-                    rows = source_conn.execute(
-                        sql.SQL("SELECT * FROM {}").format(sql.Identifier(table)).as_string(
-                            source_conn
-                        )
-                    ).fetchall()
+                    # table vem da lista fixa TABLES, não de entrada externa.
+                    rows = source_conn.execute(f"SELECT * FROM {table}").fetchall()
                     if rows:
                         columns = list(rows[0].keys())
                         insert = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(

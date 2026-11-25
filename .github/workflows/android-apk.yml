@@ -1,0 +1,74 @@
+name: Build Nexuscore Android APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Capacitor
+        run: npm install
+      - name: Generate Android project
+        run: npx cap add android
+      - name: Apply Nexuscore launcher icon
+        run: |
+          pip install pillow
+          python - <<'PY'
+          from PIL import Image, ImageDraw, ImageFilter
+          from pathlib import Path
+          import math
+          root = Path("android/app/src/main/res")
+          sizes = {"mipmap-mdpi":48,"mipmap-hdpi":72,"mipmap-xhdpi":96,"mipmap-xxhdpi":144,"mipmap-xxxhdpi":192}
+          for folder,size in sizes.items():
+              d=root/folder
+              d.mkdir(parents=True,exist_ok=True)
+              im=Image.new("RGB",(size,size),(8,20,40))
+              px=im.load()
+              for y in range(size):
+                  for x in range(size):
+                      t=(x+y)/(2*size)
+                      px[x,y]=(int(25+24*t),int(115-50*t),int(180+45*t))
+              mask=Image.new("L",(size,size),0)
+              md=ImageDraw.Draw(mask)
+              md.rounded_rectangle((size*.04,size*.04,size*.96,size*.96),radius=size*.25,fill=255)
+              im.putalpha(mask)
+              dr=ImageDraw.Draw(im)
+              w=max(2,int(size*.11))
+              dr.line([(size*.27,size*.73),(size*.27,size*.27),(size*.73,size*.73),(size*.73,size*.27)],fill="white",width=w,joint="curve")
+              dr.ellipse((size*.68,size*.14,size*.82,size*.28),fill=(190,255,244,255))
+              im.save(d/"ic_launcher.png")
+              im.save(d/"ic_launcher_round.png")
+          PY
+      - name: Build debug APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexuscore-ai-android-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish APK download
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nexuscore-android-latest
+          name: Nexuscore AI — APK mais recente
+          body: APK Android gerado automaticamente para o Nexuscore AI. A aplicação conecta-se ao serviço online.
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          make_latest: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

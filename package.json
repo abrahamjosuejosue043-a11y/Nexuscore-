@@ -4,13 +4,16 @@
   "private": true,
   "description": "Nexuscore AI Android wrapper",
   "scripts": {
-    "android": "cap sync android"
+    "android": "cap sync android",
+    "build:mobile": "esbuild speech-entry.js --bundle --platform=browser --format=iife --outfile=www/nexuscore-speech.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",
-    "@capacitor/core": "^7.4.3"
+    "@capacitor/core": "^7.4.3",
+    "@capacitor-community/speech-recognition": "7.0.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.3"
+    "@capacitor/cli": "^7.4.3",
+    "esbuild": "^0.25.0"
   }
 }

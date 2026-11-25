@@ -617,7 +617,7 @@ async function sendChat(type,form){
  try{
   const imagens=await Promise.all(files.map(fileAsDataUrl));
   const data=await api("/api/chat",{method:"POST",body:JSON.stringify({
-   texto:text||"Analise detalhadamente as imagens anexadas.",tipo,imagens,conversa_id:conversationId
+   texto:text||"Analise detalhadamente as imagens anexadas.",tipo:type,imagens,conversa_id:conversationId
   })});
   setActiveConversation(type,data.conversa_id||conversationId);
   restoredConversationIds.add(data.conversa_id||conversationId);

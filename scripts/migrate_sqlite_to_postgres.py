@@ -38,6 +38,13 @@ def migrate(source: Path, database_url: str) -> dict:
         raise RuntimeError("Instale as dependências com: pip install -r requirements.txt") from exc
 
     backup = create_backup(source)
+
+    # Inicializa o esquema PostgreSQL com o mesmo contrato usado pela aplicação.
+    os.environ["DATABASE_URL"] = database_url
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from backend import storage
+    storage.initialize()
+
     source_conn = sqlite3.connect(str(source))
     source_conn.row_factory = sqlite3.Row
     copied = {}
@@ -71,7 +78,8 @@ def migrate(source: Path, database_url: str) -> dict:
                             sql.SQL(", ").join(map(sql.Identifier, columns)),
                             sql.SQL(", ").join(sql.Placeholder() for _ in columns),
                         )
-                        target.executemany(insert, [tuple(row) for row in rows])
+                        with target.cursor() as cursor:
+                            cursor.executemany(insert, [tuple(row) for row in rows])
                     copied[table] = len(rows)
 
                 # Mantém os próximos IDs acima dos IDs que foram copiados.

@@ -19,8 +19,18 @@ jobs:
           java-version: "21"
       - name: Prepare current web interface for APK
         run: cp frontend/index.html www/index.html
-      - name: Install Capacitor
+      - name: Install Capacitor and speech plugin
         run: npm install
+      - name: Bundle native speech bridge into local app
+        run: |
+          npm run build:mobile
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("www/index.html")
+          html = path.read_text()
+          html = html.replace("</body>", '<script src="/nexuscore-speech.js"></script>\\n</body>')
+          path.write_text(html)
+          PY
       - name: Generate Android project
         run: npx cap add android
       - name: Add Android media and microphone permissions

@@ -111,7 +111,11 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     texto: str = Field(..., min_length=1, max_length=MAX_INPUT_CHARS)
     tipo: str = Field(default="geral", max_length=40)
-    imagens: list[str] = Field(default_factory=list, max_length=4)
+    imagens: list[str] = Field(default_factory=list, max_length=3)
+
+
+class ImageGenerationRequest(BaseModel):
+    prompt: str = Field(..., min_length=3, max_length=2000)
 
 
 class EmailRequest(BaseModel):
@@ -170,8 +174,10 @@ async def chamar_groq(prompt: str, imagens: Optional[list[str]] = None) -> tuple
     payload = {
         "model": selected_model,
         "messages": [{"role": "user", "content": content if imagens else prompt}],
-        "temperature": 0.7,
-        "max_tokens": 4096,
+        "temperature": 0.6,
+        "max_completion_tokens": 8192,
+        "reasoning_effort": "high",
+        "reasoning_format": "hidden",
     }
 
     try:
@@ -363,6 +369,12 @@ async def saude():
         "provedores_configurados": {
             "groq": bool(get_secret("GROQ_API_KEY")),
             "groq_vision": bool(get_secret("GROQ_API_KEY")),
+            "geracao_imagens": bool(get_secret("CLOUDFLARE_ACCOUNT_ID") and get_secret("CLOUDFLARE_API_TOKEN")),
+        },
+        "geracao_imagens": {
+            "configurada": bool(get_secret("CLOUDFLARE_ACCOUNT_ID") and get_secret("CLOUDFLARE_API_TOKEN")),
+            "modelo": os.getenv("CLOUDFLARE_IMAGE_MODEL", "@cf/leonardo/lucid-origin"),
+            "resolucao_padrao": "1024x1024",
         },
         "provedor_principal": "groq",
         "modelo_principal": GROQ_MODEL,
@@ -382,6 +394,9 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
             "GROQ_API_KEY": "configurada" if get_secret("GROQ_API_KEY") else "ausente",
             "GROQ_MODEL": GROQ_MODEL,
             "GROQ_VISION_MODEL": GROQ_VISION_MODEL,
+            "CLOUDFLARE_ACCOUNT_ID": "configurada" if get_secret("CLOUDFLARE_ACCOUNT_ID") else "ausente",
+            "CLOUDFLARE_API_TOKEN": "configurada" if get_secret("CLOUDFLARE_API_TOKEN") else "ausente",
+            "CLOUDFLARE_IMAGE_MODEL": os.getenv("CLOUDFLARE_IMAGE_MODEL", "@cf/leonardo/lucid-origin"),
             "PROVEDOR_PRINCIPAL": "Groq",
         },
         "observacao": (
@@ -442,11 +457,69 @@ async def atualizar_projeto(project_id: int, request: dict, x_admin_token: Optio
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     for image_data in request.imagens:
-        if len(image_data) > 7_000_000:
-            raise HTTPException(status_code=413, detail="Cada imagem deve ter no máximo aproximadamente 5 MB.")
+        if len(image_data) > 8_000_000:
+            raise HTTPException(status_code=413, detail="Imagem muito grande. Reduza a imagem antes de enviar.")
         if not re.match(r"^data:image/(png|jpeg|webp);base64,", image_data):
             raise HTTPException(status_code=422, detail="Formato não permitido. Use PNG, JPEG ou WebP.")
+    if sum(len(item) for item in request.imagens) > 19_000_000:
+        raise HTTPException(status_code=413, detail="O conjunto de imagens excede o limite visual de 20 MB. Envie menos imagens.")
     return await orquestrador(request.texto, request.tipo, request.imagens)
+
+
+@app.post("/api/imagens/gerar")
+async def gerar_imagem(request: ImageGenerationRequest):
+    """Geração de imagem via Cloudflare Workers AI; credenciais ficam apenas no servidor."""
+    account_id = get_secret("CLOUDFLARE_ACCOUNT_ID")
+    api_token = get_secret("CLOUDFLARE_API_TOKEN")
+    if not account_id or not api_token:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "mensagem": "O gerador de imagens ainda não está conectado.",
+                "orientacao": "Configure CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN nas variáveis do Render.",
+            },
+        )
+    model = os.getenv("CLOUDFLARE_IMAGE_MODEL", "@cf/leonardo/lucid-origin").strip()
+    if not re.fullmatch(r"@[a-z0-9-]+/[a-z0-9-]+/[a-z0-9.-]+", model):
+        raise HTTPException(status_code=500, detail="Modelo de geração de imagens inválido.")
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}"
+    payload = {
+        "prompt": request.prompt.strip(),
+        "width": 1024,
+        "height": 1024,
+        "num_steps": 30,
+        "guidance": 4.5,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+            response = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"},
+                json=payload,
+            )
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="A geração da imagem excedeu o tempo limite. Tente novamente.") from exc
+    except httpx.HTTPError as exc:
+        logger.warning("Falha de conexão com Cloudflare AI: %s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="Não foi possível conectar ao serviço de geração de imagens.") from exc
+    if response.status_code != 200:
+        detail = extract_provider_error(response)
+        logger.warning("Cloudflare AI HTTP %s: %s", response.status_code, detail)
+        if response.status_code in (401, 403):
+            message = "A Cloudflare recusou as credenciais ou as permissões do token."
+        elif response.status_code == 429:
+            message = "O limite gratuito diário de geração de imagens foi atingido."
+        else:
+            message = f"Cloudflare AI retornou HTTP {response.status_code}: {detail[:240]}"
+        raise HTTPException(status_code=502, detail=message)
+    try:
+        data = response.json()
+        image_b64 = data.get("result", {}).get("image") or data.get("image")
+    except (ValueError, AttributeError):
+        image_b64 = None
+    if not image_b64 or not isinstance(image_b64, str):
+        raise HTTPException(status_code=502, detail="O gerador não retornou uma imagem válida.")
+    return {"imagem": f"data:image/png;base64,{image_b64}", "modelo": model, "resolucao": "1024x1024"}
 
 
 @app.post("/api/email/enviar")

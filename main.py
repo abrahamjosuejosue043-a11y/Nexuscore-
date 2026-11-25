@@ -467,8 +467,9 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/api/imagens/gerar")
-async def gerar_imagem(request: ImageGenerationRequest):
-    """Geração de imagem via Cloudflare Workers AI; credenciais ficam apenas no servidor."""
+async def gerar_imagem(request: ImageGenerationRequest, x_admin_token: Optional[str] = Header(default=None)):
+    """Geração protegida de imagem via Cloudflare Workers AI; credenciais ficam apenas no servidor."""
+    require_admin_token(x_admin_token)
     account_id = get_secret("CLOUDFLARE_ACCOUNT_ID")
     api_token = get_secret("CLOUDFLARE_API_TOKEN")
     if not account_id or not api_token:

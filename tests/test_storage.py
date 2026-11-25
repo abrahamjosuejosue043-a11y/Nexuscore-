@@ -73,6 +73,54 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(cursor.lastrowid, 123)
         self.assertEqual(raw.params, ("Ideia", "Resumo", "media"))
 
+    def test_chat_conversation_groups_messages_and_can_be_renamed(self):
+        conversation_id = "thread-test-001"
+        created = self.storage.ensure_conversation(
+            conversation_id, "Organizar projetos", "geral"
+        )
+        self.assertEqual(created["title"], "Organizar projetos")
+
+        # A retomada da mesma conversa não pode substituir o título original.
+        same = self.storage.ensure_conversation(
+            conversation_id, "Outro assunto", "geral"
+        )
+        self.assertEqual(same["title"], "Organizar projetos")
+
+        self.storage.save_message(
+            "user", "geral", "Quero organizar meus projetos", conversation_id=conversation_id
+        )
+        self.storage.save_message(
+            "assistant", "geral", "Vamos criar uma estrutura.", "Groq",
+            conversation_id=conversation_id,
+        )
+
+        messages = self.storage.conversation_messages(conversation_id)
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0]["role"], "user")
+        self.assertEqual(messages[1]["role"], "assistant")
+
+        listed = self.storage.list_conversations(100)
+        item = next(x for x in listed if x["id"] == conversation_id)
+        self.assertEqual(item["message_count"], 2)
+        self.assertTrue(self.storage.rename_conversation(conversation_id, "Projetos organizados"))
+        self.assertEqual(
+            self.storage.get_conversation(conversation_id)["title"],
+            "Projetos organizados",
+        )
+
+    def test_legacy_messages_are_grouped_in_previous_history(self):
+        self.storage.save_message("user", "geral", "Mensagem antiga sem sessão")
+        with self.storage.connection() as db:
+            self.storage._backfill_legacy_messages(db)
+        legacy = self.storage.get_conversation("legacy")
+        self.assertEqual(legacy["title"], "Histórico anterior")
+        self.assertTrue(
+            any(
+                x["content"] == "Mensagem antiga sem sessão"
+                for x in self.storage.conversation_messages("legacy")
+            )
+        )
+
     def test_postgres_placeholder_adapter_preserves_legacy_queries(self):
         self.assertEqual(
             self.storage._qmark_to_pyformat(

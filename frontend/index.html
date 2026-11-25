@@ -117,6 +117,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .item p{margin:0;color:#536278;white-space:pre-wrap;font-size:12px}
 .item small{display:block;color:#8996a8;margin-top:7px;font-size:10px}
 .item .btn{margin-top:9px}
+.conversation-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.conversation-copy{flex:1;min-width:0}
+.conversation-copy strong{overflow-wrap:anywhere}
+.conversation-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.conversation-actions .btn{margin-top:0}
+.conversation-meta{font-size:11px;color:#8996a8;margin-top:5px}
+@media(max-width:600px){.conversation-row{align-items:flex-start;flex-direction:column}.conversation-actions{justify-content:flex-start}}
 .empty{border:1px dashed #d5dde8;border-radius:11px;padding:22px;text-align:center;color:#8996a8;background:#fbfcfe;font-size:12px}
 .status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:13px 0}
 .status-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
@@ -357,19 +364,19 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
  <div class="side-foot">Nexuscore AI · Ambiente de produção<br>Os recursos externos dependem das credenciais configuradas.</div>
 </aside>
 <main class="workspace">
-<section class="view active" id="view-dashboard"><div class="dashboard-head"><div><div class="eyebrow">Visão geral</div><h2>Centro de comando</h2><p id="dashboard-date">Operações do Nexuscore</p></div><button class="btn" id="refresh-dashboard">Atualizar painel</button></div><div class="dashboard-grid"><div class="metric-card"><small>Mensagens</small><strong id="metric-messages">—</strong><span>Histórico</span></div><div class="metric-card"><small>Projetos ativos</small><strong id="metric-projects">—</strong><span>Em acompanhamento</span></div><div class="metric-card"><small>Ideias</small><strong id="metric-ideas">—</strong><span>Banco de ideias</span></div><div class="metric-card"><small>Plataforma</small><strong id="metric-health">—</strong><span id="metric-provider">Verificando</span></div></div><div class="panel"><h3>Seus agentes</h3><p class="muted">Acesse cada área de trabalho.</p><div class="agent-cards"><div class="agent-card" data-open-view="diretoria"><strong>Diretoria</strong><p>Estratégia, prioridades e decisões.</p><span>Abrir agente →</span></div><div class="agent-card" data-open-view="programacao"><strong>Engenharia</strong><p>Programação e validação técnica.</p><span>Abrir agente →</span></div><div class="agent-card" data-open-view="publicidade"><strong>Marketing</strong><p>Marca, campanhas e crescimento.</p><span>Abrir agente →</span></div></div></div><div class="dashboard-columns"><div class="panel"><h3>Acesso rápido</h3><div class="quick-actions"><button data-open-view="geral">Conversar com Nexuscore</button><button data-open-view="projeto">Projetos</button><button data-open-view="ideias">Registrar ideia</button><button data-open-view="historico">Histórico</button></div></div><div class="panel"><h3>Atividade recente</h3><div id="dashboard-activity" class="list"><div class="empty">Carregando...</div></div></div></div></section><section class="view" id="view-geral">
+<section class="view active" id="view-dashboard"><div class="dashboard-head"><div><div class="eyebrow">Visão geral</div><h2>Centro de comando</h2><p id="dashboard-date">Operações do Nexuscore</p></div><button class="btn" id="refresh-dashboard">Atualizar painel</button></div><div class="dashboard-grid"><div class="metric-card"><small>Conversas</small><strong id="metric-messages">—</strong><span>Assuntos organizados</span></div><div class="metric-card"><small>Projetos ativos</small><strong id="metric-projects">—</strong><span>Em acompanhamento</span></div><div class="metric-card"><small>Ideias</small><strong id="metric-ideas">—</strong><span>Banco de ideias</span></div><div class="metric-card"><small>Plataforma</small><strong id="metric-health">—</strong><span id="metric-provider">Verificando</span></div></div><div class="panel"><h3>Seus agentes</h3><p class="muted">Acesse cada área de trabalho.</p><div class="agent-cards"><div class="agent-card" data-open-view="diretoria"><strong>Diretoria</strong><p>Estratégia, prioridades e decisões.</p><span>Abrir agente →</span></div><div class="agent-card" data-open-view="programacao"><strong>Engenharia</strong><p>Programação e validação técnica.</p><span>Abrir agente →</span></div><div class="agent-card" data-open-view="publicidade"><strong>Marketing</strong><p>Marca, campanhas e crescimento.</p><span>Abrir agente →</span></div></div></div><div class="dashboard-columns"><div class="panel"><h3>Acesso rápido</h3><div class="quick-actions"><button data-open-view="geral">Conversar com Nexuscore</button><button data-open-view="projeto">Projetos</button><button data-open-view="ideias">Registrar ideia</button><button data-open-view="historico">Histórico</button></div></div><div class="panel"><h3>Atividade recente</h3><div id="dashboard-activity" class="list"><div class="empty">Carregando...</div></div></div></div></section><section class="view" id="view-geral">
  <div class="view-head"><div><h2>Chat do time</h2><p>Converse com o núcleo central do Nexuscore.</p></div><span class="tag">Agente central</span></div>
- <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">N</div><div><strong>Nexuscore · Assistente central</strong><small>Respostas via provedores de IA conectados</small></div></div><button class="btn" data-clear="geral">Limpar tela</button></div>
+ <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">N</div><div><strong>Nexuscore · Assistente central</strong><small>Respostas via provedores de IA conectados</small></div></div><button class="btn" data-new-chat="geral" type="button">Nova conversa</button></div>
  <div class="chat" id="chat-geral"><div class="welcome"><div class="welcome-icon">◈</div><h3>Vamos trabalhar.</h3><div>Envie uma pergunta, uma ideia ou uma tarefa. Se o serviço de IA estiver indisponível, o sistema mostrará o motivo em vez de deixar uma resposta vazia.</div></div></div>
  <form class="composer" data-chat="geral"><textarea id="texto-geral" rows="1" placeholder="Escreva sua mensagem..." aria-label="Mensagem para o Nexuscore"></textarea><button class="send" type="submit">Enviar ↗</button></form><div class="hint">Enter envia · Shift + Enter cria uma nova linha</div></div>
 </section>
 <section class="view" id="view-diretoria">
  <div class="view-head"><div><h2>Diretoria</h2><p>Estratégia, prioridades, riscos e decisões.</p></div><span class="tag">Agente executivo</span></div>
- <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">D</div><div><strong>Diretoria</strong><small>Planejamento e análise de decisões</small></div></div><button class="btn" data-clear="diretoria">Limpar tela</button></div><div class="chat" id="chat-diretoria"><div class="welcome"><div class="welcome-icon">⌘</div><h3>Mesa de diretoria</h3><div>Apresente objetivos, desafios ou decisões para análise.</div></div></div><form class="composer" data-chat="diretoria"><textarea id="texto-diretoria" rows="1" placeholder="Qual decisão precisamos analisar?"></textarea><button class="send" type="submit">Enviar ↗</button></form></div>
+ <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">D</div><div><strong>Diretoria</strong><small>Planejamento e análise de decisões</small></div></div><button class="btn" data-new-chat="diretoria" type="button">Nova conversa</button></div><div class="chat" id="chat-diretoria"><div class="welcome"><div class="welcome-icon">⌘</div><h3>Mesa de diretoria</h3><div>Apresente objetivos, desafios ou decisões para análise.</div></div></div><form class="composer" data-chat="diretoria"><textarea id="texto-diretoria" rows="1" placeholder="Qual decisão precisamos analisar?"></textarea><button class="send" type="submit">Enviar ↗</button></form></div>
 </section>
 <section class="view" id="view-programacao">
  <div class="view-head"><div><h2>Engenharia</h2><p>Arquitetura, programação, depuração e validação técnica.</p></div><span class="tag">Agente técnico</span></div>
- <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">E</div><div><strong>Engenharia de software</strong><small>Desenvolvimento e revisão técnica</small></div></div><button class="btn" data-clear="programacao">Limpar tela</button></div><div class="chat" id="chat-programacao"><div class="welcome"><div class="welcome-icon">⌁</div><h3>Estação de engenharia</h3><div>Descreva o problema, envie código ou peça uma implementação.</div></div></div><form class="composer" data-chat="programacao"><textarea id="texto-programacao" rows="1" placeholder="Descreva a tarefa técnica..."></textarea><button class="send" type="submit">Enviar ↗</button></form></div>
+ <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">E</div><div><strong>Engenharia de software</strong><small>Desenvolvimento e revisão técnica</small></div></div><button class="btn" data-new-chat="programacao" type="button">Nova conversa</button></div><div class="chat" id="chat-programacao"><div class="welcome"><div class="welcome-icon">⌁</div><h3>Estação de engenharia</h3><div>Descreva o problema, envie código ou peça uma implementação.</div></div></div><form class="composer" data-chat="programacao"><textarea id="texto-programacao" rows="1" placeholder="Descreva a tarefa técnica..."></textarea><button class="send" type="submit">Enviar ↗</button></form></div>
 </section>
 <section class="view" id="view-arquivos">
  <div class="view-head"><div><h2>Arquivos e documentos</h2><p>Crie relatórios, documentos e arquivos com a IA e baixe o resultado.</p></div><span class="tag">Criação de conteúdo</span></div>
@@ -385,7 +392,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 </section>
 <section class="view" id="view-publicidade">
  <div class="view-head"><div><h2>Marketing</h2><p>Posicionamento, campanhas, conteúdo e aquisição.</p></div><span class="tag">Agente de marketing</span></div>
- <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">M</div><div><strong>Marketing e comunicação</strong><small>Estratégia de marca e crescimento</small></div></div><button class="btn" data-clear="publicidade">Limpar tela</button></div><div class="chat" id="chat-publicidade"><div class="welcome"><div class="welcome-icon">✳</div><h3>Estúdio de marketing</h3><div>Traga uma ideia, produto ou público para desenvolvermos uma estratégia.</div></div></div><form class="composer" data-chat="publicidade"><textarea id="texto-publicidade" rows="1" placeholder="O que vamos divulgar?"></textarea><button class="send" type="submit">Enviar ↗</button></form></div>
+ <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">M</div><div><strong>Marketing e comunicação</strong><small>Estratégia de marca e crescimento</small></div></div><button class="btn" data-new-chat="publicidade" type="button">Nova conversa</button></div><div class="chat" id="chat-publicidade"><div class="welcome"><div class="welcome-icon">✳</div><h3>Estúdio de marketing</h3><div>Traga uma ideia, produto ou público para desenvolvermos uma estratégia.</div></div></div><form class="composer" data-chat="publicidade"><textarea id="texto-publicidade" rows="1" placeholder="O que vamos divulgar?"></textarea><button class="send" type="submit">Enviar ↗</button></form></div>
 </section>
 <section class="view" id="view-projeto">
  <div class="view-head"><div><h2>Projetos</h2><p>Transforme uma ideia em um registro de trabalho acompanhado.</p></div><span class="tag">Área de planejamento</span></div>
@@ -393,7 +400,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
  <div class="panel"><h3>Novo projeto</h3><div class="field"><label for="project-title">Nome do projeto</label><input id="project-title" placeholder="Ex.: Lançamento do novo produto"></div><div class="field"><label for="project-summary">Objetivo e descrição</label><textarea id="project-summary" placeholder="Descreva o resultado esperado, etapas e observações..."></textarea></div><div class="actions"><button class="btn primary" id="save-project">Criar projeto</button><button class="btn" id="project-to-director">Pedir análise da Diretoria</button></div><div id="project-status" class="hint"></div></div><div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Projetos registrados</h2><p>Acompanhe o andamento e atualize o status.</p></div><button class="btn" id="load-projects">Atualizar</button></div><div id="projects-result" class="list"><div class="empty">Carregando projetos...</div></div>
 </section>
 <section class="view" id="view-historico">
- <div class="view-head"><div><h2>Histórico</h2><p>Mensagens registradas no banco de dados do serviço.</p></div><button class="btn" id="load-history">Atualizar</button></div><div id="history-result" class="list"><div class="empty">Informe o token administrativo em Conexões para consultar.</div></div>
+ <div class="view-head"><div><h2>Conversas</h2><p>Cada assunto tem seu próprio histórico, título e agente responsável.</p></div><div class="actions"><button class="btn" id="new-conversation">Nova conversa</button><button class="btn" id="load-history">Atualizar</button></div></div>
+ <div class="notice">O Nexuscore cria um título automaticamente a partir da primeira mensagem. Você pode renomear cada conversa e retomá-la quando precisar.</div>
+ <div id="history-result" class="list"><div class="empty">Informe o token administrativo em Conexões para consultar suas conversas.</div></div>
 </section>
 <section class="view" id="view-ideias">
  <div class="view-head"><div><h2>Banco de ideias</h2><p>Registre oportunidades e mantenha um repositório organizado.</p></div><button class="btn" id="load-ideas">Atualizar</button></div>
@@ -416,6 +425,21 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 </div>
 <script>
 const $=id=>document.getElementById(id);
+const CHAT_TYPES=["geral","diretoria","programacao","publicidade"];
+const activeConversationIds={};
+function activeConversationKey(type){return "nexuscore_active_conversation_"+type;}
+function getActiveConversation(type){
+ try{return activeConversationIds[type]||localStorage.getItem(activeConversationKey(type))||null;}
+ catch(e){return activeConversationIds[type]||null;}
+}
+function setActiveConversation(type,id){
+ activeConversationIds[type]=id||null;
+ try{if(id)localStorage.setItem(activeConversationKey(type),id);else localStorage.removeItem(activeConversationKey(type));}catch(e){}
+}
+function makeConversationId(){
+ if(window.crypto?.randomUUID)return window.crypto.randomUUID();
+ return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==="x"?r:(r&3|8)).toString(16);});
+}
 let adminToken="";
 try{adminToken=sessionStorage.getItem("nexuscore_admin_token")||"";}catch(e){}
 $("admin-token").value=adminToken;
@@ -500,7 +524,7 @@ addComposerTools();
 function detailMessage(detail){if(typeof detail==="string")return detail;if(detail&&typeof detail==="object"){const bits=[detail.mensagem,...(detail.motivos||[]),detail.orientacao].filter(Boolean);return bits.join("\n")||JSON.stringify(detail);}return "O servidor retornou um erro sem explicação.";}
 const API_BASE=window.Capacitor?.isNativePlatform?.()?"https://nexuscore-1-ljbi.onrender.com":"";
 async function api(url,options={}){const response=await fetch(API_BASE+url,{...options,headers:{...headers(options.body!==undefined),...(options.headers||{})}});const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{};}catch(e){data={detail:raw||"Resposta inválida do servidor."};}if(!response.ok)throw new Error(detailMessage(data.detail)||("Falha HTTP "+response.status));return data;}
-function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();if(name==="arquivos")loadArtifacts();}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
+function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();if(name==="arquivos")loadArtifacts();if(CHAT_TYPES.includes(name))restoreActiveConversation(name);}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
 function addBubble(chat,text,kind="assistant",meta=""){const empty=chat.querySelector(".welcome");if(empty)empty.remove();const el=document.createElement("div");el.className="bubble "+kind;el.textContent=text;if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;el.appendChild(m);}chat.appendChild(el);chat.scrollTop=chat.scrollHeight;return el;}
 function renderAssistantText(target,raw){
@@ -521,9 +545,101 @@ function renderAssistantText(target,raw){
  });
  flushParagraph();
 }
-function clearChat(name){const chat=$("chat-"+name);chat.innerHTML='<div class="welcome"><div class="welcome-icon">◈</div><h3>Conversa limpa</h3><div>Envie uma nova mensagem para começar.</div></div>';}
-document.querySelectorAll("[data-clear]").forEach(b=>b.addEventListener("click",()=>clearChat(b.dataset.clear)));
-async function sendChat(type,form){const input=$("texto-"+type),button=form.querySelector("button[type=submit]"),text=input.value.trim(),files=(selectedMediaByForm[type]||[]).slice(0,3);if(!text&&!files.length)return;const chat=$("chat-"+type);input.value="";addBubble(chat,(text||"Analise esta imagem.")+(files.length?"\n📎 "+files.map(f=>f.name).join(", "):""),"user");const pending=addBubble(chat,"Analisando sua solicitação...","assistant");button.disabled=true;button.textContent="Aguarde";try{const imagens=await Promise.all(files.map(fileAsDataUrl));const data=await api("/api/chat",{method:"POST",body:JSON.stringify({texto:text||"Analise detalhadamente as imagens anexadas.",tipo:type,imagens})});renderAssistantText(pending,data.resposta||"O provedor respondeu sem conteúdo. Tente novamente.");const meta=[data.cerebro,data.modelo||"",data.origem,data.tempo_ms?data.tempo_ms+" ms":""].filter(Boolean).join(" · ");if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;pending.appendChild(m);}addSpeakButton(pending,data.resposta||"",type,form._mediaInputs?.voice?.dataset.enabled==="1");}catch(error){pending.className="bubble error";pending.textContent="Não foi possível obter uma resposta.\n\n"+error.message;}finally{button.disabled=false;button.textContent="Enviar ↗";if(form._mediaInputs){form._mediaInputs.gallery.value="";form._mediaInputs.camera.value="";selectedMediaByForm[type]=[];form._mediaInputs.update();}chat.scrollTop=chat.scrollHeight;}}document.querySelectorAll("form[data-chat]").forEach(form=>{form.addEventListener("submit",e=>{e.preventDefault();sendChat(form.dataset.chat,form);});form.querySelector("textarea").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});});
+function clearChat(name){
+ const chat=$("chat-"+name);
+ chat.innerHTML='<div class="welcome"><div class="welcome-icon">◈</div><h3>Nova conversa</h3><div>Envie uma mensagem para iniciar um novo assunto.</div></div>';
+}
+function startNewChat(type="geral"){
+ if(!CHAT_TYPES.includes(type))type="geral";
+ setActiveConversation(type,null);
+ clearChat(type);
+ showView(type);
+ $("texto-"+type)?.focus();
+}
+document.querySelectorAll("[data-new-chat]").forEach(b=>b.addEventListener("click",()=>startNewChat(b.dataset.newChat)));
+
+function renderConversationMessages(type,messages){
+ const chat=$("chat-"+type);
+ if(!chat)return;
+ chat.replaceChildren();
+ if(!messages?.length){
+  chat.innerHTML='<div class="welcome"><div class="welcome-icon">◈</div><h3>Conversa sem mensagens</h3><div>Envie uma mensagem para continuar.</div></div>';
+  return;
+ }
+ messages.forEach(item=>{
+  const role=item.role==="user"?"user":"assistant";
+  const bubble=addBubble(chat,item.content||"",role);
+  if(role==="assistant"){
+   renderAssistantText(bubble,item.content||"");
+   addSpeakButton(bubble,item.content||"",type,false);
+  }
+  const meta=[item.agent,item.provider,item.created_at].filter(Boolean).join(" · ");
+  if(meta){const small=document.createElement("small");small.className="meta";small.textContent=meta;bubble.appendChild(small);}
+ });
+ chat.scrollTop=chat.scrollHeight;
+}
+const restoredConversationIds=new Set();
+async function restoreActiveConversation(type){
+ const id=getActiveConversation(type);
+ if(!id||restoredConversationIds.has(id))return;
+ try{
+  const data=await api("/api/conversas/"+encodeURIComponent(id));
+  const agent=CHAT_TYPES.includes(data.conversation?.agent)?data.conversation.agent:type;
+  setActiveConversation(agent,id);
+  renderConversationMessages(agent,data.messages||[]);
+  restoredConversationIds.add(id);
+ }catch(error){
+  if(error.message.includes("não autoriz")||error.message.includes("token"))return;
+  setActiveConversation(type,null);
+  clearChat(type);
+ }
+}
+async function openSavedConversation(id){
+ const data=await api("/api/conversas/"+encodeURIComponent(id));
+ const conversation=data.conversation||{};
+ const type=CHAT_TYPES.includes(conversation.agent)?conversation.agent:"geral";
+ setActiveConversation(type,id);
+ restoredConversationIds.add(id);
+ renderConversationMessages(type,data.messages||[]);
+ showView(type);
+}
+
+async function sendChat(type,form){
+ const input=$("texto-"+type),button=form.querySelector("button[type=submit]");
+ const text=input.value.trim(),files=(selectedMediaByForm[type]||[]).slice(0,3);
+ if(!text&&!files.length)return;
+ const chat=$("chat-"+type);
+ const conversationId=getActiveConversation(type)||makeConversationId();
+ input.value="";
+ addBubble(chat,(text||"Analise esta imagem.")+(files.length?"\n📎 "+files.map(f=>f.name).join(", "):""),"user");
+ const pending=addBubble(chat,"Analisando sua solicitação...","assistant");
+ button.disabled=true;button.textContent="Aguarde";
+ try{
+  const imagens=await Promise.all(files.map(fileAsDataUrl));
+  const data=await api("/api/chat",{method:"POST",body:JSON.stringify({
+   texto:text||"Analise detalhadamente as imagens anexadas.",tipo,imagens,conversa_id:conversationId
+  })});
+  setActiveConversation(type,data.conversa_id||conversationId);
+  restoredConversationIds.add(data.conversa_id||conversationId);
+  renderAssistantText(pending,data.resposta||"O provedor respondeu sem conteúdo. Tente novamente.");
+  const meta=[data.cerebro,data.modelo||"",data.origem,data.tempo_ms?data.tempo_ms+" ms":""].filter(Boolean).join(" · ");
+  if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;pending.appendChild(m);}
+  addSpeakButton(pending,data.resposta||"",type,form._mediaInputs?.voice?.dataset.enabled==="1");
+ }catch(error){
+  pending.className="bubble error";
+  pending.textContent="Não foi possível obter uma resposta.\n\n"+error.message;
+ }finally{
+  button.disabled=false;button.textContent="Enviar ↗";
+  if(form._mediaInputs){form._mediaInputs.gallery.value="";form._mediaInputs.camera.value="";selectedMediaByForm[type]=[];form._mediaInputs.update();}
+  chat.scrollTop=chat.scrollHeight;
+ }
+}
+document.querySelectorAll("form[data-chat]").forEach(form=>{
+ form.addEventListener("submit",e=>{e.preventDefault();sendChat(form.dataset.chat,form);});
+ form.querySelector("textarea").addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();form.requestSubmit();}
+ });
+});
 async function loadArtifacts(){
  const box=$("artifact-list");if(!box)return;box.innerHTML='<div class="empty">Carregando arquivos...</div>';
  try{const data=await api("/api/arquivos?limit=100");box.innerHTML="";
@@ -553,7 +669,50 @@ async function health(){try{const d=await api("/api/saude");$("health-label").te
 async function runDiagnostic(){await health();try{const d=await api("/api/diagnostico");$("diagnostic-result").textContent="Diagnóstico administrativo concluído (presença de variáveis; validade da chave depende de chamada real). Variáveis: "+Object.entries(d.variaveis||{}).map(([k,v])=>k+" = "+v).join(" · ");}catch(e){$("diagnostic-result").textContent=e.message;}}
 $("refresh-health").addEventListener("click",health);$("run-diagnostic").addEventListener("click",runDiagnostic);
 function renderItems(box,items,kind){box.innerHTML="";if(!items?.length){box.innerHTML='<div class="empty">Nenhum registro encontrado.</div>';return;}items.forEach(item=>{const el=document.createElement("article");el.className="item";const title=document.createElement("strong");title.textContent=kind==="history"?(item.role+" · "+item.agent):(item.title||"Registro");const p=document.createElement("p");p.textContent=kind==="history"?item.content:item.summary;const small=document.createElement("small");small.textContent=kind==="history"?(item.created_at||""):"Prioridade: "+(item.priority||"média")+" · "+(item.created_at||"");el.append(title,p,small);box.appendChild(el);});}
-async function loadHistory(){const box=$("history-result");box.innerHTML='<div class="empty">Carregando histórico...</div>';try{const d=await api("/api/conversas");renderItems(box,d.items||[],"history");}catch(e){box.innerHTML="";const n=document.createElement("div");n.className="notice error";n.textContent=e.message;box.appendChild(n);}}
+function agentLabel(type){
+ return ({geral:"Nexuscore",diretoria:"Diretoria",programacao:"Engenharia",publicidade:"Marketing"})[type]||"Nexuscore";
+}
+function formatConversationDate(value){
+ if(!value)return "";
+ const date=new Date(value);
+ return Number.isNaN(date.getTime())?String(value):date.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"});
+}
+async function renameSavedConversation(item){
+ const title=window.prompt("Novo título da conversa:",item.title||"");
+ if(title===null||!title.trim())return;
+ try{
+  await api("/api/conversas/"+encodeURIComponent(item.id),{method:"PATCH",body:JSON.stringify({titulo:title.trim()})});
+  await loadHistory();
+ }catch(error){alert(error.message);}
+}
+async function loadHistory(){
+ const box=$("history-result");
+ box.innerHTML='<div class="empty">Carregando conversas...</div>';
+ try{
+  const data=await api("/api/conversas?limit=100");
+  box.replaceChildren();
+  const items=data.items||[];
+  if(!items.length){box.innerHTML='<div class="empty">Nenhuma conversa registrada. Inicie um chat para criar a primeira.</div>';return;}
+  items.forEach(item=>{
+   const card=document.createElement("article");card.className="item conversation-row";
+   const copy=document.createElement("div");copy.className="conversation-copy";
+   const title=document.createElement("strong");title.textContent=item.title||"Nova conversa";
+   const meta=document.createElement("div");meta.className="conversation-meta";
+   const count=Number(item.message_count||0);
+   meta.textContent=agentLabel(item.agent)+" · "+count+" mensagens · Atualizada "+formatConversationDate(item.updated_at);
+   copy.append(title,meta);
+   const actions=document.createElement("div");actions.className="conversation-actions";
+   const open=document.createElement("button");open.type="button";open.className="btn primary";open.textContent="Abrir";
+   open.addEventListener("click",()=>openSavedConversation(item.id).catch(error=>alert(error.message)));
+   const rename=document.createElement("button");rename.type="button";rename.className="btn";rename.textContent="Renomear";
+   rename.addEventListener("click",()=>renameSavedConversation(item));
+   actions.append(open,rename);card.append(copy,actions);box.appendChild(card);
+  });
+ }catch(error){
+  box.replaceChildren();const n=document.createElement("div");n.className="notice error";n.textContent=error.message;box.appendChild(n);
+ }
+}
+$("new-conversation").addEventListener("click",()=>startNewChat("geral"));
 async function loadIdeas(){const box=$("ideas-result");box.innerHTML='<div class="empty">Carregando ideias...</div>';try{const d=await api("/api/ideias");renderItems(box,d.items||[],"ideas");}catch(e){box.innerHTML="";const n=document.createElement("div");n.className="notice error";n.textContent=e.message;box.appendChild(n);}}
 $("load-history").addEventListener("click",loadHistory);$("load-ideas").addEventListener("click",loadIdeas);
 async function saveIdea(title,summary,priority){if(!adminToken)throw new Error("Informe o token administrativo em Conexões antes de salvar.");return api("/api/ideias",{method:"POST",body:JSON.stringify({titulo:title,resumo:summary,prioridade:priority})});}

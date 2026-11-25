@@ -39,6 +39,24 @@ class StorageTests(unittest.TestCase):
         items = self.storage.ideas(10)
         self.assertTrue(any(item["id"] == idea_id for item in items))
 
+    def test_database_health_reports_wal_and_existing_file(self):
+        health = self.storage.health()
+        self.assertEqual(health["engine"], "sqlite")
+        self.assertTrue(health["database_exists"])
+        self.assertEqual(health["journal_mode"], "wal")
+        self.assertGreaterEqual(health["table_count"], 5)
+
+    def test_connection_rolls_back_failed_transaction(self):
+        with self.assertRaises(RuntimeError):
+            with self.storage.connection() as db:
+                db.execute(
+                    "INSERT INTO ideas(title, summary, priority) VALUES(?,?,?)",
+                    ("Não salvar", "transação de teste", "media"),
+                )
+                raise RuntimeError("forçar rollback")
+        items = self.storage.ideas(300)
+        self.assertFalse(any(item["title"] == "Não salvar" for item in items))
+
 
 if __name__ == "__main__":
     unittest.main()

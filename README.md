@@ -14,7 +14,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 Obrigatórias conforme os recursos utilizados:
 
 - `GEMINI_API_KEY`: chave do Google Gemini.
-- `GROQ_API_KEY`: chave da Groq para modelos Llama.
+- `GROQ_API_KEY`: chave da Groq para modelos compatíveis.\n- `OPENAI_API_KEY`: chave opcional da OpenAI API; quando configurada, passa a ser o provedor principal e habilita análise de imagens. A API é cobrada separadamente da assinatura ChatGPT. Nunca envie essa chave pelo chat nem a grave no GitHub.\n- `OPENAI_MODEL`: modelo de API OpenAI com suporte a visão; padrão `gpt-4o-mini`.
 - `ADMIN_TOKEN`: token forte para rotas administrativas.
 - `GEMINI_MODEL`: padrão `gemini-3.8-flash`; confirme a disponibilidade para seu projeto Google.
 - `GROQ_MODEL`: padrão `openai/gpt-oss-120b` (modelo de produção recomendado atualmente pela Groq após a descontinuação do Llama 3.3 70B para planos developer).
@@ -60,3 +60,14 @@ Segurança e rede:
 - No plano gratuito, aceite que o banco SQLite é temporário; exporte periodicamente os dados importantes antes de novos deploys. Não há garantia de retenção permanente.
 
 O envio SMTP depende das credenciais do provedor de e-mail. O recebimento IMAP está disponível sob demanda pela rota protegida; leitura automática em segundo plano e processamento de anexos ainda não fazem parte desta etapa. Não configure segredos no GitHub nem os envie pelo chat.
+
+
+## Recursos móveis (versão 1.3.0)
+
+- Interface responsiva para celular e notebook.
+- Ditado por voz usando SpeechRecognition quando o navegador oferecer suporte.
+- Leitura das respostas com a síntese de voz do dispositivo; Diretoria, Engenharia, Marketing e o agente central usam perfis de voz distintos. As vozes disponíveis e a naturalidade dependem das vozes instaladas no Android ou computador.
+- Ações de galeria e câmera pelo seletor de mídia do Android. A compilação APK declara permissões de câmera, microfone e imagens.
+- Até quatro imagens PNG, JPEG ou WebP por mensagem. A análise visual exige `OPENAI_API_KEY`; mensagens somente de texto continuam usando OpenAI (se configurada) e Groq como contingência.
+
+A interface web é servida pelo Render e pode atualizar sem reinstalar o invólucro Android. Alterações em permissões nativas exigem uma nova compilação e instalação do APK. O uso da OpenAI API tem cobrança própria por consumo e não é incluído no ChatGPT Plus/Free.

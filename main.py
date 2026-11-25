@@ -52,10 +52,12 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("nexuscore")
 
 APP_NAME = "Nexuscore AI"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip()
@@ -112,6 +114,7 @@ if allowed_origins:
 class ChatRequest(BaseModel):
     texto: str = Field(..., min_length=1, max_length=MAX_INPUT_CHARS)
     tipo: str = Field(default="geral", max_length=40)
+    imagens: list[str] = Field(default_factory=list, max_length=4)
 
 
 class EmailRequest(BaseModel):
@@ -227,6 +230,49 @@ async def chamar_groq(prompt: str) -> tuple[str, str]:
 # Orquestração básica — fallback, ainda sem agentes colaborativos
 # ---------------------------------------------------------------------------
 
+async def chamar_openai(prompt: str, imagens: Optional[list[str]] = None) -> tuple[str, str]:
+    api_key = get_secret("OPENAI_API_KEY")
+    if not api_key:
+        raise ProviderError("OpenAI", "OPENAI_API_KEY não está configurada.", 503)
+    content = [{"type": "text", "text": prompt}]
+    for image_data in (imagens or []):
+        if not isinstance(image_data, str) or not image_data.startswith("data:image/"):
+            raise ProviderError("OpenAI", "Formato de imagem inválido.", 422)
+        content.append({"type": "image_url", "image_url": {"url": image_data, "detail": "auto"}})
+    payload = {"model": OPENAI_MODEL, "messages": [{"role": "user", "content": content if imagens else prompt}], "temperature": 0.7, "max_tokens": 4096}
+    try:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+            response = await client.post(OPENAI_API_URL, headers={"Authorization": f"Bearer {api_key}"}, json=payload)
+    except httpx.TimeoutException:
+        raise ProviderError("OpenAI", "Tempo limite excedido ao consultar a OpenAI.", 504)
+    except httpx.HTTPError as exc:
+        logger.warning("Falha de conexão com OpenAI: %s", type(exc).__name__)
+        raise ProviderError("OpenAI", "Não foi possível conectar à OpenAI.", 502)
+    if response.status_code != 200:
+        detail = extract_provider_error(response)
+        if response.status_code in (401, 403):
+            message = "OpenAI recusou a chave ou a permissão. Verifique OPENAI_API_KEY e o acesso ao modelo."
+        elif response.status_code == 429:
+            message = "Limite ou crédito da API OpenAI atingido. Verifique o uso e o faturamento."
+        elif response.status_code == 404:
+            message = f"Modelo OpenAI '{OPENAI_MODEL}' não encontrado."
+        else:
+            message = f"OpenAI retornou HTTP {response.status_code}."
+        logger.warning("OpenAI HTTP %s: %s", response.status_code, detail)
+        raise ProviderError("OpenAI", message, 502)
+    try:
+        data = response.json()
+        answer = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if isinstance(answer, list):
+            answer = "\n".join(item.get("text", "") for item in answer if isinstance(item, dict))
+        answer = str(answer).strip()
+    except (ValueError, IndexError, AttributeError, TypeError):
+        answer = ""
+    if not answer:
+        raise ProviderError("OpenAI", "A OpenAI respondeu sem conteúdo.", 502)
+    return answer, str(data.get("model") or OPENAI_MODEL)
+
+
 def normalize_type(value: str) -> str:
     value = (value or "geral").strip().lower()
     aliases = {
@@ -284,7 +330,7 @@ def cache_set(key: str, value: dict) -> None:
         _RESPONSE_CACHE.popitem(last=False)
 
 
-async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
+async def orquestrador(pedido: str, tipo: str = "geral", imagens: Optional[list[str]] = None) -> dict:
     started = time.perf_counter()
     text = (pedido or "").strip()
     if not text:
@@ -292,7 +338,7 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
 
     agent_type = normalize_type(tipo)
     cache_key = f"{agent_type}:{text.casefold()}"
-    cached = cache_get(cache_key)
+    cached = cache_get(cache_key) if not imagens else None
     if cached:
         cached["origem"] = "cache_temporario"
         cached["tempo_ms"] = int((time.perf_counter() - started) * 1000)
@@ -304,7 +350,12 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
 
     # Groq é o provedor principal. Gemini só entra como contingência se houver
     # uma chave explicitamente configurada; não tenta credenciais removidas.
-    providers = [("Groq", chamar_groq)]
+    providers = []
+    if get_secret("OPENAI_API_KEY"):
+        providers.append(("OpenAI", lambda p: chamar_openai(p, imagens)))
+    if imagens and not get_secret("OPENAI_API_KEY"):
+        raise HTTPException(status_code=503, detail="A análise de imagens requer OPENAI_API_KEY configurada no Render. O Groq permanece disponível para mensagens de texto.")
+    providers.append(("Groq", chamar_groq))
     if get_secret("GEMINI_API_KEY"):
         providers.append(("Gemini", chamar_gemini))
 
@@ -312,7 +363,7 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
     for provider_name, provider_function in providers:
         try:
             provider_result = await provider_function(prompt)
-            if provider_name == "Groq":
+            if provider_name in {"Groq", "OpenAI"}:
                 answer, actual_model = provider_result
             else:
                 answer, actual_model = provider_result, GEMINI_MODEL
@@ -323,7 +374,8 @@ async def orquestrador(pedido: str, tipo: str = "geral") -> dict:
                 "modelo": actual_model,
                 "tempo_ms": int((time.perf_counter() - started) * 1000),
             }
-            cache_set(cache_key, result)
+            if not imagens:
+                cache_set(cache_key, result)
             storage.save_message("user", agent_type, text)
             storage.save_message("assistant", agent_type, answer, provider_name)
             return result
@@ -378,11 +430,12 @@ async def saude():
         "versao": APP_VERSION,
         "persistencia": "temporaria_no_plano_gratuito",
         "provedores_configurados": {
+            "openai": bool(get_secret("OPENAI_API_KEY")),
             "gemini": bool(get_secret("GEMINI_API_KEY")),
             "groq": bool(get_secret("GROQ_API_KEY")),
         },
-        "provedor_principal": "groq",
-        "modelo_principal": GROQ_MODEL,
+        "provedor_principal": "openai" if get_secret("OPENAI_API_KEY") else "groq",
+        "modelo_principal": OPENAI_MODEL if get_secret("OPENAI_API_KEY") else GROQ_MODEL,
         "modelo_groq_confirmado_por_resposta": False,
     }
 
@@ -399,6 +452,8 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
             "GROQ_API_KEY": "configurada" if get_secret("GROQ_API_KEY") else "ausente",
             "GEMINI_MODEL": GEMINI_MODEL,
             "GROQ_MODEL": GROQ_MODEL,
+            "OPENAI_API_KEY": "configurada" if get_secret("OPENAI_API_KEY") else "ausente",
+            "OPENAI_MODEL": OPENAI_MODEL,
             "GEMINI_FALLBACK": "ativo" if get_secret("GEMINI_API_KEY") else "desativado",
         },
         "observacao": (
@@ -458,7 +513,12 @@ async def atualizar_projeto(project_id: int, request: dict, x_admin_token: Optio
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
-    return await orquestrador(request.texto, request.tipo)
+    for image_data in request.imagens:
+        if len(image_data) > 7_000_000:
+            raise HTTPException(status_code=413, detail="Cada imagem deve ter no máximo aproximadamente 5 MB.")
+        if not re.match(r"^data:image/(png|jpeg|webp);base64,", image_data):
+            raise HTTPException(status_code=422, detail="Formato não permitido. Use PNG, JPEG ou WebP.")
+    return await orquestrador(request.texto, request.tipo, request.imagens)
 
 
 @app.post("/api/email/enviar")

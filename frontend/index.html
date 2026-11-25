@@ -147,16 +147,16 @@ async function startDictation(type,button){
  const active=activeDictations.get(type);
  if(active){try{await active.stop?.();}catch(e){}return;}
  const form=button.closest("form"),ui=form?._mediaInputs?.recorder,box=$("texto-"+type);
- const state={base:box.value,finalText:"",interimText:"",stopped:false,listener:null,stop:null,seconds:0,timer:null};
+ const state={base:box.value,finalText:"",interimText:"",stopped:false,userStopped:false,starting:false,restartTimer:null,listener:null,stateListener:null,stop:null,seconds:0,timer:null};
  activeDictations.set(type,state);
  button.classList.add("active-tool");button.querySelector("span").textContent="Parar";
  if(ui){ui.classList.add("visible");ui.querySelector(".voice-recorder-label").textContent="Ouvindo sua voz… 00:00";}
  const renderText=()=>{const spoken=(state.finalText+" "+state.interimText).trim();box.value=[state.base.trimEnd(),spoken].filter(Boolean).join(state.base.trim()?" ":"");};
- const cleanup=()=>{if(state.stopped)return;state.stopped=true;if(state.timer)clearInterval(state.timer);state.listener?.remove?.();state.stateListener?.remove?.();activeDictations.delete(type);button.classList.remove("active-tool");button.querySelector("span").textContent="Falar";if(ui)ui.classList.remove("visible","native-wave");};
+ const cleanup=()=>{if(state.stopped)return;state.stopped=true;if(state.timer)clearInterval(state.timer);if(state.restartTimer)clearTimeout(state.restartTimer);state.listener?.remove?.();state.stateListener?.remove?.();activeDictations.delete(type);button.classList.remove("active-tool");button.querySelector("span").textContent="Falar";if(ui)ui.classList.remove("visible","native-wave");};
  const native=window.Capacitor?.isNativePlatform?.()&&window.NexuscoreSpeechRecognition;
  if(native){
   const Speech=native;
-  state.stop=async()=>{try{await Speech.stop();}catch(e){}setTimeout(cleanup,650);};
+  state.stop=async()=>{state.userStopped=true;if(state.restartTimer)clearTimeout(state.restartTimer);try{await Speech.stop();}catch(e){}setTimeout(cleanup,650);};
   try{
    const permission=await Speech.checkPermissions();
    if(permission?.speechRecognition!=="granted"){const requested=await Speech.requestPermissions();if(requested?.speechRecognition!=="granted")throw new Error("Permissão de microfone não concedida.");}
@@ -167,22 +167,27 @@ async function startDictation(type,button){
     if(phrase){state.interimText=phrase.trim();renderText();}
    });
    state.stateListener=await Speech.addListener("listeningState",event=>{
-    if(event.status==="stopped"&&!state.stopped){state.interimText="";renderText();cleanup();}
+    if(event.status==="stopped"&&!state.stopped){
+     // O Android pode encerrar uma sessão após uma pausa curta. Mantemos a transcrição e reabrimos a escuta até o usuário tocar em Parar.
+     if(!state.userStopped&&!state.restartTimer){state.restartTimer=setTimeout(()=>{state.restartTimer=null;state.startNative?.();},450);}
+     else if(state.userStopped){cleanup();}
+    }
    });
    if(ui){ui.classList.add("native-wave");}
    state.timer=setInterval(()=>{state.seconds++;if(ui){const m=String(Math.floor(state.seconds/60)).padStart(2,"0"),sec=String(state.seconds%60).padStart(2,"0");ui.querySelector(".voice-recorder-label").textContent="Ouvindo sua voz… "+m+":"+sec;}},1000);
-   // Com partialResults=true, start() resolve imediatamente. A escuta continua até o utilizador tocar em Parar.
-   await Speech.start({language:"pt-BR",maxResults:5,partialResults:true,popup:false});
+   // Com partialResults=true, start() resolve imediatamente. Reiniciamos a sessão se o Android a encerrar após uma pausa, sem perder o texto acumulado.
+   state.startNative=async()=>{if(state.stopped||state.userStopped||state.starting)return;state.starting=true;try{await Speech.start({language:"pt-BR",maxResults:5,partialResults:true,popup:false});}catch(error){if(!state.userStopped&&!state.stopped){cleanup();alert("A escuta foi interrompida: "+(error.message||"tente iniciar novamente."));}}finally{state.starting=false;}};
+   await state.startNative();
   }catch(error){cleanup();alert("Não foi possível iniciar a transcrição: "+(error.message||"verifique a permissão e o serviço de voz do Android."));}
   return;
  }
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!SR){cleanup();alert("Ditado por voz não suportado neste navegador. Use o Chrome ou o aplicativo Android atualizado.");return;}
  const rec=new SR();state.rec=rec;rec.lang="pt-BR";rec.interimResults=true;rec.continuous=true;rec.maxAlternatives=1;
- state.stop=()=>{try{rec.stop();}catch(e){cleanup();}};
+ state.stop=()=>{state.userStopped=true;try{rec.stop();}catch(e){cleanup();}};
  rec.onresult=e=>{let final="",interim="";for(let i=0;i<e.results.length;i++){const result=e.results[i],t=result[0]?.transcript||"";if(result.isFinal)final+=t+" ";else interim+=t+" ";}state.finalText=final.trim();state.interimText=interim.trim();renderText();};
  rec.onerror=e=>{if(ui)ui.querySelector(".voice-recorder-label").textContent=e.error==="not-allowed"?"Permissão do microfone negada":"Erro no microfone: "+e.error;};
- rec.onend=()=>{state.interimText="";renderText();cleanup();};
+ rec.onend=()=>{if(state.interimText){state.finalText=[state.finalText,state.interimText].filter(Boolean).join(" ").trim();state.interimText="";renderText();}if(!state.userStopped&&!state.stopped){state.restartTimer=setTimeout(()=>{state.restartTimer=null;try{rec.start();}catch(e){cleanup();}},400);}else{cleanup();}};
  try{rec.start();if(ui){ui.classList.add("native-wave");state.timer=setInterval(()=>{state.seconds++;const m=String(Math.floor(state.seconds/60)).padStart(2,"0"),sec=String(state.seconds%60).padStart(2,"0");ui.querySelector(".voice-recorder-label").textContent="Ouvindo sua voz… "+m+":"+sec;},1000);}}catch(e){cleanup();alert("Não foi possível iniciar o microfone.");}
 }
 function speakResponse(text,type){if(!("speechSynthesis"in window))return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text),p=AGENT_VOICE_PROFILE[type]||AGENT_VOICE_PROFILE.geral;u.lang="pt-BR";const pt=window.speechSynthesis.getVoices().filter(v=>/^pt(-|_)/i.test(v.lang));if(pt.length){const i=({geral:0,diretoria:1,programacao:2,publicidade:3}[type]||0)%pt.length;u.voice=pt[i];}u.pitch=p.pitch;u.rate=p.rate;window.speechSynthesis.speak(u);}

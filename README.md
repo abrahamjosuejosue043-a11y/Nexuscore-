@@ -47,7 +47,7 @@ Segurança e rede:
 - `GET /api/saude`: saúde pública sem expor segredos.
 - `GET /api/diagnostico`: diagnóstico protegido pelo cabeçalho `X-Admin-Token`.
 - `POST /api/chat`: chat com seleção de agente, raciocínio avançado e análise de até três imagens.
-- `POST /api/imagens/gerar`: geração de imagem 1536×1536 via Cloudflare Workers AI (requer as duas variáveis Cloudflare).
+- `POST /api/imagens/gerar`: geração de imagem 1536×1536 via Cloudflare Workers AI (requer `ADMIN_TOKEN` e as duas variáveis Cloudflare).
 - `GET /api/conversas`: histórico persistido.
 - `GET/POST /api/ideias`: banco de ideias persistido.
 - `POST /api/email/enviar`: envio SMTP real; retorna erro se SMTP não estiver configurado.

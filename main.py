@@ -377,7 +377,7 @@ async def saude():
         "status": "ok",
         "sistema": APP_NAME,
         "versao": APP_VERSION,
-        "persistencia": "temporaria_no_plano_gratuito",
+        "persistencia": "postgresql" if os.getenv("DATABASE_URL") else "sqlite",
         "provedores_configurados": {
             "groq": bool(get_secret("GROQ_API_KEY")),
             "groq_vision": bool(get_secret("GROQ_API_KEY")),

@@ -60,6 +60,8 @@ html,body{width:100%;overflow-x:hidden}.shell{width:min(100%,1440px);min-width:0
 @media(max-width:600px){.voice-recorder{gap:7px;padding:8px}.voice-recorder-label{font-size:11px}.voice-wave{gap:2px}.voice-wave i{width:2px}}
 @media(prefers-reduced-motion:reduce){.voice-recorder-dot{animation:none}.voice-wave i{transition:none}}
 @media(prefers-reduced-motion:reduce){.chat::before,.chat::after{animation:none}}
+
+.item .btn{margin-top:10px}
 </style>
 </head>
 <body>
@@ -75,7 +77,7 @@ html,body{width:100%;overflow-x:hidden}.shell{width:min(100%,1440px);min-width:0
  <nav class="nav" aria-label="Navegação principal">
   <button class="active" data-view="dashboard"><span class="ico">▦</span>Dashboard</button><button data-view="geral"><span class="ico">◈</span>Chat do time</button>
   <button data-view="diretoria"><span class="ico">⌘</span>Diretoria</button>
-  <button data-view="programacao"><span class="ico">⌁</span>Engenharia</button>
+  <button data-view="programacao"><span class="ico">⌁</span>Engenharia</button><button data-view="arquivos"><span class="ico">▧</span>Arquivos</button>
   <button data-view="publicidade"><span class="ico">✳</span>Marketing</button>
   <button data-view="projeto"><span class="ico">▤</span>Projetos</button>
   <button data-view="historico"><span class="ico">◷</span>Histórico</button>
@@ -99,6 +101,18 @@ html,body{width:100%;overflow-x:hidden}.shell{width:min(100%,1440px);min-width:0
 <section class="view" id="view-programacao">
  <div class="view-head"><div><h2>Engenharia</h2><p>Arquitetura, programação, depuração e validação técnica.</p></div><span class="tag">Agente técnico</span></div>
  <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">E</div><div><strong>Engenharia de software</strong><small>Desenvolvimento e revisão técnica</small></div></div><button class="btn" data-clear="programacao">Limpar tela</button></div><div class="chat" id="chat-programacao"><div class="welcome"><div class="welcome-icon">⌁</div><h3>Estação de engenharia</h3><div>Descreva o problema, envie código ou peça uma implementação.</div></div></div><form class="composer" data-chat="programacao"><textarea id="texto-programacao" rows="1" placeholder="Descreva a tarefa técnica..."></textarea><button class="send" type="submit">Enviar ↗</button></form></div>
+</section>
+<section class="view" id="view-arquivos">
+ <div class="view-head"><div><h2>Arquivos e documentos</h2><p>Crie relatórios, documentos e arquivos com a IA e baixe o resultado.</p></div><span class="tag">Criação de conteúdo</span></div>
+ <div class="notice">Os arquivos ficam registrados no banco de dados do serviço. No plano gratuito do Render, o armazenamento é temporário e pode ser perdido em reinicializações ou deploys.</div>
+ <div class="panel"><h3>Novo arquivo</h3>
+  <div class="field"><label for="artifact-title">Nome do arquivo</label><input id="artifact-title" maxlength="160" placeholder="Ex.: Relatório mensal de operações"></div>
+  <div class="field"><label for="artifact-instructions">O que a IA deve criar?</label><textarea id="artifact-instructions" maxlength="12000" placeholder="Descreva o objetivo, o conteúdo, os dados disponíveis e o formato desejado."></textarea></div>
+  <div class="field"><label for="artifact-format">Formato do arquivo</label><select id="artifact-format"><option value="docx">Word (.docx)</option><option value="pdf">PDF (.pdf)</option><option value="md">Markdown (.md)</option><option value="txt">Texto (.txt)</option><option value="csv">Planilha CSV (.csv)</option><option value="json">Dados JSON (.json)</option></select></div>
+  <div class="actions"><button class="btn primary" id="generate-artifact">Criar arquivo com IA</button></div><div id="artifact-status" class="hint" role="status" aria-live="polite"></div>
+ </div>
+ <div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Meus arquivos</h2><p>Documentos criados nesta instalação do Nexuscore.</p></div><button class="btn" id="load-artifacts">Atualizar</button></div>
+ <div id="artifact-list" class="list"><div class="empty">Carregando arquivos...</div></div>
 </section>
 <section class="view" id="view-publicidade">
  <div class="view-head"><div><h2>Marketing</h2><p>Posicionamento, campanhas, conteúdo e aquisição.</p></div><span class="tag">Agente de marketing</span></div>
@@ -217,12 +231,35 @@ addComposerTools();
 function detailMessage(detail){if(typeof detail==="string")return detail;if(detail&&typeof detail==="object"){const bits=[detail.mensagem,...(detail.motivos||[]),detail.orientacao].filter(Boolean);return bits.join("\n")||JSON.stringify(detail);}return "O servidor retornou um erro sem explicação.";}
 const API_BASE=window.Capacitor?.isNativePlatform?.()?"https://nexuscore-1-ljbi.onrender.com":"";
 async function api(url,options={}){const response=await fetch(API_BASE+url,{...options,headers:{...headers(options.body!==undefined),...(options.headers||{})}});const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{};}catch(e){data={detail:raw||"Resposta inválida do servidor."};}if(!response.ok)throw new Error(detailMessage(data.detail)||("Falha HTTP "+response.status));return data;}
-function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
+function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();if(name==="arquivos")loadArtifacts();}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
 function addBubble(chat,text,kind="assistant",meta=""){const empty=chat.querySelector(".welcome");if(empty)empty.remove();const el=document.createElement("div");el.className="bubble "+kind;el.textContent=text;if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;el.appendChild(m);}chat.appendChild(el);chat.scrollTop=chat.scrollHeight;return el;}
 function clearChat(name){const chat=$("chat-"+name);chat.innerHTML='<div class="welcome"><div class="welcome-icon">◈</div><h3>Conversa limpa</h3><div>Envie uma nova mensagem para começar.</div></div>';}
 document.querySelectorAll("[data-clear]").forEach(b=>b.addEventListener("click",()=>clearChat(b.dataset.clear)));
 async function sendChat(type,form){const input=$("texto-"+type),button=form.querySelector("button[type=submit]"),text=input.value.trim(),files=(selectedMediaByForm[type]||[]).slice(0,4);if(!text&&!files.length)return;const chat=$("chat-"+type);input.value="";addBubble(chat,(text||"Analise esta imagem.")+(files.length?"\n📎 "+files.map(f=>f.name).join(", "):""),"user");const pending=addBubble(chat,"Analisando sua solicitação...","assistant");button.disabled=true;button.textContent="Aguarde";try{const imagens=await Promise.all(files.map(fileAsDataUrl));const data=await api("/api/chat",{method:"POST",body:JSON.stringify({texto:text||"Analise detalhadamente as imagens anexadas.",tipo:type,imagens})});pending.textContent=data.resposta||"O provedor respondeu sem conteúdo. Tente novamente.";const meta=[data.cerebro,data.modelo||"",data.origem,data.tempo_ms?data.tempo_ms+" ms":""].filter(Boolean).join(" · ");if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;pending.appendChild(m);}addSpeakButton(pending,data.resposta||"",type,form._mediaInputs?.voice?.dataset.enabled==="1");}catch(error){pending.className="bubble error";pending.textContent="Não foi possível obter uma resposta.\n\n"+error.message;}finally{button.disabled=false;button.textContent="Enviar ↗";if(form._mediaInputs){form._mediaInputs.gallery.value="";form._mediaInputs.camera.value="";selectedMediaByForm[type]=[];form._mediaInputs.update();}chat.scrollTop=chat.scrollHeight;}}document.querySelectorAll("form[data-chat]").forEach(form=>{form.addEventListener("submit",e=>{e.preventDefault();sendChat(form.dataset.chat,form);});form.querySelector("textarea").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});});
+async function loadArtifacts(){
+ const box=$("artifact-list");if(!box)return;box.innerHTML='<div class="empty">Carregando arquivos...</div>';
+ try{const data=await api("/api/arquivos?limit=100");box.innerHTML="";
+  if(!data.items?.length){box.innerHTML='<div class="empty">Nenhum arquivo criado ainda.</div>';return;}
+  data.items.forEach(item=>{const card=document.createElement("article");card.className="item";const title=document.createElement("strong");title.textContent=item.title||item.filename;const meta=document.createElement("small");meta.textContent=(item.format||"arquivo").toUpperCase()+" · "+Math.max(1,Math.round((item.size||0)/1024))+" KB · "+(item.created_at||"");const action=document.createElement("button");action.type="button";action.className="btn primary";action.textContent="Baixar arquivo";action.addEventListener("click",()=>downloadArtifact(item.id,item.filename,action));card.append(title,meta,action);box.appendChild(card);});
+ }catch(error){box.innerHTML="";const n=document.createElement("div");n.className="notice error";n.textContent=error.message;box.appendChild(n);}
+}
+async function downloadArtifact(id,filename,button){
+ const old=button.textContent;button.disabled=true;button.textContent="Preparando...";
+ try{const response=await fetch(API_BASE+"/api/arquivos/"+id+"/download",{headers:headers()});if(!response.ok){let detail="Não foi possível baixar o arquivo.";try{const d=await response.json();detail=detailMessage(d.detail)||detail;}catch(e){}throw new Error(detail);}
+ const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=filename||"arquivo";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+ }catch(error){alert(error.message);}finally{button.disabled=false;button.textContent=old;}
+}
+$("generate-artifact").addEventListener("click",async()=>{
+ const status=$("artifact-status"),button=$("generate-artifact"),titulo=$("artifact-title").value.trim(),instrucoes=$("artifact-instructions").value.trim(),formato=$("artifact-format").value;
+ if(!adminToken){status.textContent="Informe o token administrativo em Conexões para criar e guardar arquivos.";status.style.color="var(--amber)";return;}
+ if(!titulo||!instrucoes){status.textContent="Informe o nome do arquivo e o que deve ser criado.";status.style.color="var(--red)";return;}
+ button.disabled=true;button.textContent="Criando...";status.textContent="A IA está preparando o documento.";
+ try{const data=await api("/api/arquivos/gerar",{method:"POST",body:JSON.stringify({titulo,instrucoes,formato})});status.textContent="Arquivo criado e registrado: "+data.filename+" · "+Math.max(1,Math.round(data.bytes/1024))+" KB";status.style.color="var(--green)";$("artifact-title").value="";$("artifact-instructions").value="";await loadArtifacts();}
+ catch(error){status.textContent=error.message;status.style.color="var(--red)";}
+ finally{button.disabled=false;button.textContent="Criar arquivo com IA";}
+});
+$("load-artifacts").addEventListener("click",loadArtifacts);
 function saveAdminToken(){adminToken=$("admin-token").value.trim();try{if(adminToken)sessionStorage.setItem("nexuscore_admin_token",adminToken);else sessionStorage.removeItem("nexuscore_admin_token");}catch(e){}$("token-status").textContent=adminToken?"Token disponível nesta sessão. Teste o acesso executando o diagnóstico.":"Token removido desta sessão.";}
 $("save-token").addEventListener("click",()=>{saveAdminToken();runDiagnostic();if(typeof loadDashboard==="function")loadDashboard();});$("toggle-token").addEventListener("click",()=>{$("admin-token").type=$("admin-token").type==="password"?"text":"password";$("toggle-token").textContent=$("admin-token").type==="password"?"Mostrar":"Ocultar";});
 async function health(){try{const d=await api("/api/saude");$("health-label").textContent="API online";$("health-dot").className="dot ok";$("api-state").textContent="Online · v"+(d.versao||"?");$("groq-state").textContent=d.provedores_configurados?.groq?"Ativa · provedor único":"Chave ausente";$("text-model-state").textContent=d.modelo_principal||"Padrão Groq";$("vision-model-state").textContent=d.modelo_vision||"Modelo visual Groq";}catch(e){$("health-label").textContent="API indisponível";$("health-dot").className="dot bad";$("api-state").textContent="Indisponível";$("diagnostic-result").textContent=e.message;}}

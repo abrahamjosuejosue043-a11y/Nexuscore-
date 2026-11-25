@@ -4,8 +4,8 @@ Arquivo: main.py (raiz do repositório)
 
 Esta versão mantém as rotas principais do projeto e organiza:
 - Inicialização do FastAPI e armazenamento SQLite
-- Comunicação assíncrona com Gemini e Groq
-- Seleção de perfil de agente e fallback entre provedores
+- Comunicação assíncrona com Groq
+- Seleção de perfil de agente com Groq como provedor único
 - Histórico, ideias e rotas administrativas protegidas
 - Integrações SMTP/IMAP sob demanda
 
@@ -32,11 +32,6 @@ from pydantic import BaseModel, Field
 
 from backend import storage
 
-from backend.cerebro1_gemini import (
-    chamar_gemini as chamar_gemini_modulo,
-    GeminiError,
-)
-
 
 # ---------------------------------------------------------------------------
 # Configuração geral
@@ -54,12 +49,7 @@ logger = logging.getLogger("nexuscore")
 APP_NAME = "Nexuscore AI"
 APP_VERSION = "1.4.0"
 
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
-
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip()
 GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.8-27b").strip()
 
@@ -153,17 +143,6 @@ def extract_provider_error(response: httpx.Response) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Integração Gemini — delegada ao módulo backend/cerebro1_gemini.py
-# ---------------------------------------------------------------------------
-
-async def chamar_gemini(prompt: str) -> str:
-    try:
-        return await chamar_gemini_modulo(prompt)
-    except GeminiError as erro:
-        raise ProviderError("Gemini", str(erro), 502) from erro
-
-
-# ---------------------------------------------------------------------------
 # Integração Groq (modelo configurado por variável de ambiente)
 # ---------------------------------------------------------------------------
 
@@ -236,49 +215,6 @@ async def chamar_groq(prompt: str, imagens: Optional[list[str]] = None) -> tuple
 # ---------------------------------------------------------------------------
 # Orquestração básica — fallback, ainda sem agentes colaborativos
 # ---------------------------------------------------------------------------
-
-async def chamar_openai(prompt: str, imagens: Optional[list[str]] = None) -> tuple[str, str]:
-    api_key = get_secret("OPENAI_API_KEY")
-    if not api_key:
-        raise ProviderError("OpenAI", "OPENAI_API_KEY não está configurada.", 503)
-    content = [{"type": "text", "text": prompt}]
-    for image_data in (imagens or []):
-        if not isinstance(image_data, str) or not image_data.startswith("data:image/"):
-            raise ProviderError("OpenAI", "Formato de imagem inválido.", 422)
-        content.append({"type": "image_url", "image_url": {"url": image_data, "detail": "auto"}})
-    payload = {"model": OPENAI_MODEL, "messages": [{"role": "user", "content": content if imagens else prompt}], "temperature": 0.7, "max_tokens": 4096}
-    try:
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-            response = await client.post(OPENAI_API_URL, headers={"Authorization": f"Bearer {api_key}"}, json=payload)
-    except httpx.TimeoutException:
-        raise ProviderError("OpenAI", "Tempo limite excedido ao consultar a OpenAI.", 504)
-    except httpx.HTTPError as exc:
-        logger.warning("Falha de conexão com OpenAI: %s", type(exc).__name__)
-        raise ProviderError("OpenAI", "Não foi possível conectar à OpenAI.", 502)
-    if response.status_code != 200:
-        detail = extract_provider_error(response)
-        if response.status_code in (401, 403):
-            message = "OpenAI recusou a chave ou a permissão. Verifique OPENAI_API_KEY e o acesso ao modelo."
-        elif response.status_code == 429:
-            message = "Limite ou crédito da API OpenAI atingido. Verifique o uso e o faturamento."
-        elif response.status_code == 404:
-            message = f"Modelo OpenAI '{OPENAI_MODEL}' não encontrado."
-        else:
-            message = f"OpenAI retornou HTTP {response.status_code}."
-        logger.warning("OpenAI HTTP %s: %s", response.status_code, detail)
-        raise ProviderError("OpenAI", message, 502)
-    try:
-        data = response.json()
-        answer = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        if isinstance(answer, list):
-            answer = "\n".join(item.get("text", "") for item in answer if isinstance(item, dict))
-        answer = str(answer).strip()
-    except (ValueError, IndexError, AttributeError, TypeError):
-        answer = ""
-    if not answer:
-        raise ProviderError("OpenAI", "A OpenAI respondeu sem conteúdo.", 502)
-    return answer, str(data.get("model") or OPENAI_MODEL)
-
 
 def normalize_type(value: str) -> str:
     value = (value or "geral").strip().lower()

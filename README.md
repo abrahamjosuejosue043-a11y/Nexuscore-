@@ -1,6 +1,6 @@
 # Nexuscore AI
 
-API central FastAPI com três perfis especializados (Diretoria, Engenharia e Marketing), Groq como núcleo de linguagem e persistência local SQLite. Os perfis ainda não executam uma cadeia colaborativa entre si.
+API central FastAPI com três perfis especializados (Diretoria, Engenharia e Marketing), Groq como núcleo de linguagem e persistência local SQLite. Os perfis são instruções especializadas sobre o mesmo modelo Groq; ainda não existe colaboração multiagente encadeada.
 
 ## Execução
 
@@ -11,44 +11,36 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ## Variáveis de ambiente
 
-Obrigatórias conforme os recursos utilizados:
+- `GROQ_API_KEY`: chave do provedor único de linguagem, raciocínio e análise visual.
+- `ADMIN_TOKEN`: token forte para as rotas administrativas e criação/gestão de arquivos.
+- `GROQ_MODEL`: modelo de texto (padrão `openai/gpt-oss-120b`).
+- `GROQ_VISION_MODEL`: modelo multimodal para OCR e análise de imagens (padrão `qwen/qwen3.8-27b`).
+- `DATABASE_PATH`: caminho do SQLite; padrão local `data/nexuscore.db`.
+- `AI_REQUEST_TIMEOUT`: timeout de chamadas à IA em segundos (padrão 45).
+- `MAX_INPUT_CHARS`: limite de texto de entrada (padrão 8000).
 
-- `GROQ_API_KEY`: chave da Groq para modelos compatíveis.\n- `OPENAI_API_KEY`: chave opcional da OpenAI API; quando configurada, passa a ser o provedor principal e habilita análise de imagens. A API é cobrada separadamente da assinatura ChatGPT. Nunca envie essa chave pelo chat nem a grave no GitHub.\n- `OPENAI_MODEL`: modelo de API OpenAI com suporte a visão; padrão `gpt-4o-mini`.
-- `ADMIN_TOKEN`: token forte para rotas administrativas.
-- `GROQ_MODEL`: padrão `openai/gpt-oss-120b`, com raciocínio avançado ativado.
-- `GROQ_VISION_MODEL`: padrão `qwen/qwen3.8-27b`, modelo multimodal para OCR, leitura de capturas de tela e análise visual (até 3 imagens por requisição).
-
-E-mail de saída (SMTP):
-
-- `SMTP_HOST`, `SMTP_PORT` (padrão 587), `SMTP_USER`, `SMTP_PASSWORD`.
-- `SMTP_FROM`: remetente; se omitido, usa `SMTP_USER`.
-
-Recebimento IMAP manual (rota administrativa `GET /api/email/receber`):
-- `IMAP_HOST`, `IMAP_PORT` (padrão 993), `IMAP_USER`, `IMAP_PASSWORD`.
-- `IMAP_FOLDER`: pasta a consultar (padrão `INBOX`).
-- `EMAIL_DESTINATARIO`: destinatário padrão opcional. Também é possível enviar `destinatario` na requisição.
+E-mail (opcional):
+- SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`.
+- IMAP: `IMAP_HOST`, `IMAP_PORT`, `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_FOLDER`.
+- `EMAIL_DESTINATARIO`: destinatário padrão opcional.
 
 Persistência:
-
-- `DATABASE_PATH`: caminho do arquivo SQLite. Padrão local: `data/nexuscore.db`. O código também reconhece `DB_PATH` como alias compatível.
-- No plano gratuito do Render, não há disco persistente incluído. O banco SQLite funciona como armazenamento temporário e os dados podem ser perdidos em reinicializações, suspensão ou novos deploys. O projeto não contratará recursos pagos sem autorização.
-
-Segurança e rede:
-
-- `CORS_ORIGINS`: origens permitidas separadas por vírgula. Deixe vazio se frontend e API forem servidos pela mesma origem.
-- `AI_REQUEST_TIMEOUT`: timeout em segundos (padrão 45).
-- `MAX_INPUT_CHARS`: limite de entrada (padrão 8000).
+- Conversas, ideias, projetos, e-mails e arquivos gerados são registrados no SQLite.
+- No plano gratuito do Render, o disco local é temporário. Dados e documentos podem ser perdidos em reinicializações, suspensão ou novos deploys. O projeto não contratará recursos pagos sem autorização.
+- Para persistência confiável, será necessário configurar armazenamento persistente ou banco externo e revisar a estratégia de backup.
 
 ## Rotas principais
 
-- `GET /api/saude`: saúde pública sem expor segredos.
-- `GET /api/diagnostico`: diagnóstico protegido pelo cabeçalho `X-Admin-Token`.
-- `POST /api/chat`: chat com seleção de agente, raciocínio avançado e análise de até três imagens.
-- `GET /api/conversas`: histórico persistido.
-- `GET/POST /api/ideias`: banco de ideias persistido.
-- `POST /api/email/enviar`: envio SMTP real; retorna erro se SMTP não estiver configurado.
-- `POST /api/email/analisar`: analisa o conteúdo fornecido e salva o resultado no banco.
-- `GET /api/email/receber`: busca mensagens não lidas via IMAP; requer `X-Admin-Token`.
+- `GET /api/saude`: estado público da API.
+- `GET /api/diagnostico`: diagnóstico protegido por `X-Admin-Token`.
+- `POST /api/chat`: conversa e análise de até três imagens via Groq.
+- `GET /api/conversas`: histórico protegido.
+- `GET/POST /api/ideias`: banco de ideias.
+- `GET/POST/PATCH /api/projetos`: registros e status de projetos.
+- `GET /api/arquivos`: lista de arquivos gerados.
+- `POST /api/arquivos/gerar`: cria DOCX, PDF, Markdown, TXT, CSV ou JSON via Groq.
+- `GET /api/arquivos/{id}/download`: baixa um arquivo gerado.
+- `POST /api/email/enviar`, `POST /api/email/analisar`, `GET /api/email/receber`: operações de e-mail protegidas por token.
 
 ## Deploy no Render
 

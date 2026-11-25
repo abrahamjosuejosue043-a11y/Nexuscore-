@@ -203,6 +203,68 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
  .footer{font-size:9px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* Dashboard refinement: clearer hierarchy, stronger scanability, restrained interaction. */
+#view-dashboard{max-width:1180px;margin-inline:auto}
+#view-dashboard .dashboard-head{align-items:center;padding:5px 2px 3px}
+#view-dashboard .dashboard-head h2{font-size:clamp(25px,3vw,32px);letter-spacing:-.045em;line-height:1.12}
+#view-dashboard .dashboard-head p{margin-top:8px;font-size:12px}
+#view-dashboard .dashboard-head .btn{min-height:38px;padding-inline:15px}
+#view-dashboard .dashboard-grid{gap:12px;margin:22px 0 18px}
+#view-dashboard .metric-card{position:relative;overflow:hidden;min-height:116px;padding:17px 18px 15px;border-radius:14px;box-shadow:0 1px 2px rgba(15,23,42,.025);transition:border-color .18s,box-shadow .18s,transform .18s}
+#view-dashboard .metric-card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:#dce5f2}
+#view-dashboard .metric-card:nth-child(1)::before{background:#5478c9}
+#view-dashboard .metric-card:nth-child(2)::before{background:#168b83}
+#view-dashboard .metric-card:nth-child(3)::before{background:#8a75bd}
+#view-dashboard .metric-card:nth-child(4)::before{background:#4f9b75}
+#view-dashboard .metric-card small{font-size:10px;font-weight:700;letter-spacing:.055em;text-transform:uppercase;color:#728198}
+#view-dashboard .metric-card strong{margin-top:10px;font-size:29px;font-variant-numeric:tabular-nums;letter-spacing:-.05em}
+#view-dashboard .metric-card span{margin-top:4px;font-size:10px;color:#8390a2}
+#view-dashboard .panel{padding:19px;border-radius:14px}
+#view-dashboard .panel h3{font-size:13px;letter-spacing:-.01em}
+#view-dashboard .panel>.muted{margin-top:4px;font-size:11px}
+#view-dashboard .agent-cards{gap:12px;margin-top:15px}
+#view-dashboard .agent-card{position:relative;min-height:124px;padding:16px;border-radius:12px;background:linear-gradient(145deg,#fff 0%,#fbfcfe 100%);transition:border-color .18s,box-shadow .18s,transform .18s}
+#view-dashboard .agent-card::after{content:"";position:absolute;right:15px;top:17px;width:7px;height:7px;border-radius:50%;background:#d8e2ef}
+#view-dashboard .agent-card:nth-child(1)::after{background:#5478c9}
+#view-dashboard .agent-card:nth-child(2)::after{background:#168b83}
+#view-dashboard .agent-card:nth-child(3)::after{background:#8a75bd}
+#view-dashboard .agent-card strong{font-size:13px;color:#25364e}
+#view-dashboard .agent-card p{max-width:25ch;min-height:34px;margin:8px 0 11px;font-size:11px;line-height:1.5}
+#view-dashboard .agent-card span{font-size:10px;letter-spacing:.01em}
+#view-dashboard .agent-card:hover{transform:translateY(-2px);border-color:#c6d4e7;box-shadow:0 8px 22px rgba(32,55,88,.07)}
+#view-dashboard .agent-card:focus-visible{outline:3px solid rgba(49,95,206,.2);outline-offset:3px}
+#view-dashboard .dashboard-columns{gap:14px;margin-top:14px}
+#view-dashboard .quick-actions{gap:8px;margin-top:13px}
+#view-dashboard .quick-actions button{min-height:42px;padding:10px 12px;border-radius:10px;font-size:11px;transition:background .16s,border-color .16s,color .16s}
+#view-dashboard .quick-actions button:focus-visible{outline:3px solid rgba(49,95,206,.2);outline-offset:2px}
+#view-dashboard #dashboard-activity{gap:8px}
+#view-dashboard #dashboard-activity .item{padding:12px 13px;border-radius:10px;background:#fbfcfe}
+#view-dashboard #dashboard-activity .item strong{font-size:11px}
+#view-dashboard #dashboard-activity .item small{margin-top:3px;font-size:10px}
+@media(max-width:850px){
+ #view-dashboard .dashboard-head{align-items:flex-start}
+ #view-dashboard .dashboard-head h2{font-size:25px}
+ #view-dashboard .dashboard-grid{gap:9px;margin:16px 0 13px}
+ #view-dashboard .metric-card{min-height:102px;padding:14px 13px}
+ #view-dashboard .metric-card strong{font-size:25px}
+ #view-dashboard .panel{padding:15px}
+ #view-dashboard .agent-cards{gap:8px}
+ #view-dashboard .agent-card{min-height:116px;padding:13px}
+}
+@media(max-width:520px){
+ #view-dashboard .dashboard-head{gap:10px}
+ #view-dashboard .dashboard-head .btn{padding:8px 10px;font-size:10px;white-space:nowrap}
+ #view-dashboard .dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #view-dashboard .agent-cards{grid-template-columns:1fr}
+ #view-dashboard .agent-card{min-height:0}
+ #view-dashboard .agent-card p{min-height:0;max-width:none}
+ #view-dashboard .dashboard-columns{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+ #view-dashboard .metric-card,#view-dashboard .agent-card,#view-dashboard .quick-actions button{transition:none}
+}
+
 </style>
 </head>
 <body>

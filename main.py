@@ -47,7 +47,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger("nexuscore")
 
 APP_NAME = "Nexuscore AI"
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.5.0"
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b").strip()
@@ -485,9 +485,9 @@ async def gerar_imagem(request: ImageGenerationRequest):
     url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}"
     payload = {
         "prompt": request.prompt.strip(),
-        "width": 1024,
-        "height": 1024,
-        "num_steps": 30,
+        "width": 1536,
+        "height": 1536,
+        "num_steps": 40,
         "guidance": 4.5,
     }
     try:
@@ -519,7 +519,7 @@ async def gerar_imagem(request: ImageGenerationRequest):
         image_b64 = None
     if not image_b64 or not isinstance(image_b64, str):
         raise HTTPException(status_code=502, detail="O gerador não retornou uma imagem válida.")
-    return {"imagem": f"data:image/png;base64,{image_b64}", "modelo": model, "resolucao": "1024x1024"}
+    return {"imagem": f"data:image/png;base64,{image_b64}", "modelo": model, "resolucao": "1536x1536"}
 
 
 @app.post("/api/email/enviar")

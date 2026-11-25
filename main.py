@@ -305,15 +305,15 @@ def cache_set(key: str, value: dict) -> None:
 
 def build_conversation_title(text: str) -> str:
     """Cria um título curto a partir da primeira mensagem, sem uma chamada extra à IA."""
-    value = re.sub(r"\\s+", " ", (text or "")).strip()
+    value = re.sub(r"\s+", " ", (text or "")).strip()
     value = re.sub(
-        r"^(?:oi|olá|ola|bom dia|boa tarde|boa noite)[,!.\\s-]*",
+        r"^(?:oi|olá|ola|bom dia|boa tarde|boa noite)[,!.\s-]*",
         "",
         value,
         flags=re.IGNORECASE,
     )
     value = re.sub(
-        r"^(?:por favor|me ajude a|me ajuda a|quero|preciso|gostaria de)\\s+",
+        r"^(?:por favor|me ajude a|me ajuda a|quero|preciso|gostaria de)\s+",
         "",
         value,
         flags=re.IGNORECASE,

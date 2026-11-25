@@ -5,3 +5,4 @@ httpx
 pydantic
 python-docx
 reportlab
+psycopg[binary]>=3.2,<4.0

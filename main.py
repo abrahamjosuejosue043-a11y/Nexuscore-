@@ -773,7 +773,7 @@ async def gerar_plano_diretoria(
     try:
         plan_id = storage.create_work_plan(
             title[:160], request.objetivo.strip(), summary[:8000],
-            request.projeto_id, items, conversation_id=request.conversa_id,
+            request.projeto_id, items,
         )
     except ValueError:
         raise HTTPException(status_code=404, detail="Projeto não encontrado.")

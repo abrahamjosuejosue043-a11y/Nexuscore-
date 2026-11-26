@@ -389,8 +389,14 @@ def create_department_task(
         return cur.lastrowid
 
 
-def list_department_tasks(limit=100, department=None, status=None):
-    """Lista tarefas por departamento/status; sem filtro retorna o quadro completo."""
+def list_department_tasks(
+    limit=100, department=None, status=None, conversation_id=None, project_id=None
+):
+    """Lista tarefas com filtros opcionais de departamento, conversa e projeto.
+
+    Quando conversation_id ou project_id é informado, a consulta fica restrita
+    exatamente àquele vínculo; tarefas sem vínculo não são misturadas ao contexto.
+    """
     conditions = []
     params = []
     if department:
@@ -399,6 +405,12 @@ def list_department_tasks(limit=100, department=None, status=None):
     if status:
         conditions.append("status=?")
         params.append(str(status))
+    if conversation_id is not None:
+        conditions.append("conversation_id=?")
+        params.append(str(conversation_id))
+    if project_id is not None:
+        conditions.append("project_id=?")
+        params.append(int(project_id))
     where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
     params.append(max(1, min(int(limit), 200)))
     query = (

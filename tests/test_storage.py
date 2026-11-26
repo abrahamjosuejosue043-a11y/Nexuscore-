@@ -208,6 +208,40 @@ class StorageTests(unittest.TestCase):
         self.assertIsNotNone(completed["completed_at"])
         self.assertEqual(completed["result"], "Testes revisados e aprovados.")
 
+    def test_department_tasks_can_be_isolated_by_conversation_and_project(self):
+        conversation_a = self.storage.create_department_task(
+            "Tarefa conversa A", "Contexto exclusivo da conversa A.",
+            "programacao", "alta", conversation_id="conversation-a", project_id=11,
+        )
+        conversation_b = self.storage.create_department_task(
+            "Tarefa conversa B", "Contexto exclusivo da conversa B.",
+            "programacao", "media", conversation_id="conversation-b", project_id=22,
+        )
+        unlinked = self.storage.create_department_task(
+            "Tarefa sem vínculo", "Não deve entrar em contexto de conversa.",
+            "programacao", "baixa",
+        )
+
+        tasks_a = self.storage.list_department_tasks(
+            100, department="programacao", conversation_id="conversation-a"
+        )
+        self.assertEqual([item["id"] for item in tasks_a], [conversation_a])
+        self.assertNotIn(conversation_b, {item["id"] for item in tasks_a})
+        self.assertNotIn(unlinked, {item["id"] for item in tasks_a})
+
+        tasks_project_22 = self.storage.list_department_tasks(
+            100, department="programacao", project_id=22
+        )
+        self.assertEqual([item["id"] for item in tasks_project_22], [conversation_b])
+
+        # Sem filtros, o quadro administrativo continua exibindo todas as tarefas.
+        all_tasks = self.storage.list_department_tasks(100, department="programacao")
+        self.assertTrue(
+            {conversation_a, conversation_b, unlinked}.issubset(
+                {item["id"] for item in all_tasks}
+            )
+        )
+
     def test_archived_memory_is_no_longer_shared_but_is_preserved(self):
         memory_id = self.storage.save_shared_memory(
             "Decisão temporária", "Este registro será arquivado.", "decisao", "todos"

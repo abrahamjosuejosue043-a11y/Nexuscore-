@@ -425,11 +425,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 </section>
 <section class="view" id="view-memoria">
  <div class="view-head"><div><h2>Memória compartilhada</h2><p>Conhecimentos, objetivos, decisões e processos consultados pelos agentes.</p></div><button class="btn" id="load-memory">Atualizar</button></div>
- <div class="notice">Registre aqui informações que os departamentos devem considerar em diferentes conversas. A memória não salva automaticamente tudo o que é dito nos chats: somente os registros que você adicionar serão compartilhados.</div>
+ <div class="notice">Registre informações que os agentes devem considerar. Memórias globais podem ser usadas em qualquer projeto; memórias vinculadas só entram em conversas do projeto correspondente. Registros antigos sem escopo continuam visíveis, mas não são enviados a conversas vinculadas a projetos.</div>
  <div class="panel">
   <h3>Novo registro de memória</h3>
   <div class="field"><label for="memory-title">Título</label><input id="memory-title" maxlength="160" placeholder="Ex.: Objetivo principal do Nexuscore"></div>
   <div class="field"><label for="memory-content">Conteúdo</label><textarea id="memory-content" maxlength="8000" placeholder="Escreva a informação, decisão, regra ou contexto que os agentes devem lembrar..."></textarea></div>
+  <div class="field"><label for="memory-project">Escopo da memória</label><select id="memory-project"><option value="">Global · todos os projetos</option></select><small>Escolha um projeto para restringir esta memória a ele.</small></div>
   <div class="grid2">
    <div class="field"><label for="memory-category">Categoria</label><select id="memory-category"><option value="contexto">Contexto</option><option value="decisao">Decisão</option><option value="objetivo">Objetivo</option><option value="processo">Processo</option><option value="preferencia">Preferência</option><option value="referencia">Referência</option></select></div>
    <div class="field"><label for="memory-department">Compartilhar com</label><select id="memory-department"><option value="todos">Todos os departamentos</option><option value="geral">Nexuscore</option><option value="diretoria">Diretoria</option><option value="programacao">Engenharia</option><option value="publicidade">Marketing</option></select></div>
@@ -871,8 +872,21 @@ function memoryDepartmentLabel(value){
 function memoryCategoryLabel(value){
  return ({contexto:"Contexto",decisao:"Decisão",objetivo:"Objetivo",processo:"Processo",preferencia:"Preferência",referencia:"Referência"})[value]||value||"Contexto";
 }
+async function loadMemoryProjects(){
+ const select=$("memory-project");if(!select)return;
+ try{
+  const data=await api("/api/projetos?limit=200");
+  select.replaceChildren(new Option("Global · todos os projetos",""));
+  (data.items||[]).forEach(project=>select.add(new Option(project.title+" · #"+project.id,String(project.id))));
+  select.disabled=false;
+ }catch(error){
+  select.replaceChildren(new Option("Configure o token para listar projetos",""));
+  select.disabled=true;
+ }
+}
 async function loadMemory(){
  const box=$("memory-list");
+ await loadMemoryProjects();
  if(!box)return;
  box.innerHTML='<div class="empty">Carregando memórias...</div>';
  try{
@@ -885,7 +899,8 @@ async function loadMemory(){
    const title=document.createElement("strong");title.textContent=item.title||"Sem título";
    const body=document.createElement("p");body.textContent=item.content||"";
    const meta=document.createElement("small");
-   meta.textContent=memoryCategoryLabel(item.category)+" · "+memoryDepartmentLabel(item.department)+" · Criada "+formatConversationDate(item.created_at);
+   const scopeLabel=item.scope==="legacy"?"Registro antigo sem escopo":item.scope==="project"?"Projeto #"+item.project_id:"Global";
+   meta.textContent=scopeLabel+" · "+memoryCategoryLabel(item.category)+" · "+memoryDepartmentLabel(item.department)+" · Criada "+formatConversationDate(item.created_at);
    const archive=document.createElement("button");archive.type="button";archive.className="btn";archive.textContent="Arquivar";
    archive.addEventListener("click",async()=>{
     if(!window.confirm("Arquivar esta memória? Os agentes deixarão de recebê-la como contexto, mas o registro permanecerá no banco."))return;
@@ -907,9 +922,10 @@ $("save-memory").addEventListener("click",async()=>{
  button.disabled=true;button.textContent="Salvando...";
  try{
   await api("/api/memoria",{method:"POST",body:JSON.stringify({
-   titulo,conteudo,categoria:$("memory-category").value,departamento:$("memory-department").value
+   titulo,conteudo,categoria:$("memory-category").value,departamento:$("memory-department").value,
+   project_id:$("memory-project").value?Number($("memory-project").value):null
   })});
-  $("memory-title").value="";$("memory-content").value="";
+  $("memory-title").value="";$("memory-content").value="";$("memory-project").value="";
   status.textContent="Memória registrada. Os agentes poderão consultá-la nas próximas respostas.";
   status.style.color="var(--green)";
   await loadMemory();

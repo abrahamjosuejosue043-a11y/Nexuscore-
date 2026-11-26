@@ -164,6 +164,54 @@ class StorageTests(unittest.TestCase):
         self.assertIn(engineering_id, engineering_ids)
         self.assertNotIn(engineering_id, marketing_ids)
 
+    def test_shared_memory_prompt_scope_prevents_cross_project_context(self):
+        project_a = self.storage.save_project("Projeto memória A", "Escopo A.")
+        project_b = self.storage.save_project("Projeto memória B", "Escopo B.")
+        global_id = self.storage.save_shared_memory(
+            "Regra global", "Registrar decisões importantes.", "processo", "todos"
+        )
+        memory_a = self.storage.save_shared_memory(
+            "Plano do projeto A", "Executar etapa exclusiva A.", "objetivo", "todos",
+            project_id=project_a,
+        )
+        memory_b = self.storage.save_shared_memory(
+            "Plano do projeto B", "Executar etapa exclusiva B.", "objetivo", "todos",
+            project_id=project_b,
+        )
+        legacy_id = self.storage.save_shared_memory(
+            "Registro antigo", "Conteúdo antigo sem escopo definido.", "contexto", "todos"
+        )
+        with self.storage.connection() as db:
+            db.execute(
+                "UPDATE shared_memory SET scope='legacy' WHERE id=?",
+                (legacy_id,),
+            )
+
+        context_a = self.storage.shared_memories(
+            100, department="geral", project_id=project_a, prompt_context=True
+        )
+        ids_a = {item["id"] for item in context_a}
+        self.assertIn(global_id, ids_a)
+        self.assertIn(memory_a, ids_a)
+        self.assertNotIn(memory_b, ids_a)
+        self.assertNotIn(legacy_id, ids_a)
+
+        unscoped_context = self.storage.shared_memories(
+            100, department="geral", prompt_context=True
+        )
+        unscoped_ids = {item["id"] for item in unscoped_context}
+        self.assertIn(global_id, unscoped_ids)
+        self.assertIn(legacy_id, unscoped_ids)
+        self.assertNotIn(memory_a, unscoped_ids)
+        self.assertNotIn(memory_b, unscoped_ids)
+
+    def test_shared_memory_rejects_unknown_project(self):
+        with self.assertRaises(ValueError):
+            self.storage.save_shared_memory(
+                "Memória inválida", "Não deve ser salva em projeto inexistente.",
+                project_id=999999,
+            )
+
     def test_conversation_can_be_linked_to_an_existing_project(self):
         project_id = self.storage.save_project(
             "Projeto vinculado", "Projeto usado para testar o contexto da conversa."

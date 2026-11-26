@@ -161,8 +161,12 @@ def initialize():
                 department TEXT NOT NULL DEFAULT 'todos',
                 source_agent TEXT NOT NULL DEFAULT 'usuario',
                 status TEXT NOT NULL DEFAULT 'active',
+                project_id BIGINT,
+                scope TEXT NOT NULL DEFAULT 'legacy',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+            "ALTER TABLE shared_memory ADD COLUMN IF NOT EXISTS project_id BIGINT",
+            "ALTER TABLE shared_memory ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'legacy'",
             """CREATE TABLE IF NOT EXISTS department_tasks (
                 id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL,
                 assigned_department TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT 'diretoria',
@@ -179,6 +183,7 @@ def initialize():
             "CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)",
             "CREATE INDEX IF NOT EXISTS idx_email_log_created_at ON email_log(created_at)",
             "CREATE INDEX IF NOT EXISTS idx_shared_memory_status_department ON shared_memory(status, department, updated_at)",
+            "CREATE INDEX IF NOT EXISTS idx_shared_memory_scope_project ON shared_memory(status, scope, project_id, updated_at)",
             "CREATE INDEX IF NOT EXISTS idx_department_tasks_queue ON department_tasks(assigned_department, status, priority, updated_at)",
         ]
         with connection() as db:
@@ -229,8 +234,14 @@ def initialize():
             department TEXT NOT NULL DEFAULT 'todos',
             source_agent TEXT NOT NULL DEFAULT 'usuario',
             status TEXT NOT NULL DEFAULT 'active',
+            project_id INTEGER, scope TEXT NOT NULL DEFAULT 'legacy',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        memory_columns = {row["name"] for row in db.execute("PRAGMA table_info(shared_memory)").fetchall()}
+        if "project_id" not in memory_columns:
+            db.execute("ALTER TABLE shared_memory ADD COLUMN project_id INTEGER")
+        if "scope" not in memory_columns:
+            db.execute("ALTER TABLE shared_memory ADD COLUMN scope TEXT NOT NULL DEFAULT 'legacy'")
         db.execute("""CREATE TABLE IF NOT EXISTS department_tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
             description TEXT NOT NULL, assigned_department TEXT NOT NULL,
@@ -249,6 +260,7 @@ def initialize():
         db.execute("CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_email_log_created_at ON email_log(created_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_shared_memory_status_department ON shared_memory(status, department, updated_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_shared_memory_scope_project ON shared_memory(status, scope, project_id, updated_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_department_tasks_queue ON department_tasks(assigned_department, status, priority, updated_at)")
 
 
@@ -464,26 +476,41 @@ def update_department_task(task_id, status, result=None):
         return cur.rowcount > 0
 
 
-def save_shared_memory(title, content, category="contexto", department="todos", source_agent="usuario"):
-    """Registra um conhecimento explícito e persistente para uso compartilhado."""
+def save_shared_memory(
+    title, content, category="contexto", department="todos",
+    source_agent="usuario", project_id=None
+):
+    """Salva memória global ou vinculada a um projeto existente."""
+    value = int(project_id) if project_id is not None else None
     with connection() as db:
+        if value is not None:
+            exists = db.execute("SELECT id FROM projects WHERE id=?", (value,)).fetchone()
+            if not exists:
+                raise ValueError("Projeto não encontrado.")
+        scope = "project" if value is not None else "global"
         cur = db.execute(
             """INSERT INTO shared_memory(
-                   title, content, category, department, source_agent, status
-               ) VALUES(?,?,?,?,?,'active')""",
+                   title, content, category, department, source_agent, status,
+                   project_id, scope
+               ) VALUES(?,?,?,?,?,'active',?,?)""",
             (
                 str(title).strip()[:160],
                 str(content).strip()[:8000],
                 str(category).strip()[:30],
                 str(department).strip()[:30],
                 str(source_agent).strip()[:40],
+                value,
+                scope,
             ),
         )
         return cur.lastrowid
 
 
-def shared_memories(limit=100, department=None, include_archived=False):
-    """Lista memórias ativas; para agentes, inclui registros globais e do próprio departamento."""
+def shared_memories(
+    limit=100, department=None, include_archived=False,
+    project_id=None, prompt_context=False
+):
+    """Lista memórias; no prompt aplica escopo estrito para evitar vazamento entre projetos."""
     conditions = []
     params = []
     if not include_archived:
@@ -491,10 +518,20 @@ def shared_memories(limit=100, department=None, include_archived=False):
     if department:
         conditions.append("(department='todos' OR department=?)")
         params.append(str(department))
+    if prompt_context:
+        if project_id is None:
+            conditions.append("scope IN ('global', 'legacy')")
+        else:
+            conditions.append("(scope='global' OR (scope='project' AND project_id=?))")
+            params.append(int(project_id))
+    elif project_id is not None:
+        conditions.append("project_id=?")
+        params.append(int(project_id))
     where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
     params.append(max(1, min(int(limit), 200)))
     query = (
-        "SELECT id, title, content, category, department, source_agent, status, created_at, updated_at "
+        "SELECT id, title, content, category, department, source_agent, status, "
+        "project_id, scope, created_at, updated_at "
         "FROM shared_memory" + where
         + " ORDER BY updated_at DESC, id DESC LIMIT ?"
     )

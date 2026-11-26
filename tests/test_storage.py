@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from main import build_conversation_title
+from main import build_conversation_title, build_prompt, select_shared_memories
 
 
 class StorageTests(unittest.TestCase):
@@ -123,6 +123,42 @@ class StorageTests(unittest.TestCase):
             )
         )
 
+    def test_shared_memory_is_visible_globally_and_by_department(self):
+        global_id = self.storage.save_shared_memory(
+            "Objetivo central",
+            "O Nexuscore deve registrar decisões importantes e relatórios.",
+            "objetivo",
+            "todos",
+        )
+        engineering_id = self.storage.save_shared_memory(
+            "Padrão de engenharia",
+            "Toda alteração precisa de testes automatizados.",
+            "processo",
+            "programacao",
+        )
+
+        engineering = self.storage.shared_memories(100, department="programacao")
+        marketing = self.storage.shared_memories(100, department="publicidade")
+        engineering_ids = {item["id"] for item in engineering}
+        marketing_ids = {item["id"] for item in marketing}
+
+        self.assertIn(global_id, engineering_ids)
+        self.assertIn(global_id, marketing_ids)
+        self.assertIn(engineering_id, engineering_ids)
+        self.assertNotIn(engineering_id, marketing_ids)
+
+    def test_archived_memory_is_no_longer_shared_but_is_preserved(self):
+        memory_id = self.storage.save_shared_memory(
+            "Decisão temporária", "Este registro será arquivado.", "decisao", "todos"
+        )
+        self.assertTrue(self.storage.archive_shared_memory(memory_id))
+        self.assertFalse(
+            any(item["id"] == memory_id for item in self.storage.shared_memories(100))
+        )
+        archived = self.storage.shared_memories(100, include_archived=True)
+        item = next(item for item in archived if item["id"] == memory_id)
+        self.assertEqual(item["status"], "archived")
+
     def test_postgres_placeholder_adapter_preserves_legacy_queries(self):
         self.assertEqual(
             self.storage._qmark_to_pyformat(
@@ -141,6 +177,47 @@ class StorageTests(unittest.TestCase):
                 raise RuntimeError("forçar rollback")
         items = self.storage.ideas(300)
         self.assertFalse(any(item["title"] == "Não salvar" for item in items))
+
+
+class SharedPromptTests(unittest.TestCase):
+    def test_prompt_includes_conversation_history_and_shared_memory(self):
+        prompt = build_prompt(
+            "Qual é a próxima etapa?",
+            "diretoria",
+            conversation_history=[
+                {"role": "user", "content": "Nosso objetivo é lançar o Nexuscore."},
+                {"role": "assistant", "content": "Precisamos definir as prioridades."},
+            ],
+            shared_memories=[
+                {
+                    "title": "Objetivo do projeto",
+                    "content": "Lançar uma versão estável antes de adicionar novas funções.",
+                    "category": "objetivo",
+                }
+            ],
+        )
+        self.assertIn("Nosso objetivo é lançar o Nexuscore.", prompt)
+        self.assertIn("Lançar uma versão estável", prompt)
+        self.assertIn("MEMÓRIA COMPARTILHADA", prompt)
+        self.assertIn("CONTEXTO DESTA CONVERSA", prompt)
+
+    def test_memory_selector_prefers_matching_subject(self):
+        memories = [
+            {
+                "title": "Estratégia financeira",
+                "content": "Controlar receitas, despesas e fluxo de caixa.",
+                "category": "objetivo",
+                "updated_at": "2026-11-25",
+            },
+            {
+                "title": "Calendário de marketing",
+                "content": "Planejar campanhas e publicações.",
+                "category": "processo",
+                "updated_at": "2026-11-26",
+            },
+        ]
+        selected = select_shared_memories("Como acompanhar o fluxo de caixa?", memories, limit=1)
+        self.assertEqual(selected[0]["title"], "Estratégia financeira")
 
 
 class ConversationTitleTests(unittest.TestCase):

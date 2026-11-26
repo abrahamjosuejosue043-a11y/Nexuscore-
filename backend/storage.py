@@ -440,6 +440,10 @@ def create_department_task(
 ):
     """Cria uma tarefa encaminhada a um departamento."""
     with connection() as db:
+        if project_id is not None:
+            exists = db.execute("SELECT id FROM projects WHERE id=?", (int(project_id),)).fetchone()
+            if not exists:
+                raise ValueError("Projeto não encontrado.")
         cur = db.execute(
             """INSERT INTO department_tasks(
                    title, description, assigned_department, created_by, priority,

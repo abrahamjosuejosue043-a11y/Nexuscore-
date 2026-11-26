@@ -14,7 +14,7 @@ DB_PATH = os.getenv("DATABASE_PATH") or os.getenv("DB_PATH") or str(
     Path(__file__).resolve().parent.parent / "data" / "nexuscore.db"
 )
 SQLITE_TIMEOUT_SECONDS = 30
-_ID_TABLES = {"conversations", "ideas", "projects", "artifacts", "email_log"}
+_ID_TABLES = {"conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory"}
 
 
 def _database_url():

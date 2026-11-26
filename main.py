@@ -498,8 +498,14 @@ async def orquestrador(
     available_memories = storage.shared_memories(limit=30, department=agent_type)
     selected_memories = select_shared_memories(text, available_memories, limit=6)
     task_department = None if agent_type in {"geral", "diretoria"} else agent_type
+    # Contexto de tarefas é isolado por conversa. Tarefas de outras conversas
+    # ou projetos não podem ser injetadas no prompt atual.
     assigned_tasks = [
-        task for task in storage.list_department_tasks(limit=40, department=task_department)
+        task for task in storage.list_department_tasks(
+            limit=40,
+            department=task_department,
+            conversation_id=conversation_id,
+        )
         if task.get("status") != "concluida"
     ][:8]
     prompt = build_prompt(

@@ -618,7 +618,7 @@ def approve_work_plan(plan_id):
             task_ids.append(cur.lastrowid)
         db.execute(
             """UPDATE work_plans SET status='aprovado', approved_at=CURRENT_TIMESTAMP,
-               updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='rascunho'""",
+               updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='aprovando'""",
             (int(plan_id),),
         )
     return task_ids

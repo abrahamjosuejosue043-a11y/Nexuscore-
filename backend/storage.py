@@ -341,11 +341,11 @@ def messages(limit=50):
 def list_conversations(limit=100):
     with connection() as db:
         rows = db.execute(
-            """SELECT s.id, s.title, s.agent, s.created_at, s.updated_at,
+            """SELECT s.id, s.title, s.agent, s.project_id, s.created_at, s.updated_at,
                       COUNT(m.id) AS message_count
                FROM chat_sessions s
                LEFT JOIN conversations m ON m.conversation_id=s.id
-               GROUP BY s.id, s.title, s.agent, s.created_at, s.updated_at
+               GROUP BY s.id, s.title, s.agent, s.project_id, s.created_at, s.updated_at
                ORDER BY s.updated_at DESC
                LIMIT ?""",
             (max(1, min(int(limit), 200)),),

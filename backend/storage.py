@@ -153,12 +153,21 @@ def initialize():
                 id BIGSERIAL PRIMARY KEY, direction TEXT NOT NULL, sender TEXT,
                 recipient TEXT, subject TEXT, body TEXT, status TEXT NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+            """CREATE TABLE IF NOT EXISTS shared_memory (
+                id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'contexto',
+                department TEXT NOT NULL DEFAULT 'todos',
+                source_agent TEXT NOT NULL DEFAULT 'usuario',
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
             "CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)",
             "CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)",
             "CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)",
             "CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status)",
             "CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)",
             "CREATE INDEX IF NOT EXISTS idx_email_log_created_at ON email_log(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_shared_memory_status_department ON shared_memory(status, department, updated_at)",
         ]
         with connection() as db:
             for statement in statements:
@@ -198,6 +207,14 @@ def initialize():
             id INTEGER PRIMARY KEY AUTOINCREMENT, direction TEXT NOT NULL,
             sender TEXT, recipient TEXT, subject TEXT, body TEXT,
             status TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS shared_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+            content TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'contexto',
+            department TEXT NOT NULL DEFAULT 'todos',
+            source_agent TEXT NOT NULL DEFAULT 'usuario',
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)")
@@ -205,6 +222,7 @@ def initialize():
         db.execute("CREATE INDEX IF NOT EXISTS idx_ideas_status ON ideas(status)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_email_log_created_at ON email_log(created_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_shared_memory_status_department ON shared_memory(status, department, updated_at)")
 
 
 def health():
@@ -317,6 +335,55 @@ def rename_conversation(conversation_id, title):
             """UPDATE chat_sessions SET title=?, updated_at=CURRENT_TIMESTAMP
                WHERE id=?""",
             (str(title).strip()[:100], str(conversation_id)),
+        )
+        return cur.rowcount > 0
+
+
+def save_shared_memory(title, content, category="contexto", department="todos", source_agent="usuario"):
+    """Registra um conhecimento explícito e persistente para uso compartilhado."""
+    with connection() as db:
+        cur = db.execute(
+            """INSERT INTO shared_memory(
+                   title, content, category, department, source_agent, status
+               ) VALUES(?,?,?,?,?,'active')""",
+            (
+                str(title).strip()[:160],
+                str(content).strip()[:8000],
+                str(category).strip()[:30],
+                str(department).strip()[:30],
+                str(source_agent).strip()[:40],
+            ),
+        )
+        return cur.lastrowid
+
+
+def shared_memories(limit=100, department=None, include_archived=False):
+    """Lista memórias ativas; para agentes, inclui registros globais e do próprio departamento."""
+    conditions = []
+    params = []
+    if not include_archived:
+        conditions.append("status='active'")
+    if department:
+        conditions.append("(department='todos' OR department=?)")
+        params.append(str(department))
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(max(1, min(int(limit), 200)))
+    query = (
+        "SELECT id, title, content, category, department, source_agent, status, created_at, updated_at "
+        "FROM shared_memory" + where
+        + " ORDER BY updated_at DESC, id DESC LIMIT ?"
+    )
+    with connection() as db:
+        rows = db.execute(query, tuple(params)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def archive_shared_memory(memory_id):
+    """Arquiva sem excluir fisicamente, preservando rastreabilidade."""
+    with connection() as db:
+        cur = db.execute(
+            "UPDATE shared_memory SET status='archived', updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='active'",
+            (int(memory_id),),
         )
         return cur.rowcount > 0
 

@@ -21,6 +21,7 @@ import time
 import hmac
 import uuid
 import logging
+import json
 from pathlib import Path
 from io import BytesIO
 from html import escape as html_escape
@@ -177,6 +178,12 @@ class SharedMemoryRequest(BaseModel):
     project_id: Optional[int] = Field(default=None, ge=1)
 
 
+class WorkPlanGenerateRequest(BaseModel):
+    objetivo: str = Field(..., min_length=20, max_length=8000)
+    projeto_id: int = Field(..., ge=1)
+    conversa_id: Optional[str] = Field(default=None, max_length=36)
+
+
 class DepartmentTaskRequest(BaseModel):
     titulo: str = Field(..., min_length=2, max_length=160)
     descricao: str = Field(..., min_length=5, max_length=8000)
@@ -235,7 +242,9 @@ def extract_provider_error(response: httpx.Response) -> str:
 # Integração Groq (modelo configurado por variável de ambiente)
 # ---------------------------------------------------------------------------
 
-async def chamar_groq(prompt: str, imagens: Optional[list[str]] = None) -> tuple[str, str]:
+async def chamar_groq(
+    prompt: str, imagens: Optional[list[str]] = None, json_mode: bool = False
+) -> tuple[str, str]:
     api_key = get_secret("GROQ_API_KEY")
     if not api_key:
         raise ProviderError(
@@ -258,6 +267,9 @@ async def chamar_groq(prompt: str, imagens: Optional[list[str]] = None) -> tuple
         "reasoning_effort": "high",
         "reasoning_format": "hidden",
     }
+
+    if json_mode and not imagens:
+        payload["response_format"] = {"type": "json_object"}
 
     # Ferramentas nativas são opt-in e só são anexadas ao modelo compatível.
     # O modelo visual continua isolado nesta etapa para não alterar o fluxo de imagens.
@@ -689,6 +701,106 @@ async def renomear_conversa(
     if not storage.rename_conversation(conversa_id, title):
         raise HTTPException(status_code=404, detail="Conversa não encontrada.")
     return {"id": conversa_id, "titulo": title[:100], "status": "renomeada"}
+
+
+@app.get("/api/planos")
+async def listar_planos(
+    limit: int = 50,
+    projeto_id: Optional[int] = None,
+    status: Optional[str] = None,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    if status and status not in {"rascunho", "aprovado", "rejeitado"}:
+        raise HTTPException(status_code=422, detail="Status de plano inválido.")
+    return {"items": storage.list_work_plans(limit, project_id=projeto_id, status=status)}
+
+
+@app.post("/api/planos/gerar")
+async def gerar_plano_diretoria(
+    request: WorkPlanGenerateRequest,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    if not storage.project_exists(request.projeto_id):
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    prompt = (
+        "Você é a Diretoria do Nexuscore AI. Transforme o objetivo em um plano de trabalho "
+        "realista, dividido em tarefas claras e delegáveis. Não execute nada, não diga que "
+        "já fez algo e não invente dados.\n"
+        "Responda SOMENTE com um objeto JSON válido, sem Markdown, com esta estrutura: "
+        '{"titulo":"...","resumo":"...","tarefas":[{"titulo":"...","descricao":"...",'
+        '"departamento":"diretoria|programacao|publicidade|geral","prioridade":"alta|media|baixa"}]}.\n'
+        "Crie entre 3 e 8 tarefas. Cada descrição deve incluir resultado esperado e critérios "
+        "de aceitação. Ordene as tarefas na sequência lógica. Encaminhe implementação técnica "
+        "para programacao, estratégia e comunicação para publicidade, coordenação para diretoria. "
+        "Se houver credenciais, pagamentos, ações legais, publicação ou implantação, descreva "
+        "a necessidade de aprovação humana; não solicite segredos.\n\n"
+        f"Projeto ID: {request.projeto_id}\nObjetivo do usuário:\n{request.objetivo.strip()}"
+    )
+    try:
+        raw, model = await chamar_groq(prompt, json_mode=True)
+        data = json.loads(raw)
+    except ProviderError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=502, detail="A Diretoria não retornou um plano JSON válido.")
+    title = str(data.get("titulo") or "").strip()
+    summary = str(data.get("resumo") or "").strip()
+    raw_items = data.get("tarefas")
+    if not title or not summary or not isinstance(raw_items, list) or not 3 <= len(raw_items) <= 8:
+        raise HTTPException(status_code=502, detail="O plano gerado não atende à estrutura exigida.")
+    allowed_departments = {"diretoria", "programacao", "publicidade", "geral"}
+    allowed_priorities = {"alta", "media", "baixa"}
+    items = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=502, detail="Uma tarefa do plano veio em formato inválido.")
+        department = str(item.get("departamento") or "").strip().lower()
+        priority = str(item.get("prioridade") or "media").strip().lower()
+        task_title = str(item.get("titulo") or "").strip()
+        description = str(item.get("descricao") or "").strip()
+        if department not in allowed_departments or priority not in allowed_priorities or not task_title or not description:
+            raise HTTPException(status_code=502, detail="Uma tarefa do plano contém campos inválidos.")
+        items.append({
+            "title": task_title[:160],
+            "description": description[:8000],
+            "department": department,
+            "priority": priority,
+        })
+    plan_id = storage.create_work_plan(
+        title[:160], request.objetivo.strip(), summary[:8000],
+        request.projeto_id, items, conversation_id=request.conversa_id,
+    )
+    plan = storage.get_work_plan(plan_id)
+    return {"plan": plan, "modelo": model, "status": "rascunho_aguardando_aprovacao"}
+
+
+@app.post("/api/planos/{plan_id}/aprovar")
+async def aprovar_plano(
+    plan_id: int,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    task_ids = storage.approve_work_plan(plan_id)
+    if task_ids is None:
+        if not storage.get_work_plan(plan_id):
+            raise HTTPException(status_code=404, detail="Plano não encontrado.")
+        raise HTTPException(status_code=409, detail="Somente planos em rascunho podem ser aprovados.")
+    return {"id": plan_id, "status": "aprovado", "tarefas_criadas": task_ids}
+
+
+@app.post("/api/planos/{plan_id}/rejeitar")
+async def rejeitar_plano(
+    plan_id: int,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    if not storage.reject_work_plan(plan_id):
+        if not storage.get_work_plan(plan_id):
+            raise HTTPException(status_code=404, detail="Plano não encontrado.")
+        raise HTTPException(status_code=409, detail="Somente planos em rascunho podem ser rejeitados.")
+    return {"id": plan_id, "status": "rejeitado"}
 
 
 @app.get("/api/tarefas")

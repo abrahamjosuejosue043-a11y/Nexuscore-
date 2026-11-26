@@ -14,7 +14,7 @@ DB_PATH = os.getenv("DATABASE_PATH") or os.getenv("DB_PATH") or str(
     Path(__file__).resolve().parent.parent / "data" / "nexuscore.db"
 )
 SQLITE_TIMEOUT_SECONDS = 30
-_ID_TABLES = {"conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory", "department_tasks"}
+_ID_TABLES = {"conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory", "department_tasks", "work_plans", "work_plan_items"}
 
 
 def _database_url():
@@ -172,10 +172,23 @@ def initialize():
                 assigned_department TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT 'diretoria',
                 priority TEXT NOT NULL DEFAULT 'media',
                 status TEXT NOT NULL DEFAULT 'pendente', result TEXT NOT NULL DEFAULT '',
-                conversation_id TEXT, project_id BIGINT,
+                conversation_id TEXT, project_id BIGINT, plan_id BIGINT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMPTZ)""",
+            "ALTER TABLE department_tasks ADD COLUMN IF NOT EXISTS plan_id BIGINT",
+            """CREATE TABLE IF NOT EXISTS work_plans (
+                id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, objective TEXT NOT NULL,
+                summary TEXT NOT NULL, project_id BIGINT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'rascunho', created_by TEXT NOT NULL DEFAULT 'diretoria',
+                conversation_id TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                approved_at TIMESTAMPTZ, rejected_at TIMESTAMPTZ)""",
+            """CREATE TABLE IF NOT EXISTS work_plan_items (
+                id BIGSERIAL PRIMARY KEY, plan_id BIGINT NOT NULL REFERENCES work_plans(id),
+                title TEXT NOT NULL, description TEXT NOT NULL,
+                assigned_department TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'media',
+                position INTEGER NOT NULL DEFAULT 0)""",
             "CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)",
             "CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)",
             "CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)",
@@ -185,6 +198,9 @@ def initialize():
             "CREATE INDEX IF NOT EXISTS idx_shared_memory_status_department ON shared_memory(status, department, updated_at)",
             "CREATE INDEX IF NOT EXISTS idx_shared_memory_scope_project ON shared_memory(status, scope, project_id, updated_at)",
             "CREATE INDEX IF NOT EXISTS idx_department_tasks_queue ON department_tasks(assigned_department, status, priority, updated_at)",
+            "CREATE INDEX IF NOT EXISTS idx_department_tasks_plan ON department_tasks(plan_id)",
+            "CREATE INDEX IF NOT EXISTS idx_work_plans_project_status ON work_plans(project_id, status, updated_at)",
+            "CREATE INDEX IF NOT EXISTS idx_work_plan_items_plan ON work_plan_items(plan_id, position)",
         ]
         with connection() as db:
             for statement in statements:
@@ -248,10 +264,27 @@ def initialize():
             created_by TEXT NOT NULL DEFAULT 'diretoria',
             priority TEXT NOT NULL DEFAULT 'media',
             status TEXT NOT NULL DEFAULT 'pendente', result TEXT NOT NULL DEFAULT '',
-            conversation_id TEXT, project_id INTEGER,
+            conversation_id TEXT, project_id INTEGER, plan_id INTEGER,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             completed_at TEXT)""")
+        task_columns = {row["name"] for row in db.execute("PRAGMA table_info(department_tasks)").fetchall()}
+        if "plan_id" not in task_columns:
+            db.execute("ALTER TABLE department_tasks ADD COLUMN plan_id INTEGER")
+        db.execute("""CREATE TABLE IF NOT EXISTS work_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+            objective TEXT NOT NULL, summary TEXT NOT NULL, project_id INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'rascunho',
+            created_by TEXT NOT NULL DEFAULT 'diretoria', conversation_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            approved_at TEXT, rejected_at TEXT)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS work_plan_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, plan_id INTEGER NOT NULL,
+            title TEXT NOT NULL, description TEXT NOT NULL,
+            assigned_department TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'media',
+            position INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(plan_id) REFERENCES work_plans(id))""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)")
@@ -262,6 +295,9 @@ def initialize():
         db.execute("CREATE INDEX IF NOT EXISTS idx_shared_memory_status_department ON shared_memory(status, department, updated_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_shared_memory_scope_project ON shared_memory(status, scope, project_id, updated_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_department_tasks_queue ON department_tasks(assigned_department, status, priority, updated_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_department_tasks_plan ON department_tasks(plan_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_work_plans_project_status ON work_plans(project_id, status, updated_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_work_plan_items_plan ON work_plan_items(plan_id, position)")
 
 
 def health():
@@ -400,15 +436,15 @@ def rename_conversation(conversation_id, title):
 
 def create_department_task(
     title, description, assigned_department, priority="media",
-    created_by="diretoria", conversation_id=None, project_id=None
+    created_by="diretoria", conversation_id=None, project_id=None, plan_id=None
 ):
     """Cria uma tarefa encaminhada a um departamento."""
     with connection() as db:
         cur = db.execute(
             """INSERT INTO department_tasks(
                    title, description, assigned_department, created_by, priority,
-                   conversation_id, project_id
-               ) VALUES(?,?,?,?,?,?,?)""",
+                   conversation_id, project_id, plan_id
+               ) VALUES(?,?,?,?,?,?,?,?)""",
             (
                 str(title).strip()[:160],
                 str(description).strip()[:8000],
@@ -417,6 +453,7 @@ def create_department_task(
                 str(priority),
                 str(conversation_id) if conversation_id else None,
                 int(project_id) if project_id is not None else None,
+                int(plan_id) if plan_id is not None else None,
             ),
         )
         return cur.lastrowid
@@ -438,12 +475,16 @@ def list_department_tasks(
     if status:
         conditions.append("status=?")
         params.append(str(status))
-    if conversation_id is not None:
-        conditions.append("conversation_id=?")
-        params.append(str(conversation_id))
-    if project_id is not None:
-        conditions.append("project_id=?")
-        params.append(int(project_id))
+    if conversation_id is not None and project_id is not None:
+        conditions.append("(conversation_id=? OR (project_id=? AND conversation_id IS NULL))")
+        params.extend([str(conversation_id), int(project_id)])
+    else:
+        if conversation_id is not None:
+            conditions.append("conversation_id=?")
+            params.append(str(conversation_id))
+        if project_id is not None:
+            conditions.append("project_id=?")
+            params.append(int(project_id))
     where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
     params.append(max(1, min(int(limit), 200)))
     query = (
@@ -455,6 +496,133 @@ def list_department_tasks(
         rows = db.execute(query, tuple(params)).fetchall()
     return [dict(row) for row in rows]
 
+
+
+def project_exists(project_id):
+    with connection() as db:
+        return db.execute("SELECT id FROM projects WHERE id=?", (int(project_id),)).fetchone() is not None
+
+
+def create_work_plan(title, objective, summary, project_id, items, conversation_id=None):
+    """Cria um plano em rascunho e seus itens; nada é delegado antes da aprovação."""
+    value = int(project_id)
+    with connection() as db:
+        if not db.execute("SELECT id FROM projects WHERE id=?", (value,)).fetchone():
+            raise ValueError("Projeto não encontrado.")
+        cur = db.execute(
+            """INSERT INTO work_plans(title, objective, summary, project_id, status, conversation_id)
+               VALUES(?,?,?,?, 'rascunho', ?)""",
+            (
+                str(title).strip()[:160],
+                str(objective).strip()[:8000],
+                str(summary).strip()[:8000],
+                value,
+                str(conversation_id) if conversation_id else None,
+            ),
+        )
+        plan_id = cur.lastrowid
+        for position, item in enumerate(items):
+            db.execute(
+                """INSERT INTO work_plan_items(
+                       plan_id, title, description, assigned_department, priority, position
+                   ) VALUES(?,?,?,?,?,?)""",
+                (
+                    plan_id,
+                    str(item["title"]).strip()[:160],
+                    str(item["description"]).strip()[:8000],
+                    str(item["department"]),
+                    str(item["priority"]),
+                    position,
+                ),
+            )
+    return plan_id
+
+
+def get_work_plan(plan_id):
+    with connection() as db:
+        row = db.execute("SELECT * FROM work_plans WHERE id=?", (int(plan_id),)).fetchone()
+        if not row:
+            return None
+        plan = dict(row)
+        items = db.execute(
+            "SELECT * FROM work_plan_items WHERE plan_id=? ORDER BY position, id",
+            (int(plan_id),),
+        ).fetchall()
+    plan["items"] = [dict(item) for item in items]
+    return plan
+
+
+def list_work_plans(limit=50, project_id=None, status=None):
+    conditions = []
+    params = []
+    if project_id is not None:
+        conditions.append("project_id=?")
+        params.append(int(project_id))
+    if status:
+        conditions.append("status=?")
+        params.append(str(status))
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(max(1, min(int(limit), 200)))
+    with connection() as db:
+        rows = db.execute(
+            "SELECT * FROM work_plans" + where + " ORDER BY updated_at DESC, id DESC LIMIT ?",
+            tuple(params),
+        ).fetchall()
+        plans = [dict(row) for row in rows]
+        for plan in plans:
+            items = db.execute(
+                "SELECT * FROM work_plan_items WHERE plan_id=? ORDER BY position, id",
+                (plan["id"],),
+            ).fetchall()
+            plan["items"] = [dict(item) for item in items]
+    return plans
+
+
+def approve_work_plan(plan_id):
+    """Aprova um plano uma única vez e cria as tarefas delegadas atomicamente."""
+    with connection() as db:
+        plan_row = db.execute(
+            "SELECT * FROM work_plans WHERE id=?", (int(plan_id),)
+        ).fetchone()
+        if not plan_row or plan_row["status"] != "rascunho":
+            return None
+        plan = dict(plan_row)
+        items = db.execute(
+            "SELECT * FROM work_plan_items WHERE plan_id=? ORDER BY position, id",
+            (int(plan_id),),
+        ).fetchall()
+        if not items:
+            return None
+        task_ids = []
+        for item in items:
+            cur = db.execute(
+                """INSERT INTO department_tasks(
+                       title, description, assigned_department, created_by, priority,
+                       conversation_id, project_id, plan_id, status, result
+                   ) VALUES(?,?,?,?,?,?,?,?, 'pendente', '')""",
+                (
+                    item["title"], item["description"], item["assigned_department"],
+                    "diretoria", item["priority"], plan.get("conversation_id"),
+                    plan["project_id"], int(plan_id),
+                ),
+            )
+            task_ids.append(cur.lastrowid)
+        db.execute(
+            """UPDATE work_plans SET status='aprovado', approved_at=CURRENT_TIMESTAMP,
+               updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='rascunho'""",
+            (int(plan_id),),
+        )
+    return task_ids
+
+
+def reject_work_plan(plan_id):
+    with connection() as db:
+        cur = db.execute(
+            """UPDATE work_plans SET status='rejeitado', rejected_at=CURRENT_TIMESTAMP,
+               updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='rascunho'""",
+            (int(plan_id),),
+        )
+        return cur.rowcount > 0
 
 def update_department_task(task_id, status, result=None):
     """Atualiza estado e resultado de uma tarefa, mantendo data de conclusão coerente."""

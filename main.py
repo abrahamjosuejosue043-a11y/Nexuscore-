@@ -446,10 +446,11 @@ async def orquestrador(
     history = storage.conversation_messages(conversation_id, limit=8)
     available_memories = storage.shared_memories(limit=30, department=agent_type)
     selected_memories = select_shared_memories(text, available_memories, limit=6)
+    task_department = None if agent_type in {"geral", "diretoria"} else agent_type
     assigned_tasks = [
-        task for task in storage.list_department_tasks(limit=30, department=agent_type)
+        task for task in storage.list_department_tasks(limit=40, department=task_department)
         if task.get("status") != "concluida"
-    ][:5]
+    ][:8]
     prompt = build_prompt(
         text,
         agent_type,

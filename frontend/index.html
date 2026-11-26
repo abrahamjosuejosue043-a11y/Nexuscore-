@@ -866,7 +866,7 @@ $("generate-plan").addEventListener("click",async()=>{
  if(!projectId||objective.length<20){status.textContent="Selecione um projeto e descreva o objetivo com pelo menos 20 caracteres.";status.style.color="var(--red)";return;}
  button.disabled=true;button.textContent="Diretoria analisando...";
  try{
-  const data=await api("/api/planos/gerar",{method:"POST",body:JSON.stringify({projeto_id:Number(projectId),objetivo})});
+  const data=await api("/api/planos/gerar",{method:"POST",body:JSON.stringify({projeto_id:Number(projectId),objetivo:objective})});
   $("plan-objective").value="";
   status.textContent="Plano #"+data.plan.id+" criado como rascunho. Revise os itens antes de aprovar.";
   status.style.color="var(--green)";await loadPlans();

@@ -273,7 +273,7 @@ async def chamar_groq(
 
     # Ferramentas nativas são opt-in e só são anexadas ao modelo compatível.
     # O modelo visual continua isolado nesta etapa para não alterar o fluxo de imagens.
-    agent_tools = configured_groq_tools(model=selected_model) if not imagens else []
+    agent_tools = configured_groq_tools(model=selected_model) if not imagens and not json_mode else []
     if agent_tools:
         payload["tools"] = agent_tools
         payload["tool_choice"] = "auto"
@@ -745,6 +745,8 @@ async def gerar_plano_diretoria(
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
     except (ValueError, TypeError):
         raise HTTPException(status_code=502, detail="A Diretoria não retornou um plano JSON válido.")
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="A Diretoria retornou um formato de plano inválido.")
     title = str(data.get("titulo") or "").strip()
     summary = str(data.get("resumo") or "").strip()
     raw_items = data.get("tarefas")
@@ -768,10 +770,13 @@ async def gerar_plano_diretoria(
             "department": department,
             "priority": priority,
         })
-    plan_id = storage.create_work_plan(
-        title[:160], request.objetivo.strip(), summary[:8000],
-        request.projeto_id, items, conversation_id=request.conversa_id,
-    )
+    try:
+        plan_id = storage.create_work_plan(
+            title[:160], request.objetivo.strip(), summary[:8000],
+            request.projeto_id, items, conversation_id=request.conversa_id,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
     plan = storage.get_work_plan(plan_id)
     return {"plan": plan, "modelo": model, "status": "rascunho_aguardando_aprovacao"}
 
@@ -838,15 +843,18 @@ async def criar_tarefa(
         raise HTTPException(status_code=422, detail="Departamento de destino inválido.")
     if prioridade not in prioridades:
         raise HTTPException(status_code=422, detail="Prioridade inválida.")
-    task_id = storage.create_department_task(
-        request.titulo,
-        request.descricao,
-        departamento,
-        prioridade,
-        created_by="geral",
-        conversation_id=request.conversa_id,
-        project_id=request.projeto_id,
-    )
+    try:
+        task_id = storage.create_department_task(
+            request.titulo,
+            request.descricao,
+            departamento,
+            prioridade,
+            created_by="geral",
+            conversation_id=request.conversa_id,
+            project_id=request.projeto_id,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
     return {"id": task_id, "status": "criada", "departamento": departamento}
 
 

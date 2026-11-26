@@ -24,11 +24,12 @@ import logging
 from pathlib import Path
 from io import BytesIO
 from html import escape as html_escape
-from collections import OrderedDict
+from collections import OrderedDict, deque
+from threading import Lock
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
@@ -62,6 +63,46 @@ CACHE_MAX_ITEMS = int(os.getenv("CACHE_MAX_ITEMS", "100"))
 
 # Cache temporário limitado. Não substitui o futuro banco de dados.
 _RESPONSE_CACHE: OrderedDict[str, dict] = OrderedDict()
+
+# Controle básico de abuso no endpoint público de IA.
+# O limite é local ao processo; no Render este serviço opera com um worker por padrão.
+CHAT_RATE_LIMIT_REQUESTS = 20
+CHAT_RATE_LIMIT_WINDOW_SECONDS = 60.0
+_CHAT_REQUEST_TIMESTAMPS: dict[str, deque[float]] = {}
+_CHAT_RATE_LIMIT_LOCK = Lock()
+
+
+def enforce_chat_rate_limit(client_ip: Optional[str], now: Optional[float] = None) -> None:
+    """Limita chamadas públicas de chat por IP em uma janela móvel de 60 segundos."""
+    key = (str(client_ip or "unknown").strip() or "unknown")[:128]
+    current = time.monotonic() if now is None else float(now)
+    cutoff = current - CHAT_RATE_LIMIT_WINDOW_SECONDS
+
+    with _CHAT_RATE_LIMIT_LOCK:
+        timestamps = _CHAT_REQUEST_TIMESTAMPS.setdefault(key, deque())
+        while timestamps and timestamps[0] <= cutoff:
+            timestamps.popleft()
+
+        if len(timestamps) >= CHAT_RATE_LIMIT_REQUESTS:
+            retry_after = max(1, int(CHAT_RATE_LIMIT_WINDOW_SECONDS - (current - timestamps[0]) + 0.999))
+            raise HTTPException(
+                status_code=429,
+                detail="Limite temporário de mensagens atingido. Aguarde antes de enviar outra solicitação.",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        timestamps.append(current)
+
+        # Evita crescimento ilimitado caso muitas origens diferentes atinjam o endpoint.
+        if len(_CHAT_REQUEST_TIMESTAMPS) > 4096:
+            stale_keys = [
+                ip for ip, entries in _CHAT_REQUEST_TIMESTAMPS.items()
+                if not entries or entries[-1] <= cutoff
+            ]
+            for ip in stale_keys:
+                _CHAT_REQUEST_TIMESTAMPS.pop(ip, None)
+
+
 
 
 def get_secret(name: str) -> Optional[str]:
@@ -299,9 +340,9 @@ def select_shared_memories(text: str, memories: list[dict], limit: int = 6) -> l
         ranked.append((score, str(item.get("updated_at") or ""), item))
     ranked.sort(key=lambda row: (row[0], row[1]), reverse=True)
     matched = [item for score, _, item in ranked if score > 0][:limit]
-    if matched:
-        return matched
-    return [item for _, _, item in ranked[:min(3, limit)]]
+    # Não injeta registros sem relação com a solicitação: memória irrelevante
+    # aumenta ruído e pode expor contexto que o agente não precisa receber.
+    return matched
 
 
 def build_prompt(
@@ -853,7 +894,9 @@ async def baixar_arquivo(artifact_id: int, x_admin_token: Optional[str] = Header
 
 
 @app.post("/api/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, http_request: Request):
+    client_ip = http_request.client.host if http_request.client else None
+    enforce_chat_rate_limit(client_ip)
     for image_data in request.imagens:
         if len(image_data) > 8_000_000:
             raise HTTPException(status_code=413, detail="Imagem muito grande. Reduza a imagem antes de enviar.")

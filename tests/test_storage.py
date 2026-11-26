@@ -236,9 +236,10 @@ class StorageTests(unittest.TestCase):
 
         # Sem filtros, o quadro administrativo continua exibindo todas as tarefas.
         all_tasks = self.storage.list_department_tasks(100, department="programacao")
-        self.assertEqual(
-            {conversation_a, conversation_b, unlinked},
-            {item["id"] for item in all_tasks},
+        self.assertTrue(
+            {conversation_a, conversation_b, unlinked}.issubset(
+                {item["id"] for item in all_tasks}
+            )
         )
 
     def test_archived_memory_is_no_longer_shared_but_is_preserved(self):

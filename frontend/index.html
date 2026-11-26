@@ -403,9 +403,18 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 </section>
 <section class="view" id="view-tarefas">
  <div class="view-head"><div><h2>Coordenação de tarefas</h2><p>A Diretoria encaminha atividades; cada departamento consulta sua fila e registra o resultado.</p></div><button class="btn" id="load-tasks">Atualizar</button></div>
- <div class="notice">Esta é uma fila compartilhada e rastreável. A atribuição não executa a tarefa automaticamente: o agente recebe o contexto quando você conversa com ele, e a conclusão é registrada após revisão.</div>
+ <div class="notice">A Diretoria pode transformar um objetivo em um plano dividido por departamento. O plano fica em rascunho e nenhuma tarefa é encaminhada até sua aprovação. A fila manual continua disponível abaixo.</div>
  <div class="panel">
-  <h3>Encaminhar nova tarefa</h3>
+  <h3>Gerar plano com a Diretoria</h3>
+  <div class="field"><label for="plan-project">Projeto</label><select id="plan-project"><option value="">Carregando projetos...</option></select></div>
+  <div class="field"><label for="plan-objective">Objetivo e contexto</label><textarea id="plan-objective" maxlength="8000" placeholder="Descreva o que deseja alcançar, restrições, prazo e resultado esperado..."></textarea></div>
+  <div class="actions"><button class="btn primary" id="generate-plan">Gerar plano para revisão</button></div>
+  <div id="plan-generate-status" class="hint" aria-live="polite"></div>
+ </div>
+ <div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Planos da Diretoria</h2><p>Revise os itens antes de aprovar a distribuição das tarefas.</p></div><button class="btn" id="load-plans">Atualizar planos</button></div>
+ <div id="plan-list" class="list"><div class="empty">Carregando planos...</div></div>
+ <div class="panel">
+  <h3>Encaminhar tarefa manualmente</h3>
   <div class="field"><label for="task-title">Título da tarefa</label><input id="task-title" maxlength="160" placeholder="Ex.: Revisar fluxo de cadastro"></div>
   <div class="field"><label for="task-description">Descrição e resultado esperado</label><textarea id="task-description" maxlength="8000" placeholder="Explique o que precisa ser feito, contexto, critérios de aceitação e restrições..."></textarea></div>
   <div class="grid2">
@@ -583,7 +592,7 @@ addComposerTools();
 function detailMessage(detail){if(typeof detail==="string")return detail;if(detail&&typeof detail==="object"){const bits=[detail.mensagem,...(detail.motivos||[]),detail.orientacao].filter(Boolean);return bits.join("\n")||JSON.stringify(detail);}return "O servidor retornou um erro sem explicação.";}
 const API_BASE=window.Capacitor?.isNativePlatform?.()?"https://nexuscore-1-ljbi.onrender.com":"";
 async function api(url,options={}){const response=await fetch(API_BASE+url,{...options,headers:{...headers(options.body!==undefined),...(options.headers||{})}});const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{};}catch(e){data={detail:raw||"Resposta inválida do servidor."};}if(!response.ok)throw new Error(detailMessage(data.detail)||("Falha HTTP "+response.status));return data;}
-function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="tarefas")loadTasks();if(name==="memoria")loadMemory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();if(name==="arquivos")loadArtifacts();if(CHAT_TYPES.includes(name))restoreActiveConversation(name);}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
+function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="tarefas"){loadTasks();loadPlans();}if(name==="memoria")loadMemory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();if(name==="arquivos")loadArtifacts();if(CHAT_TYPES.includes(name))restoreActiveConversation(name);}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
 function addBubble(chat,text,kind="assistant",meta=""){const empty=chat.querySelector(".welcome");if(empty)empty.remove();const el=document.createElement("div");el.className="bubble "+kind;el.textContent=text;if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;el.appendChild(m);}chat.appendChild(el);chat.scrollTop=chat.scrollHeight;return el;}
 function renderAssistantText(target,raw){
@@ -804,6 +813,60 @@ function taskDepartmentLabel(value){
 function taskStatusLabel(value){
  return ({pendente:"Pendente",em_andamento:"Em andamento",bloqueada:"Bloqueada",concluida:"Concluída"})[value]||value||"Pendente";
 }
+async function loadPlanProjects(){
+ const select=$("plan-project");if(!select)return;
+ try{
+  const data=await api("/api/projetos?limit=200");
+  select.replaceChildren(new Option("Selecione um projeto",""));
+  (data.items||[]).forEach(project=>select.add(new Option(project.title+" · #"+project.id,String(project.id))));
+  select.disabled=!(data.items||[]).length;
+ }catch(error){
+  select.replaceChildren(new Option("Configure o token para listar projetos",""));
+  select.disabled=true;
+ }
+}
+async function loadPlans(){
+ const box=$("plan-list");if(!box)return;
+ await loadPlanProjects();
+ box.innerHTML='<div class="empty">Carregando planos...</div>';
+ try{
+  const data=await api("/api/planos?limit=100");
+  const plans=data.items||[];box.replaceChildren();
+  if(!plans.length){box.innerHTML='<div class="empty">Ainda não há planos da Diretoria.</div>';return;}
+  plans.forEach(plan=>{
+   const card=document.createElement("article");card.className="item";
+   const title=document.createElement("strong");title.textContent="#"+plan.id+" · "+plan.title;
+   const summary=document.createElement("p");summary.textContent=plan.summary||plan.objective||"";
+   const meta=document.createElement("small");meta.textContent="Projeto #"+plan.project_id+" · "+(plan.status==="rascunho"?"Aguardando aprovação":plan.status==="aprovado"?"Aprovado": "Rejeitado")+" · "+formatConversationDate(plan.created_at);
+   const items=document.createElement("ol");
+   (plan.items||[]).forEach(item=>{const li=document.createElement("li");li.textContent=taskDepartmentLabel(item.assigned_department)+" · "+item.title+" — "+item.description;items.appendChild(li);});
+   card.append(title,summary,meta,items);
+   if(plan.status==="rascunho"){
+    const actions=document.createElement("div");actions.className="actions";
+    const approve=document.createElement("button");approve.type="button";approve.className="btn primary";approve.textContent="Aprovar e encaminhar tarefas";
+    approve.addEventListener("click",async()=>{approve.disabled=true;try{const result=await api("/api/planos/"+plan.id+"/aprovar",{method:"POST",body:JSON.stringify({})});alert("Plano aprovado. "+result.tarefas_criadas.length+" tarefas foram encaminhadas.");await loadPlans();await loadTasks();}catch(error){alert(error.message);approve.disabled=false;}});
+    const reject=document.createElement("button");reject.type="button";reject.className="btn";reject.textContent="Rejeitar plano";
+    reject.addEventListener("click",async()=>{if(!window.confirm("Rejeitar este plano? Nenhuma tarefa será encaminhada."))return;reject.disabled=true;try{await api("/api/planos/"+plan.id+"/rejeitar",{method:"POST",body:JSON.stringify({})});await loadPlans();}catch(error){alert(error.message);reject.disabled=false;}});
+    actions.append(approve,reject);card.append(actions);
+   }
+   box.appendChild(card);
+  });
+ }catch(error){box.replaceChildren();const n=document.createElement("div");n.className="notice error";n.textContent=error.message;box.appendChild(n);}
+}
+$("load-plans").addEventListener("click",loadPlans);
+$("generate-plan").addEventListener("click",async()=>{
+ const button=$("generate-plan"),status=$("plan-generate-status");
+ const projectId=$("plan-project").value,objective=$("plan-objective").value.trim();
+ if(!projectId||objective.length<20){status.textContent="Selecione um projeto e descreva o objetivo com pelo menos 20 caracteres.";status.style.color="var(--red)";return;}
+ button.disabled=true;button.textContent="Diretoria analisando...";
+ try{
+  const data=await api("/api/planos/gerar",{method:"POST",body:JSON.stringify({projeto_id:Number(projectId),objetivo})});
+  $("plan-objective").value="";
+  status.textContent="Plano #"+data.plan.id+" criado como rascunho. Revise os itens antes de aprovar.";
+  status.style.color="var(--green)";await loadPlans();
+ }catch(error){status.textContent=error.message;status.style.color="var(--red)";}
+ finally{button.disabled=false;button.textContent="Gerar plano para revisão";}
+});
 async function loadTasks(){
  const box=$("task-list");
  if(!box)return;

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from main import build_conversation_title, build_prompt, select_shared_memories
+from main import build_conversation_title, build_prompt, enforce_chat_rate_limit, select_shared_memories
 
 
 class StorageTests(unittest.TestCase):
@@ -74,6 +74,23 @@ class StorageTests(unittest.TestCase):
         self.assertIn("RETURNING id", raw.statement)
         self.assertEqual(cursor.lastrowid, 123)
         self.assertEqual(raw.params, ("Ideia", "Resumo", "media"))
+
+    def test_conversation_context_returns_latest_messages_in_order(self):
+        conversation_id = "thread-latest-context"
+        self.storage.ensure_conversation(conversation_id, "Contexto recente", "geral")
+        for index in range(12):
+            self.storage.save_message(
+                "user" if index % 2 == 0 else "assistant",
+                "geral",
+                f"Mensagem {index}",
+                conversation_id=conversation_id,
+            )
+
+        items = self.storage.conversation_messages(conversation_id, limit=8)
+        self.assertEqual(
+            [item["content"] for item in items],
+            [f"Mensagem {index}" for index in range(4, 12)],
+        )
 
     def test_chat_conversation_groups_messages_and_can_be_renamed(self):
         conversation_id = "thread-test-001"
@@ -264,6 +281,33 @@ class SharedPromptTests(unittest.TestCase):
         self.assertIn("Validar fluxo de login", prompt)
         self.assertIn("Revisar autenticação e criar testes", prompt)
         self.assertIn("não pode alterar", prompt)
+
+    def test_memory_selector_does_not_inject_unrelated_memories(self):
+        memories = [
+            {
+                "title": "Planejamento financeiro",
+                "content": "Acompanhar receitas e despesas mensais.",
+                "category": "objetivo",
+                "updated_at": "2026-11-26",
+            }
+        ]
+        selected = select_shared_memories(
+            "Como melhorar a iluminação do escritório?", memories, limit=6
+        )
+        self.assertEqual(selected, [])
+
+    def test_chat_rate_limit_blocks_requests_over_window_and_recovers(self):
+        client_ip = "unit-test-rate-limit-security"
+        for _ in range(20):
+            enforce_chat_rate_limit(client_ip, now=100.0)
+
+        with self.assertRaises(Exception) as captured:
+            enforce_chat_rate_limit(client_ip, now=100.0)
+        self.assertEqual(captured.exception.status_code, 429)
+        self.assertIn("Retry-After", captured.exception.headers)
+
+        # Depois da janela, a mesma origem pode voltar a usar o chat.
+        enforce_chat_rate_limit(client_ip, now=161.0)
 
     def test_memory_selector_prefers_matching_subject(self):
         memories = [

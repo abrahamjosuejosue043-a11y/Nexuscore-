@@ -301,7 +301,7 @@ class StorageTests(unittest.TestCase):
         )
 
         tasks_a = self.storage.list_department_tasks(
-            100, department="programacao", conversation_id="conversation-a"
+            100, department="programacao", conversation_id="conversation-a", project_id=11
         )
         self.assertEqual([item["id"] for item in tasks_a], [conversation_a])
         self.assertNotIn(conversation_b, {item["id"] for item in tasks_a})
@@ -319,6 +319,79 @@ class StorageTests(unittest.TestCase):
                 {item["id"] for item in all_tasks}
             )
         )
+
+    def test_work_plan_requires_approval_before_delegation(self):
+        project_id = self.storage.save_project("Projeto plano", "Projeto para testar a Diretoria.")
+        items = [
+            {"title": "Analisar requisitos", "description": "Entregar requisitos e critérios.", "department": "diretoria", "priority": "alta"},
+            {"title": "Implementar solução", "description": "Entregar código testado.", "department": "programacao", "priority": "alta"},
+            {"title": "Preparar comunicação", "description": "Entregar plano de comunicação.", "department": "publicidade", "priority": "media"},
+        ]
+        plan_id = self.storage.create_work_plan(
+            "Plano de lançamento", "Lançar a funcionalidade com segurança.",
+            "Plano em três frentes.", project_id, items,
+        )
+        plan = self.storage.get_work_plan(plan_id)
+        self.assertEqual(plan["status"], "rascunho")
+        self.assertEqual(len(plan["items"]), 3)
+        self.assertFalse(any(
+            item.get("plan_id") == plan_id
+            for item in self.storage.list_department_tasks(200)
+        ))
+
+        task_ids = self.storage.approve_work_plan(plan_id)
+        self.assertEqual(len(task_ids), 3)
+        approved = self.storage.get_work_plan(plan_id)
+        self.assertEqual(approved["status"], "aprovado")
+        tasks = [
+            item for item in self.storage.list_department_tasks(200)
+            if item.get("plan_id") == plan_id
+        ]
+        self.assertEqual({item["id"] for item in tasks}, set(task_ids))
+        self.assertTrue(all(item["project_id"] == project_id for item in tasks))
+        self.assertTrue(all(item["status"] == "pendente" for item in tasks))
+        self.assertIsNone(self.storage.approve_work_plan(plan_id))
+
+    def test_rejected_work_plan_never_creates_department_tasks(self):
+        project_id = self.storage.save_project("Projeto rejeitado", "Projeto de teste.")
+        plan_id = self.storage.create_work_plan(
+            "Plano não aprovado", "Objetivo que será rejeitado.", "Resumo.",
+            project_id,
+            [
+                {"title": "Tarefa A", "description": "Descrição A.", "department": "diretoria", "priority": "media"},
+                {"title": "Tarefa B", "description": "Descrição B.", "department": "programacao", "priority": "media"},
+                {"title": "Tarefa C", "description": "Descrição C.", "department": "publicidade", "priority": "baixa"},
+            ],
+        )
+        self.assertTrue(self.storage.reject_work_plan(plan_id))
+        self.assertEqual(self.storage.get_work_plan(plan_id)["status"], "rejeitado")
+        self.assertFalse(any(
+            item.get("plan_id") == plan_id
+            for item in self.storage.list_department_tasks(200)
+        ))
+        self.assertFalse(self.storage.reject_work_plan(plan_id))
+
+    def test_project_tasks_are_visible_only_inside_matching_project_context(self):
+        project_id = self.storage.save_project("Projeto tarefa", "Contexto de tarefas.")
+        shared = self.storage.create_department_task(
+            "Tarefa compartilhada do projeto", "Disponível nas conversas do projeto.",
+            "programacao", "alta", project_id=project_id,
+        )
+        same_conversation = self.storage.create_department_task(
+            "Tarefa desta conversa", "Vinculada à conversa e projeto.",
+            "programacao", "media", conversation_id="conv-current", project_id=project_id,
+        )
+        other_conversation = self.storage.create_department_task(
+            "Tarefa de outra conversa", "Não deve aparecer nesta conversa.",
+            "programacao", "media", conversation_id="conv-other", project_id=project_id,
+        )
+        context = self.storage.list_department_tasks(
+            100, department="programacao", conversation_id="conv-current", project_id=project_id
+        )
+        ids = {item["id"] for item in context}
+        self.assertIn(shared, ids)
+        self.assertIn(same_conversation, ids)
+        self.assertNotIn(other_conversation, ids)
 
     def test_archived_memory_is_no_longer_shared_but_is_preserved(self):
         memory_id = self.storage.save_shared_memory(

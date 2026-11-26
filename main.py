@@ -181,7 +181,6 @@ class SharedMemoryRequest(BaseModel):
 class WorkPlanGenerateRequest(BaseModel):
     objetivo: str = Field(..., min_length=20, max_length=8000)
     projeto_id: int = Field(..., ge=1)
-    conversa_id: Optional[str] = Field(default=None, max_length=36)
 
 
 class DepartmentTaskRequest(BaseModel):

@@ -13,8 +13,9 @@ from pathlib import Path
 import sqlite3
 import sys
 
-TABLES = ("chat_sessions", "conversations", "ideas", "projects", "artifacts", "email_log")
-SERIAL_TABLES = ("conversations", "ideas", "projects", "artifacts", "email_log")
+TABLES = ("chat_sessions", "conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory")
+OPTIONAL_TABLES = {"chat_sessions", "shared_memory"}
+SERIAL_TABLES = ("conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory")
 
 
 def create_backup(source: Path) -> Path:
@@ -58,7 +59,7 @@ def migrate(source: Path, database_url: str) -> dict:
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 ).fetchall()
             }
-            required_tables = set(TABLES) - {"chat_sessions"}
+            required_tables = set(TABLES) - OPTIONAL_TABLES
             missing = required_tables - source_tables
             if missing:
                 raise RuntimeError(
@@ -97,6 +98,8 @@ def migrate(source: Path, database_url: str) -> dict:
                             [{"id": legacy_id, "title": "Histórico anterior", "agent": "geral"}]
                             if needs_legacy_session else []
                         )
+                    elif table in OPTIONAL_TABLES and table not in source_tables:
+                        rows = []
                     else:
                         rows = source_conn.execute(f"SELECT * FROM {table}").fetchall()
 

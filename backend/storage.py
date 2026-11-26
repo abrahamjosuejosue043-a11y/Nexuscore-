@@ -476,15 +476,16 @@ def list_department_tasks(
         conditions.append("status=?")
         params.append(str(status))
     if conversation_id is not None and project_id is not None:
-        conditions.append("(conversation_id=? OR (project_id=? AND conversation_id IS NULL))")
-        params.extend([str(conversation_id), int(project_id)])
-    else:
-        if conversation_id is not None:
-            conditions.append("conversation_id=?")
-            params.append(str(conversation_id))
-        if project_id is not None:
-            conditions.append("project_id=?")
-            params.append(int(project_id))
+        conditions.append(
+            "((conversation_id=? AND project_id=?) OR (project_id=? AND conversation_id IS NULL))"
+        )
+        params.extend([str(conversation_id), int(project_id), int(project_id)])
+    elif conversation_id is not None:
+        conditions.append("conversation_id=? AND project_id IS NULL")
+        params.append(str(conversation_id))
+    elif project_id is not None:
+        conditions.append("project_id=?")
+        params.append(int(project_id))
     where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
     params.append(max(1, min(int(limit), 200)))
     query = (

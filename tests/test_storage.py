@@ -147,6 +147,50 @@ class StorageTests(unittest.TestCase):
         self.assertIn(engineering_id, engineering_ids)
         self.assertNotIn(engineering_id, marketing_ids)
 
+    def test_department_tasks_are_assigned_and_track_progress(self):
+        task_id = self.storage.create_department_task(
+            "Validar fluxo de login",
+            "Revisar autenticação e escrever testes automatizados.",
+            "programacao",
+            "alta",
+            created_by="geral",
+        )
+        engineering = self.storage.list_department_tasks(
+            100, department="programacao"
+        )
+        marketing = self.storage.list_department_tasks(
+            100, department="publicidade"
+        )
+        task = next(item for item in engineering if item["id"] == task_id)
+        self.assertEqual(task["status"], "pendente")
+        self.assertEqual(task["priority"], "alta")
+        self.assertFalse(any(item["id"] == task_id for item in marketing))
+
+        self.assertTrue(
+            self.storage.update_department_task(
+                task_id, "em_andamento", "Auditoria iniciada."
+            )
+        )
+        updated = next(
+            item for item in self.storage.list_department_tasks(100, "programacao")
+            if item["id"] == task_id
+        )
+        self.assertEqual(updated["status"], "em_andamento")
+        self.assertEqual(updated["result"], "Auditoria iniciada.")
+
+        self.assertTrue(
+            self.storage.update_department_task(
+                task_id, "concluida", "Testes revisados e aprovados."
+            )
+        )
+        completed = next(
+            item for item in self.storage.list_department_tasks(100, "programacao")
+            if item["id"] == task_id
+        )
+        self.assertEqual(completed["status"], "concluida")
+        self.assertIsNotNone(completed["completed_at"])
+        self.assertEqual(completed["result"], "Testes revisados e aprovados.")
+
     def test_archived_memory_is_no_longer_shared_but_is_preserved(self):
         memory_id = self.storage.save_shared_memory(
             "Decisão temporária", "Este registro será arquivado.", "decisao", "todos"
@@ -200,6 +244,26 @@ class SharedPromptTests(unittest.TestCase):
         self.assertIn("Lançar uma versão estável", prompt)
         self.assertIn("MEMÓRIA COMPARTILHADA", prompt)
         self.assertIn("CONTEXTO DESTA CONVERSA", prompt)
+
+    def test_prompt_includes_tasks_assigned_to_current_department(self):
+        prompt = build_prompt(
+            "Vamos trabalhar na tarefa atribuída?",
+            "programacao",
+            department_tasks=[
+                {
+                    "id": 21,
+                    "title": "Validar fluxo de login",
+                    "description": "Revisar autenticação e criar testes.",
+                    "status": "pendente",
+                    "priority": "alta",
+                    "result": "",
+                }
+            ],
+        )
+        self.assertIn("FILA DE TAREFAS DO SEU DEPARTAMENTO", prompt)
+        self.assertIn("Validar fluxo de login", prompt)
+        self.assertIn("Revisar autenticação e criar testes", prompt)
+        self.assertIn("não pode alterar", prompt)
 
     def test_memory_selector_prefers_matching_subject(self):
         memories = [

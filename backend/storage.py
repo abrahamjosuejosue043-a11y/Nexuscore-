@@ -14,7 +14,7 @@ DB_PATH = os.getenv("DATABASE_PATH") or os.getenv("DB_PATH") or str(
     Path(__file__).resolve().parent.parent / "data" / "nexuscore.db"
 )
 SQLITE_TIMEOUT_SECONDS = 30
-_ID_TABLES = {"conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory"}
+_ID_TABLES = {"conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory", "department_tasks"}
 
 
 def _database_url():
@@ -161,6 +161,15 @@ def initialize():
                 status TEXT NOT NULL DEFAULT 'active',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+            """CREATE TABLE IF NOT EXISTS department_tasks (
+                id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL,
+                assigned_department TEXT NOT NULL, created_by TEXT NOT NULL DEFAULT 'diretoria',
+                priority TEXT NOT NULL DEFAULT 'media',
+                status TEXT NOT NULL DEFAULT 'pendente', result TEXT NOT NULL DEFAULT '',
+                conversation_id TEXT, project_id BIGINT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMPTZ)""",
             "CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)",
             "CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)",
             "CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)",
@@ -168,6 +177,7 @@ def initialize():
             "CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)",
             "CREATE INDEX IF NOT EXISTS idx_email_log_created_at ON email_log(created_at)",
             "CREATE INDEX IF NOT EXISTS idx_shared_memory_status_department ON shared_memory(status, department, updated_at)",
+            "CREATE INDEX IF NOT EXISTS idx_department_tasks_queue ON department_tasks(assigned_department, status, priority, updated_at)",
         ]
         with connection() as db:
             for statement in statements:
@@ -215,6 +225,16 @@ def initialize():
             status TEXT NOT NULL DEFAULT 'active',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS department_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+            description TEXT NOT NULL, assigned_department TEXT NOT NULL,
+            created_by TEXT NOT NULL DEFAULT 'diretoria',
+            priority TEXT NOT NULL DEFAULT 'media',
+            status TEXT NOT NULL DEFAULT 'pendente', result TEXT NOT NULL DEFAULT '',
+            conversation_id TEXT, project_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT)""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)")
@@ -223,6 +243,7 @@ def initialize():
         db.execute("CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_email_log_created_at ON email_log(created_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_shared_memory_status_department ON shared_memory(status, department, updated_at)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_department_tasks_queue ON department_tasks(assigned_department, status, priority, updated_at)")
 
 
 def health():
@@ -335,6 +356,72 @@ def rename_conversation(conversation_id, title):
             """UPDATE chat_sessions SET title=?, updated_at=CURRENT_TIMESTAMP
                WHERE id=?""",
             (str(title).strip()[:100], str(conversation_id)),
+        )
+        return cur.rowcount > 0
+
+
+def create_department_task(
+    title, description, assigned_department, priority="media",
+    created_by="diretoria", conversation_id=None, project_id=None
+):
+    """Cria uma tarefa encaminhada a um departamento."""
+    with connection() as db:
+        cur = db.execute(
+            """INSERT INTO department_tasks(
+                   title, description, assigned_department, created_by, priority,
+                   conversation_id, project_id
+               ) VALUES(?,?,?,?,?,?,?)""",
+            (
+                str(title).strip()[:160],
+                str(description).strip()[:8000],
+                str(assigned_department),
+                str(created_by),
+                str(priority),
+                str(conversation_id) if conversation_id else None,
+                int(project_id) if project_id is not None else None,
+            ),
+        )
+        return cur.lastrowid
+
+
+def list_department_tasks(limit=100, department=None, status=None):
+    """Lista tarefas por departamento/status; sem filtro retorna o quadro completo."""
+    conditions = []
+    params = []
+    if department:
+        conditions.append("assigned_department=?")
+        params.append(str(department))
+    if status:
+        conditions.append("status=?")
+        params.append(str(status))
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(max(1, min(int(limit), 200)))
+    query = (
+        "SELECT * FROM department_tasks" + where
+        + " ORDER BY CASE priority WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END, "
+          "updated_at DESC, id DESC LIMIT ?"
+    )
+    with connection() as db:
+        rows = db.execute(query, tuple(params)).fetchall()
+    return [dict(row) for row in rows]
+
+
+def update_department_task(task_id, status, result=None):
+    """Atualiza estado e resultado de uma tarefa, mantendo data de conclusão coerente."""
+    allowed = {"pendente", "em_andamento", "bloqueada", "concluida"}
+    if status not in allowed:
+        raise ValueError("Status de tarefa inválido.")
+    with connection() as db:
+        cur = db.execute(
+            """UPDATE department_tasks
+               SET status=?,
+                   result=COALESCE(?, result),
+                   updated_at=CURRENT_TIMESTAMP,
+                   completed_at=CASE WHEN ?='concluida'
+                                     THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
+                                     ELSE NULL END
+               WHERE id=?""",
+            (status, result, status, int(task_id)),
         )
         return cur.rowcount > 0
 

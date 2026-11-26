@@ -356,6 +356,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <button data-view="programacao"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-5 4 5 4M16 8l5 4-5 4M14 4l-4 16"/></svg></span>Engenharia</button><button data-view="arquivos"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z"/><path d="M13 3v7h7M8 14h8M8 17h6"/></svg></span>Arquivos</button>
   <button data-view="publicidade"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14V9a2 2 0 0 1 2-2h3l9-4v17l-9-4H6a2 2 0 0 1-2-2Z"/><path d="m8 16 2 5h4l-3-5M21 9v5"/></svg></span>Marketing</button>
   <button data-view="projeto"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4V2h8v2M7 9h10M7 13h6M7 17h4"/></svg></span>Projetos</button>
+  <button data-view="tarefas"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/></svg></span>Tarefas dos departamentos</button>
   <button data-view="historico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2M4 5l2 2"/></svg></span>Conversas</button>
   <button data-view="memoria"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Memória compartilhada</button>
   <button data-view="ideias"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 22h4M8.5 14.5A7 7 0 1 1 15.5 14.5c-.9.7-1.5 1.6-1.5 2.5h-4c0-.9-.6-1.8-1.5-2.5Z"/><path d="M12 3v2M4.9 5.9l1.4 1.4M19.1 5.9l-1.4 1.4"/></svg></span>Banco de ideias</button>
@@ -399,6 +400,23 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
  <div class="view-head"><div><h2>Projetos</h2><p>Transforme uma ideia em um registro de trabalho acompanhado.</p></div><span class="tag">Área de planejamento</span></div>
  <div class="notice">Projetos são registros próprios, separados do Banco de Ideias. Para criar e acompanhar projetos, configure o token administrativo em Conexões.</div>
  <div class="panel"><h3>Novo projeto</h3><div class="field"><label for="project-title">Nome do projeto</label><input id="project-title" placeholder="Ex.: Lançamento do novo produto"></div><div class="field"><label for="project-summary">Objetivo e descrição</label><textarea id="project-summary" placeholder="Descreva o resultado esperado, etapas e observações..."></textarea></div><div class="actions"><button class="btn primary" id="save-project">Criar projeto</button><button class="btn" id="project-to-director">Pedir análise da Diretoria</button></div><div id="project-status" class="hint"></div></div><div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Projetos registrados</h2><p>Acompanhe o andamento e atualize o status.</p></div><button class="btn" id="load-projects">Atualizar</button></div><div id="projects-result" class="list"><div class="empty">Carregando projetos...</div></div>
+</section>
+<section class="view" id="view-tarefas">
+ <div class="view-head"><div><h2>Coordenação de tarefas</h2><p>A Diretoria encaminha atividades; cada departamento consulta sua fila e registra o resultado.</p></div><button class="btn" id="load-tasks">Atualizar</button></div>
+ <div class="notice">Esta é uma fila compartilhada e rastreável. A atribuição não executa a tarefa automaticamente: o agente recebe o contexto quando você conversa com ele, e a conclusão é registrada após revisão.</div>
+ <div class="panel">
+  <h3>Encaminhar nova tarefa</h3>
+  <div class="field"><label for="task-title">Título da tarefa</label><input id="task-title" maxlength="160" placeholder="Ex.: Revisar fluxo de cadastro"></div>
+  <div class="field"><label for="task-description">Descrição e resultado esperado</label><textarea id="task-description" maxlength="8000" placeholder="Explique o que precisa ser feito, contexto, critérios de aceitação e restrições..."></textarea></div>
+  <div class="grid2">
+   <div class="field"><label for="task-department">Departamento responsável</label><select id="task-department"><option value="diretoria">Diretoria</option><option value="programacao">Engenharia</option><option value="publicidade">Marketing</option><option value="geral">Nexuscore central</option></select></div>
+   <div class="field"><label for="task-priority">Prioridade</label><select id="task-priority"><option value="alta">Alta</option><option value="media" selected>Média</option><option value="baixa">Baixa</option></select></div>
+  </div>
+  <div class="actions"><button class="btn primary" id="create-task">Encaminhar tarefa</button></div>
+  <div id="task-create-status" class="hint" aria-live="polite"></div>
+ </div>
+ <div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Quadro de trabalho</h2><p>Atualize o andamento e registre o resultado de cada departamento.</p></div><select id="task-filter" aria-label="Filtrar tarefas"><option value="">Todos os departamentos</option><option value="diretoria">Diretoria</option><option value="programacao">Engenharia</option><option value="publicidade">Marketing</option><option value="geral">Nexuscore</option></select></div>
+ <div id="task-list" class="list"><div class="empty">Carregando tarefas...</div></div>
 </section>
 <section class="view" id="view-historico">
  <div class="view-head"><div><h2>Conversas</h2><p>Cada assunto tem seu próprio histórico, título e agente responsável.</p></div><div class="actions"><button class="btn" id="new-conversation">Nova conversa</button><button class="btn" id="load-history">Atualizar</button></div></div>
@@ -542,7 +560,7 @@ addComposerTools();
 function detailMessage(detail){if(typeof detail==="string")return detail;if(detail&&typeof detail==="object"){const bits=[detail.mensagem,...(detail.motivos||[]),detail.orientacao].filter(Boolean);return bits.join("\n")||JSON.stringify(detail);}return "O servidor retornou um erro sem explicação.";}
 const API_BASE=window.Capacitor?.isNativePlatform?.()?"https://nexuscore-1-ljbi.onrender.com":"";
 async function api(url,options={}){const response=await fetch(API_BASE+url,{...options,headers:{...headers(options.body!==undefined),...(options.headers||{})}});const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{};}catch(e){data={detail:raw||"Resposta inválida do servidor."};}if(!response.ok)throw new Error(detailMessage(data.detail)||("Falha HTTP "+response.status));return data;}
-function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="memoria")loadMemory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();if(name==="arquivos")loadArtifacts();if(CHAT_TYPES.includes(name))restoreActiveConversation(name);}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
+function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="tarefas")loadTasks();if(name==="memoria")loadMemory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();if(name==="arquivos")loadArtifacts();if(CHAT_TYPES.includes(name))restoreActiveConversation(name);}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
 function addBubble(chat,text,kind="assistant",meta=""){const empty=chat.querySelector(".welcome");if(empty)empty.remove();const el=document.createElement("div");el.className="bubble "+kind;el.textContent=text;if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;el.appendChild(m);}chat.appendChild(el);chat.scrollTop=chat.scrollHeight;return el;}
 function renderAssistantText(target,raw){
@@ -754,6 +772,74 @@ async function loadHistory(){
  }
 }
 $("new-conversation").addEventListener("click",()=>startNewChat("geral"));
+function taskDepartmentLabel(value){
+ return ({geral:"Nexuscore",diretoria:"Diretoria",programacao:"Engenharia",publicidade:"Marketing"})[value]||value||"Sem departamento";
+}
+function taskStatusLabel(value){
+ return ({pendente:"Pendente",em_andamento:"Em andamento",bloqueada:"Bloqueada",concluida:"Concluída"})[value]||value||"Pendente";
+}
+async function loadTasks(){
+ const box=$("task-list");
+ if(!box)return;
+ box.innerHTML='<div class="empty">Carregando tarefas...</div>';
+ const department=$("task-filter")?.value||"";
+ try{
+  const data=await api("/api/tarefas?limit=100"+(department?"&departamento="+encodeURIComponent(department):""));
+  const items=data.items||[];
+  box.replaceChildren();
+  if(!items.length){box.innerHTML='<div class="empty">Nenhuma tarefa encontrada. Encaminhe a primeira acima.</div>';return;}
+  items.forEach(task=>{
+   const card=document.createElement("article");card.className="item";
+   const title=document.createElement("strong");title.textContent="#"+task.id+" · "+(task.title||"Tarefa sem título");
+   const description=document.createElement("p");description.textContent=task.description||"";
+   const meta=document.createElement("small");
+   meta.textContent=taskDepartmentLabel(task.assigned_department)+" · Prioridade "+(task.priority||"média")+" · Criada "+formatConversationDate(task.created_at);
+   const controls=document.createElement("div");controls.className="grid2";controls.style.marginTop="10px";
+   const statusWrap=document.createElement("div");statusWrap.className="field";
+   const statusLabel=document.createElement("label");statusLabel.textContent="Andamento";
+   const status=document.createElement("select");
+   [["pendente","Pendente"],["em_andamento","Em andamento"],["bloqueada","Bloqueada"],["concluida","Concluída"]].forEach(([v,l])=>{const option=document.createElement("option");option.value=v;option.textContent=l;status.appendChild(option);});
+   status.value=task.status||"pendente";statusWrap.append(statusLabel,status);
+   const resultWrap=document.createElement("div");resultWrap.className="field";
+   const resultLabel=document.createElement("label");resultLabel.textContent="Resultado / observações";
+   const result=document.createElement("textarea");result.rows=2;result.maxLength=8000;result.placeholder="Registre o resultado revisado, bloqueios ou próximos passos...";result.value=task.result||"";
+   resultWrap.append(resultLabel,result);controls.append(statusWrap,resultWrap);
+   const saved=document.createElement("div");saved.className="hint";
+   if(task.completed_at)saved.textContent="Concluída em "+formatConversationDate(task.completed_at);
+   const save=document.createElement("button");save.type="button";save.className="btn primary";save.textContent="Salvar atualização";
+   save.addEventListener("click",async()=>{
+    save.disabled=true;save.textContent="Salvando...";
+    try{
+     await api("/api/tarefas/"+task.id,{method:"PATCH",body:JSON.stringify({status:status.value,resultado:result.value})});
+     saved.textContent="Atualização salva · "+new Date().toLocaleString("pt-BR");
+     await loadTasks();
+    }catch(error){alert(error.message);save.disabled=false;save.textContent="Salvar atualização";}
+   });
+   card.append(title,description,meta,controls,saved,save);box.appendChild(card);
+  });
+ }catch(error){
+  box.replaceChildren();const notice=document.createElement("div");notice.className="notice error";notice.textContent=error.message;box.appendChild(notice);
+ }
+}
+$("load-tasks").addEventListener("click",loadTasks);
+$("task-filter").addEventListener("change",loadTasks);
+$("create-task").addEventListener("click",async()=>{
+ const button=$("create-task"),status=$("task-create-status");
+ const title=$("task-title").value.trim(),description=$("task-description").value.trim();
+ if(!title||!description){status.textContent="Informe o título e a descrição da tarefa.";status.style.color="var(--red)";return;}
+ button.disabled=true;button.textContent="Encaminhando...";
+ try{
+  const data=await api("/api/tarefas",{method:"POST",body:JSON.stringify({
+   titulo:title,descricao:description,departamento:$("task-department").value,prioridade:$("task-priority").value
+  })});
+  $("task-title").value="";$("task-description").value="";
+  status.textContent="Tarefa #"+data.id+" encaminhada para "+taskDepartmentLabel(data.departamento)+".";
+  status.style.color="var(--green)";
+  $("task-filter").value="";
+  await loadTasks();
+ }catch(error){status.textContent=error.message;status.style.color="var(--red)";}
+ finally{button.disabled=false;button.textContent="Encaminhar tarefa";}
+});
 function memoryDepartmentLabel(value){
  return ({todos:"Todos os departamentos",geral:"Nexuscore",diretoria:"Diretoria",programacao:"Engenharia",publicidade:"Marketing"})[value]||value||"Todos";
 }

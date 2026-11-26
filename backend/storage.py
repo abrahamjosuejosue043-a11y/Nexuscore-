@@ -343,8 +343,13 @@ def get_conversation(conversation_id):
 def conversation_messages(conversation_id, limit=500):
     with connection() as db:
         rows = db.execute(
-            """SELECT * FROM conversations
-               WHERE conversation_id=? ORDER BY id ASC LIMIT ?""",
+            """SELECT * FROM (
+                   SELECT * FROM conversations
+                   WHERE conversation_id=?
+                   ORDER BY id DESC
+                   LIMIT ?
+               ) AS recent_messages
+               ORDER BY id ASC""",
             (str(conversation_id), max(1, min(int(limit), 1000))),
         ).fetchall()
     return [dict(row) for row in rows]

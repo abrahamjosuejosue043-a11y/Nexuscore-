@@ -158,10 +158,15 @@ class ChatRequest(BaseModel):
     tipo: str = Field(default="geral", max_length=40)
     imagens: list[str] = Field(default_factory=list, max_length=3)
     conversa_id: Optional[str] = Field(default=None, max_length=36)
+    project_id: Optional[int] = Field(default=None, ge=1)
 
 
 class ConversationTitleRequest(BaseModel):
     titulo: str = Field(..., min_length=1, max_length=100)
+
+
+class ConversationProjectRequest(BaseModel):
+    project_id: Optional[int] = Field(default=None, ge=1)
 
 
 class SharedMemoryRequest(BaseModel):
@@ -483,6 +488,7 @@ async def orquestrador(
     tipo: str = "geral",
     imagens: Optional[list[str]] = None,
     conversa_id: Optional[str] = None,
+    project_id: Optional[int] = None,
 ) -> dict:
     started = time.perf_counter()
     text = (pedido or "").strip()
@@ -492,8 +498,20 @@ async def orquestrador(
     agent_type = normalize_type(tipo)
     conversation_id = str(conversa_id or uuid.uuid4())
     conversation_title = build_conversation_title(text)
-    # O cache global foi removido do fluxo: cada resposta deve considerar o histórico
-    # específico desta conversa e a memória compartilhada mais recente.
+    session = storage.ensure_conversation(conversation_id, conversation_title, agent_type)
+    if project_id is not None:
+        current_project_id = session.get("project_id") if session else None
+        if current_project_id is not None and int(current_project_id) != int(project_id):
+            raise HTTPException(
+                status_code=409,
+                detail="Esta conversa já está vinculada a outro projeto. Altere o vínculo explicitamente antes de continuar.",
+            )
+        if current_project_id is None:
+            if not storage.set_conversation_project(conversation_id, project_id):
+                raise HTTPException(status_code=404, detail="Projeto não encontrado ou conversa indisponível.")
+            session = storage.get_conversation(conversation_id)
+    active_project_id = session.get("project_id") if session else None
+    # O histórico e as tarefas permanecem vinculados à conversa atual.
     history = storage.conversation_messages(conversation_id, limit=8)
     available_memories = storage.shared_memories(limit=30, department=agent_type)
     selected_memories = select_shared_memories(text, available_memories, limit=6)
@@ -505,6 +523,7 @@ async def orquestrador(
             limit=40,
             department=task_department,
             conversation_id=conversation_id,
+            project_id=active_project_id,
         )
         if task.get("status") != "concluida"
     ][:8]
@@ -539,7 +558,6 @@ async def orquestrador(
         "modelo": actual_model,
         "tempo_ms": int((time.perf_counter() - started) * 1000),
     }
-    session = storage.ensure_conversation(conversation_id, conversation_title, agent_type)
     storage.save_message("user", agent_type, text, conversation_id=conversation_id)
     storage.save_message(
         "assistant", agent_type, answer, provider_name,
@@ -547,6 +565,7 @@ async def orquestrador(
     )
     result["conversa_id"] = conversation_id
     result["titulo_conversa"] = session["title"] if session else conversation_title
+    result["projeto_id"] = active_project_id
     return result
 
 
@@ -635,6 +654,20 @@ async def abrir_conversa(conversa_id: str, x_admin_token: Optional[str] = Header
         "conversation": item,
         "messages": storage.conversation_messages(conversa_id),
     }
+
+
+@app.patch("/api/conversas/{conversa_id}/projeto")
+async def vincular_projeto_conversa(
+    conversa_id: str,
+    request: ConversationProjectRequest,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    if not storage.set_conversation_project(conversa_id, request.project_id):
+        if not storage.get_conversation(conversa_id):
+            raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    return {"id": conversa_id, "project_id": request.project_id, "status": "vinculo_atualizado"}
 
 
 @app.patch("/api/conversas/{conversa_id}")
@@ -926,7 +959,9 @@ async def chat(request: ChatRequest, http_request: Request):
         conversa_id = str(uuid.UUID(request.conversa_id)) if request.conversa_id else str(uuid.uuid4())
     except (ValueError, AttributeError):
         raise HTTPException(status_code=422, detail="Identificador de conversa inválido.")
-    return await orquestrador(request.texto, request.tipo, request.imagens, conversa_id)
+    return await orquestrador(
+        request.texto, request.tipo, request.imagens, conversa_id, request.project_id
+    )
 
 
 @app.post("/api/email/enviar")

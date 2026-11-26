@@ -129,8 +129,10 @@ def initialize():
         statements = [
             """CREATE TABLE IF NOT EXISTS chat_sessions (
                 id TEXT PRIMARY KEY, title TEXT NOT NULL, agent TEXT NOT NULL DEFAULT 'geral',
+                project_id BIGINT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+            "ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS project_id BIGINT",
             """CREATE TABLE IF NOT EXISTS conversations (
                 id BIGSERIAL PRIMARY KEY, role TEXT NOT NULL, agent TEXT NOT NULL,
                 content TEXT NOT NULL, provider TEXT, conversation_id TEXT,
@@ -189,8 +191,12 @@ def initialize():
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("""CREATE TABLE IF NOT EXISTS chat_sessions (
             id TEXT PRIMARY KEY, title TEXT NOT NULL, agent TEXT NOT NULL DEFAULT 'geral',
+            project_id INTEGER,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        session_columns = {row["name"] for row in db.execute("PRAGMA table_info(chat_sessions)").fetchall()}
+        if "project_id" not in session_columns:
+            db.execute("ALTER TABLE chat_sessions ADD COLUMN project_id INTEGER")
         db.execute("""CREATE TABLE IF NOT EXISTS conversations (
             id INTEGER PRIMARY KEY AUTOINCREMENT, role TEXT NOT NULL,
             agent TEXT NOT NULL, content TEXT NOT NULL, provider TEXT,
@@ -283,7 +289,7 @@ def health():
 
 
 def ensure_conversation(conversation_id, title, agent):
-    """Cria uma conversa uma única vez; mensagens posteriores preservam o título."""
+    """Cria uma conversa uma única vez; mensagens posteriores preservam seu vínculo."""
     with connection() as db:
         db.execute(
             """INSERT INTO chat_sessions(id, title, agent) VALUES(?,?,?)
@@ -294,6 +300,21 @@ def ensure_conversation(conversation_id, title, agent):
             "SELECT * FROM chat_sessions WHERE id=?", (str(conversation_id),)
         ).fetchone()
     return dict(row) if row else None
+
+
+def set_conversation_project(conversation_id, project_id):
+    """Associa ou desassocia explicitamente uma conversa a um projeto existente."""
+    value = int(project_id) if project_id is not None else None
+    with connection() as db:
+        if value is not None:
+            exists = db.execute("SELECT id FROM projects WHERE id=?", (value,)).fetchone()
+            if not exists:
+                return False
+        cur = db.execute(
+            "UPDATE chat_sessions SET project_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (value, str(conversation_id)),
+        )
+        return cur.rowcount > 0
 
 
 def save_message(role, agent, content, provider=None, conversation_id=None):
@@ -320,11 +341,11 @@ def messages(limit=50):
 def list_conversations(limit=100):
     with connection() as db:
         rows = db.execute(
-            """SELECT s.id, s.title, s.agent, s.created_at, s.updated_at,
+            """SELECT s.id, s.title, s.agent, s.project_id, s.created_at, s.updated_at,
                       COUNT(m.id) AS message_count
                FROM chat_sessions s
                LEFT JOIN conversations m ON m.conversation_id=s.id
-               GROUP BY s.id, s.title, s.agent, s.created_at, s.updated_at
+               GROUP BY s.id, s.title, s.agent, s.project_id, s.created_at, s.updated_at
                ORDER BY s.updated_at DESC
                LIMIT ?""",
             (max(1, min(int(limit), 200)),),

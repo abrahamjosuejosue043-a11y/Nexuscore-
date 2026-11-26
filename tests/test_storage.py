@@ -164,6 +164,36 @@ class StorageTests(unittest.TestCase):
         self.assertIn(engineering_id, engineering_ids)
         self.assertNotIn(engineering_id, marketing_ids)
 
+    def test_conversation_can_be_linked_to_an_existing_project(self):
+        project_id = self.storage.save_project(
+            "Projeto vinculado", "Projeto usado para testar o contexto da conversa."
+        )
+        conversation_id = "conversation-project-link"
+        session = self.storage.ensure_conversation(
+            conversation_id, "Conversa vinculada", "geral"
+        )
+        self.assertIsNone(session["project_id"])
+        self.assertTrue(
+            self.storage.set_conversation_project(conversation_id, project_id)
+        )
+        linked = self.storage.get_conversation(conversation_id)
+        self.assertEqual(linked["project_id"], project_id)
+        listed = next(
+            item for item in self.storage.list_conversations(200)
+            if item["id"] == conversation_id
+        )
+        self.assertEqual(listed["project_id"], project_id)
+        self.assertFalse(
+            self.storage.set_conversation_project(conversation_id, 999999)
+        )
+        self.assertEqual(
+            self.storage.get_conversation(conversation_id)["project_id"], project_id
+        )
+        self.assertTrue(self.storage.set_conversation_project(conversation_id, None))
+        self.assertIsNone(
+            self.storage.get_conversation(conversation_id)["project_id"]
+        )
+
     def test_department_tasks_are_assigned_and_track_progress(self):
         task_id = self.storage.create_department_task(
             "Validar fluxo de login",

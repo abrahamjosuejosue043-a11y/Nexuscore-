@@ -287,13 +287,15 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(completed["result"], "Testes revisados e aprovados.")
 
     def test_department_tasks_can_be_isolated_by_conversation_and_project(self):
+        project_11 = self.storage.save_project("Projeto tarefa 11", "Escopo de teste.")
+        project_22 = self.storage.save_project("Projeto tarefa 22", "Escopo de teste.")
         conversation_a = self.storage.create_department_task(
             "Tarefa conversa A", "Contexto exclusivo da conversa A.",
-            "programacao", "alta", conversation_id="conversation-a", project_id=11,
+            "programacao", "alta", conversation_id="conversation-a", project_id=project_11,
         )
         conversation_b = self.storage.create_department_task(
             "Tarefa conversa B", "Contexto exclusivo da conversa B.",
-            "programacao", "media", conversation_id="conversation-b", project_id=22,
+            "programacao", "media", conversation_id="conversation-b", project_id=project_22,
         )
         unlinked = self.storage.create_department_task(
             "Tarefa sem vínculo", "Não deve entrar em contexto de conversa.",
@@ -301,14 +303,14 @@ class StorageTests(unittest.TestCase):
         )
 
         tasks_a = self.storage.list_department_tasks(
-            100, department="programacao", conversation_id="conversation-a", project_id=11
+            100, department="programacao", conversation_id="conversation-a", project_id=project_11
         )
         self.assertEqual([item["id"] for item in tasks_a], [conversation_a])
         self.assertNotIn(conversation_b, {item["id"] for item in tasks_a})
         self.assertNotIn(unlinked, {item["id"] for item in tasks_a})
 
         tasks_project_22 = self.storage.list_department_tasks(
-            100, department="programacao", project_id=22
+            100, department="programacao", project_id=project_22
         )
         self.assertEqual([item["id"] for item in tasks_project_22], [conversation_b])
 

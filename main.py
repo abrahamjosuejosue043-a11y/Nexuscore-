@@ -174,6 +174,7 @@ class SharedMemoryRequest(BaseModel):
     conteudo: str = Field(..., min_length=5, max_length=8000)
     categoria: str = Field(default="contexto", max_length=30)
     departamento: str = Field(default="todos", max_length=30)
+    project_id: Optional[int] = Field(default=None, ge=1)
 
 
 class DepartmentTaskRequest(BaseModel):
@@ -513,7 +514,12 @@ async def orquestrador(
     active_project_id = session.get("project_id") if session else None
     # O histórico e as tarefas permanecem vinculados à conversa atual.
     history = storage.conversation_messages(conversation_id, limit=8)
-    available_memories = storage.shared_memories(limit=30, department=agent_type)
+    available_memories = storage.shared_memories(
+        limit=50,
+        department=agent_type,
+        project_id=active_project_id,
+        prompt_context=True,
+    )
     selected_memories = select_shared_memories(text, available_memories, limit=6)
     task_department = None if agent_type in {"geral", "diretoria"} else agent_type
     # Contexto de tarefas é isolado por conversa. Tarefas de outras conversas
@@ -777,10 +783,19 @@ async def criar_memoria(
         raise HTTPException(status_code=422, detail="Categoria de memória inválida.")
     if departamento not in departamentos:
         raise HTTPException(status_code=422, detail="Departamento de destino inválido.")
-    memory_id = storage.save_shared_memory(
-        titulo, conteudo, categoria, departamento, source_agent="usuario"
-    )
-    return {"id": memory_id, "status": "salva"}
+    try:
+        memory_id = storage.save_shared_memory(
+            titulo, conteudo, categoria, departamento,
+            source_agent="usuario", project_id=request.project_id,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    return {
+        "id": memory_id,
+        "project_id": request.project_id,
+        "scope": "project" if request.project_id is not None else "global",
+        "status": "salva",
+    }
 
 
 @app.delete("/api/memoria/{memory_id}")

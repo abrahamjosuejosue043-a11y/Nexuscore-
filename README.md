@@ -15,6 +15,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 - `ADMIN_TOKEN`: token forte para as rotas administrativas e criação/gestão de arquivos.
 - `GROQ_MODEL`: modelo de texto (padrão `openai/gpt-oss-120b`).
 - `GROQ_VISION_MODEL`: modelo multimodal para OCR e análise de imagens (padrão `qwen/qwen3.8-27b`).
+- `GROQ_AGENT_TOOLS`: ferramentas nativas opcionais separadas por vírgula (`browser_search`, `code_interpreter`); vazio por padrão. Nesta etapa, só são enviadas ao modelo `openai/gpt-oss-120b` e não são usadas no fluxo de imagens.
 - `DATABASE_URL`: conexão PostgreSQL; quando presente, seleciona PostgreSQL (use a URL pooled do Neon para o serviço web).
 - `DATABASE_PATH`: caminho do SQLite quando `DATABASE_URL` não estiver configurada; padrão local `data/nexuscore.db`.
 - `AI_REQUEST_TIMEOUT`: timeout de chamadas à IA em segundos (padrão 45).
@@ -67,4 +68,4 @@ O envio SMTP depende das credenciais do provedor de e-mail. O recebimento IMAP e
 - Raciocínio avançado configurado no modelo principal e no modelo visual.
 - Análise de imagens, OCR e interpretação visual via Groq. A API Groq não oferece geração de imagens; nenhum provedor externo foi adicionado.
 
-A interface web é servida pelo Render e pode atualizar sem reinstalar o invólucro Android. Alterações em permissões nativas exigem uma nova compilação e instalação do APK. A Groq é o provedor único de linguagem, raciocínio e análise visual. Geração de imagens não está disponível pela API Groq.
+A interface web é servida pelo Render e pode atualizar sem reinstalar o invólucro Android. Alterações em permissões nativas exigem uma nova compilação e instalação do APK. A Groq é o provedor atual de linguagem, raciocínio e análise visual. As ferramentas nativas de pesquisa na web e execução de código podem ser habilitadas com `GROQ_AGENT_TOOLS`; ficam desativadas por padrão e dependem da disponibilidade/limites do provedor. Geração de imagens não está disponível pela API Groq.

@@ -35,6 +35,7 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from backend import storage
+from backend.agent_tools import configured_groq_tools, agent_tools_status
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +252,13 @@ async def chamar_groq(prompt: str, imagens: Optional[list[str]] = None) -> tuple
         "reasoning_effort": "high",
         "reasoning_format": "hidden",
     }
+
+    # Ferramentas nativas são opt-in e só são anexadas ao modelo compatível.
+    # O modelo visual continua isolado nesta etapa para não alterar o fluxo de imagens.
+    agent_tools = configured_groq_tools(model=selected_model) if not imagens else []
+    if agent_tools:
+        payload["tools"] = agent_tools
+        payload["tool_choice"] = "auto"
 
     try:
         async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
@@ -574,6 +582,7 @@ async def saude():
             "groq_vision": bool(get_secret("GROQ_API_KEY")),
         },
         "provedor_principal": "groq",
+        "ferramentas_agente": agent_tools_status(model=GROQ_MODEL),
         "modelo_principal": GROQ_MODEL,
         "modelo_vision": GROQ_VISION_MODEL,
         "modelo_groq_confirmado_por_resposta": False,
@@ -592,6 +601,7 @@ async def diagnostico(x_admin_token: Optional[str] = Header(default=None)):
             "GROQ_API_KEY": "configurada" if get_secret("GROQ_API_KEY") else "ausente",
             "GROQ_MODEL": GROQ_MODEL,
             "GROQ_VISION_MODEL": GROQ_VISION_MODEL,
+            "FERRAMENTAS_AGENTE": agent_tools_status(model=GROQ_MODEL),
             "PROVEDOR_PRINCIPAL": "Groq",
         },
         "observacao": (

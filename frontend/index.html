@@ -417,6 +417,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <h3>Encaminhar tarefa manualmente</h3>
   <div class="field"><label for="task-title">Título da tarefa</label><input id="task-title" maxlength="160" placeholder="Ex.: Revisar fluxo de cadastro"></div>
   <div class="field"><label for="task-description">Descrição e resultado esperado</label><textarea id="task-description" maxlength="8000" placeholder="Explique o que precisa ser feito, contexto, critérios de aceitação e restrições..."></textarea></div>
+  <div class="field"><label for="task-project">Projeto (opcional)</label><select id="task-project"><option value="">Sem projeto · tarefa não vinculada</option></select></div>
   <div class="grid2">
    <div class="field"><label for="task-department">Departamento responsável</label><select id="task-department"><option value="diretoria">Diretoria</option><option value="programacao">Engenharia</option><option value="publicidade">Marketing</option><option value="geral">Nexuscore central</option></select></div>
    <div class="field"><label for="task-priority">Prioridade</label><select id="task-priority"><option value="alta">Alta</option><option value="media" selected>Média</option><option value="baixa">Baixa</option></select></div>
@@ -814,15 +815,20 @@ function taskStatusLabel(value){
  return ({pendente:"Pendente",em_andamento:"Em andamento",bloqueada:"Bloqueada",concluida:"Concluída"})[value]||value||"Pendente";
 }
 async function loadPlanProjects(){
- const select=$("plan-project");if(!select)return;
+ const select=$("plan-project"),taskSelect=$("task-project");if(!select)return;
  try{
-  const data=await api("/api/projetos?limit=200");
+  const data=await api("/api/projetos?limit=200"),projects=data.items||[];
   select.replaceChildren(new Option("Selecione um projeto",""));
-  (data.items||[]).forEach(project=>select.add(new Option(project.title+" · #"+project.id,String(project.id))));
-  select.disabled=!(data.items||[]).length;
+  projects.forEach(project=>select.add(new Option(project.title+" · #"+project.id,String(project.id))));
+  select.disabled=!projects.length;
+  if(taskSelect){
+   taskSelect.replaceChildren(new Option("Sem projeto · tarefa não vinculada",""));
+   projects.forEach(project=>taskSelect.add(new Option(project.title+" · #"+project.id,String(project.id))));
+   taskSelect.disabled=false;
+  }
  }catch(error){
-  select.replaceChildren(new Option("Configure o token para listar projetos",""));
-  select.disabled=true;
+  select.replaceChildren(new Option("Configure o token para listar projetos",""));select.disabled=true;
+  if(taskSelect){taskSelect.replaceChildren(new Option("Configure o token para listar projetos",""));taskSelect.disabled=true;}
  }
 }
 async function loadPlans(){
@@ -882,7 +888,7 @@ async function loadTasks(){
    const title=document.createElement("strong");title.textContent="#"+task.id+" · "+(task.title||"Tarefa sem título");
    const description=document.createElement("p");description.textContent=task.description||"";
    const meta=document.createElement("small");
-   meta.textContent=taskDepartmentLabel(task.assigned_department)+" · Prioridade "+(task.priority||"média")+" · Criada "+formatConversationDate(task.created_at);
+   meta.textContent=taskDepartmentLabel(task.assigned_department)+(task.project_id?" · Projeto #"+task.project_id:"")+(task.plan_id?" · Plano #"+task.plan_id:"")+" · Prioridade "+(task.priority||"média")+" · Criada "+formatConversationDate(task.created_at);
    const controls=document.createElement("div");controls.className="grid2";controls.style.marginTop="10px";
    const statusWrap=document.createElement("div");statusWrap.className="field";
    const statusLabel=document.createElement("label");statusLabel.textContent="Andamento";
@@ -919,9 +925,10 @@ $("create-task").addEventListener("click",async()=>{
  button.disabled=true;button.textContent="Encaminhando...";
  try{
   const data=await api("/api/tarefas",{method:"POST",body:JSON.stringify({
-   titulo:title,descricao:description,departamento:$("task-department").value,prioridade:$("task-priority").value
+   titulo:title,descricao:description,departamento:$("task-department").value,prioridade:$("task-priority").value,
+   projeto_id:$("task-project").value?Number($("task-project").value):null
   })});
-  $("task-title").value="";$("task-description").value="";
+  $("task-title").value="";$("task-description").value="";$("task-project").value="";
   status.textContent="Tarefa #"+data.id+" encaminhada para "+taskDepartmentLabel(data.departamento)+".";
   status.style.color="var(--green)";
   $("task-filter").value="";

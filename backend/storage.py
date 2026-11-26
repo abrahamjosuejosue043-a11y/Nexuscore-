@@ -586,18 +586,22 @@ def list_work_plans(limit=50, project_id=None, status=None):
 def approve_work_plan(plan_id):
     """Aprova um plano uma única vez e cria as tarefas delegadas atomicamente."""
     with connection() as db:
+        claimed = db.execute(
+            "UPDATE work_plans SET status='aprovando' WHERE id=? AND status='rascunho'",
+            (int(plan_id),),
+        )
+        if claimed.rowcount == 0:
+            return None
         plan_row = db.execute(
             "SELECT * FROM work_plans WHERE id=?", (int(plan_id),)
         ).fetchone()
-        if not plan_row or plan_row["status"] != "rascunho":
-            return None
         plan = dict(plan_row)
         items = db.execute(
             "SELECT * FROM work_plan_items WHERE plan_id=? ORDER BY position, id",
             (int(plan_id),),
         ).fetchall()
         if not items:
-            return None
+            raise ValueError("Plano sem tarefas não pode ser aprovado.")
         task_ids = []
         for item in items:
             cur = db.execute(

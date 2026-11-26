@@ -13,9 +13,9 @@ from pathlib import Path
 import sqlite3
 import sys
 
-TABLES = ("chat_sessions", "conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory")
-OPTIONAL_TABLES = {"chat_sessions", "shared_memory"}
-SERIAL_TABLES = ("conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory")
+TABLES = ("chat_sessions", "conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory", "department_tasks")
+OPTIONAL_TABLES = {"chat_sessions", "shared_memory", "department_tasks"}
+SERIAL_TABLES = ("conversations", "ideas", "projects", "artifacts", "email_log", "shared_memory", "department_tasks")
 
 
 def create_backup(source: Path) -> Path:

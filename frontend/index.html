@@ -666,7 +666,30 @@ $("load-artifacts").addEventListener("click",loadArtifacts);
 function saveAdminToken(){adminToken=$("admin-token").value.trim();try{if(adminToken)sessionStorage.setItem("nexuscore_admin_token",adminToken);else sessionStorage.removeItem("nexuscore_admin_token");}catch(e){}$("token-status").textContent=adminToken?"Token disponível nesta sessão. Teste o acesso executando o diagnóstico.":"Token removido desta sessão.";}
 $("save-token").addEventListener("click",()=>{saveAdminToken();runDiagnostic();if(typeof loadDashboard==="function")loadDashboard();});$("toggle-token").addEventListener("click",()=>{$("admin-token").type=$("admin-token").type==="password"?"text":"password";$("toggle-token").textContent=$("admin-token").type==="password"?"Mostrar":"Ocultar";});
 async function health(){try{const d=await api("/api/saude");$("health-label").textContent="API online";$("health-dot").className="dot ok";$("api-state").textContent="Online · v"+(d.versao||"?");$("groq-state").textContent=d.provedores_configurados?.groq?"Ativa · provedor único":"Chave ausente";$("text-model-state").textContent=d.modelo_principal||"Padrão Groq";$("vision-model-state").textContent=d.modelo_vision||"Modelo visual Groq";}catch(e){$("health-label").textContent="API indisponível";$("health-dot").className="dot bad";$("api-state").textContent="Indisponível";$("diagnostic-result").textContent=e.message;}}
-async function runDiagnostic(){await health();try{const d=await api("/api/diagnostico");$("diagnostic-result").textContent="Diagnóstico administrativo concluído (presença de variáveis; validade da chave depende de chamada real). Variáveis: "+Object.entries(d.variaveis||{}).map(([k,v])=>k+" = "+v).join(" · ");}catch(e){$("diagnostic-result").textContent=e.message;}}
+function formatStorageDiagnostic(info){
+ if(!info||typeof info!=="object")return "Banco: não informado pela API.";
+ const engine=String(info.engine||"desconhecido").toUpperCase();
+ const parts=["Banco: "+engine];
+ if(engine==="POSTGRESQL"){
+  parts.push("conexão: "+(info.database_reachable===true?"acessível":info.database_reachable===false?"indisponível":"não confirmada"));
+  if(info.table_count!==undefined)parts.push("tabelas: "+info.table_count);
+  if(info.server_version)parts.push("versão: "+info.server_version);
+ }else if(engine==="SQLITE"){
+  parts.push("arquivo: "+(info.database_exists?"presente":"não encontrado"));
+  if(info.table_count!==undefined)parts.push("tabelas: "+info.table_count);
+  if(info.journal_mode)parts.push("modo: "+info.journal_mode);
+ }
+ return parts.join(" · ");
+}
+async function runDiagnostic(){
+ await health();
+ try{
+  const d=await api("/api/diagnostico");
+  const storage=formatStorageDiagnostic(d.armazenamento);
+  const variables=Object.entries(d.variaveis||{}).map(([k,v])=>k+" = "+v).join(" · ");
+  $("diagnostic-result").textContent="Diagnóstico administrativo concluído. "+storage+(variables?"\nVariáveis: "+variables:"");
+ }catch(e){$("diagnostic-result").textContent=e.message;}
+}
 $("refresh-health").addEventListener("click",health);$("run-diagnostic").addEventListener("click",runDiagnostic);
 function renderItems(box,items,kind){box.innerHTML="";if(!items?.length){box.innerHTML='<div class="empty">Nenhum registro encontrado.</div>';return;}items.forEach(item=>{const el=document.createElement("article");el.className="item";const title=document.createElement("strong");title.textContent=kind==="history"?(item.role+" · "+item.agent):(item.title||"Registro");const p=document.createElement("p");p.textContent=kind==="history"?item.content:item.summary;const small=document.createElement("small");small.textContent=kind==="history"?(item.created_at||""):"Prioridade: "+(item.priority||"média")+" · "+(item.created_at||"");el.append(title,p,small);box.appendChild(el);});}
 function agentLabel(type){

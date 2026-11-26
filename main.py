@@ -333,9 +333,11 @@ def select_shared_memories(text: str, memories: list[dict], limit: int = 6) -> l
     for item in memories:
         title_terms = tokenize(item.get("title"))
         content_terms = tokenize(item.get("content"))
-        score = (len(request_terms & title_terms) * 3) + len(request_terms & content_terms)
-        # Decisões e objetivos são mais estáveis e têm valor transversal.
-        if item.get("category") in {"decisao", "objetivo", "preferencia"}:
+        overlap = (len(request_terms & title_terms) * 3) + len(request_terms & content_terms)
+        score = overlap
+        # A categoria só desempata registros que já têm correspondência lexical.
+        # Sem sobreposição, um objetivo/decisão não deve entrar no prompt por acaso.
+        if overlap > 0 and item.get("category") in {"decisao", "objetivo", "preferencia"}:
             score += 1
         ranked.append((score, str(item.get("updated_at") or ""), item))
     ranked.sort(key=lambda row: (row[0], row[1]), reverse=True)

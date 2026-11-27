@@ -1,6 +1,7 @@
 """Tests for CEO project approval and 24-hour rejection expiry."""
 
 import os
+import sqlite3
 import tempfile
 import unittest
 from datetime import datetime
@@ -120,7 +121,7 @@ class CEOProjectApprovalTests(unittest.TestCase):
         purge_after = datetime.strptime(data["purge_after"], "%Y-%m-%d %H:%M:%S")
         self.assertEqual((purge_after - decided_at).total_seconds(), 24 * 60 * 60)
         self.assertEqual(storage.purge_expired_rejected_projects(), [])
-        self.assertIsNotNone(storage.projects(approval_status="rejeitado"))
+        self.assertEqual(len(storage.projects(approval_status="rejeitado")), 1)
 
         with storage.connection() as db:
             db.execute(
@@ -167,6 +168,34 @@ class CEOProjectApprovalTests(unittest.TestCase):
         self.assertEqual(storage.purge_expired_rejected_projects(), [])
         self.assertTrue(storage.project_exists(pending_id))
         self.assertTrue(storage.project_exists(approved_id))
+
+    def test_legacy_projects_are_migrated_as_approved_without_losing_rows(self):
+        legacy_path = os.path.join(self.temp_dir.name, "legacy-projects.db")
+        db = sqlite3.connect(legacy_path)
+        db.execute(
+            """CREATE TABLE projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
+                summary TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'planejado',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"""
+        )
+        db.execute(
+            "INSERT INTO projects(title,summary) VALUES(?,?)",
+            ("Projeto legado", "Registro anterior à fila de aprovação."),
+        )
+        db.commit()
+        db.close()
+
+        current_path = storage.DB_PATH
+        storage.DB_PATH = legacy_path
+        try:
+            storage.initialize()
+            migrated = storage.projects()
+            self.assertEqual(len(migrated), 1)
+            self.assertEqual(migrated[0]["title"], "Projeto legado")
+            self.assertEqual(migrated[0]["approval_status"], "aprovado")
+        finally:
+            storage.DB_PATH = current_path
 
     def test_project_decisions_require_admin_token(self):
         project_id = self._create_project()

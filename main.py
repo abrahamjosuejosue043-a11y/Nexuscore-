@@ -472,11 +472,23 @@ def build_director_data_context(project_id: Optional[int], project_resolution_no
             lines.append("Amostra dos planos registrados (até 30 mais recentes):")
             for plan in plans[:30]:
                 items = plan.get("items") or []
+                objective = str(plan.get("objective") or "").strip()
+                summary = str(plan.get("summary") or "").strip()
+                rejection_reason = str(plan.get("rejection_reason") or "").strip()
                 lines.append(
                     f"- Plano #{plan.get('id')}: {str(plan.get('title') or 'Sem título')}; "
                     f"status={plan.get('status')}; itens={len(items)}; "
                     f"criado_em={plan.get('created_at') or 'não informado'}."
                 )
+                lines.append(
+                    f"  Objetivo: {objective[:1200] if objective else 'não registrado nos dados disponíveis'}."
+                )
+                lines.append(
+                    f"  Resumo: {summary[:1200] if summary else 'não registrado nos dados disponíveis'}."
+                )
+                if str(plan.get("status") or "").lower() == "rejeitado":
+                    reason_text = rejection_reason[:1200] if rejection_reason else "não registrado no banco de dados."
+                    lines.append(f"  Motivo da rejeição: {reason_text}")
         else:
             lines.append("Nenhum plano foi encontrado para este projeto.")
         if project_resolution_note:

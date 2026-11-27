@@ -48,7 +48,11 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertIn("Planos encontrados neste projeto: 1", context)
         self.assertIn("rejeitado=1", context)
         self.assertIn(f"Plano #{self.plan_id}", context)
+        self.assertIn("Objetivo do plano A.", context)
+        self.assertIn("Resumo do plano A.", context)
+        self.assertIn("Motivo da rejeição: não registrado no banco de dados.", context)
         self.assertNotIn(f"Plano #{self.other_plan_id}", context)
+        self.assertNotIn("Objetivo do plano B.", context)
 
     def test_status_counts_include_all_plans_without_list_limit(self):
         counts = storage.work_plan_status_counts(self.project_id)

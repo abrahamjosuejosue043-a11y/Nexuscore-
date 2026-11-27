@@ -177,6 +177,12 @@ def initialize():
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMPTZ)""",
             "ALTER TABLE department_tasks ADD COLUMN IF NOT EXISTS plan_id BIGINT",
+            """CREATE TABLE IF NOT EXISTS task_events (
+                id BIGSERIAL PRIMARY KEY, task_id BIGINT NOT NULL REFERENCES department_tasks(id),
+                event_type TEXT NOT NULL, from_status TEXT, to_status TEXT,
+                actor TEXT NOT NULL, details TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+            "CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, created_at, id)",
             """CREATE TABLE IF NOT EXISTS work_plans (
                 id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, objective TEXT NOT NULL,
                 summary TEXT NOT NULL, project_id BIGINT NOT NULL,
@@ -271,6 +277,13 @@ def initialize():
         task_columns = {row["name"] for row in db.execute("PRAGMA table_info(department_tasks)").fetchall()}
         if "plan_id" not in task_columns:
             db.execute("ALTER TABLE department_tasks ADD COLUMN plan_id INTEGER")
+        db.execute("""CREATE TABLE IF NOT EXISTS task_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL,
+            event_type TEXT NOT NULL, from_status TEXT, to_status TEXT,
+            actor TEXT NOT NULL, details TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(task_id) REFERENCES department_tasks(id))""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, created_at, id)")
         db.execute("""CREATE TABLE IF NOT EXISTS work_plans (
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
             objective TEXT NOT NULL, summary TEXT NOT NULL, project_id INTEGER NOT NULL,
@@ -460,7 +473,9 @@ def create_department_task(
                 int(plan_id) if plan_id is not None else None,
             ),
         )
-        return cur.lastrowid
+        task_id = cur.lastrowid
+        _insert_task_event(db, task_id, "created", None, "pendente", str(created_by or "sistema"), "Tarefa criada.")
+        return task_id
 
 
 def list_department_tasks(
@@ -616,6 +631,7 @@ def approve_work_plan(plan_id):
                 ),
             )
             task_ids.append(cur.lastrowid)
+            _insert_task_event(db, cur.lastrowid, "delegated", None, "pendente", "diretoria", f"Tarefa delegada pelo plano #{int(plan_id)}.")
         db.execute(
             """UPDATE work_plans SET status='aprovado', approved_at=CURRENT_TIMESTAMP,
                updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='aprovando'""",
@@ -633,23 +649,60 @@ def reject_work_plan(plan_id):
         )
         return cur.rowcount > 0
 
-def update_department_task(task_id, status, result=None):
-    """Atualiza estado e resultado de uma tarefa, mantendo data de conclusão coerente."""
-    allowed = {"pendente", "em_andamento", "bloqueada", "concluida"}
+def _insert_task_event(db, task_id, event_type, from_status, to_status, actor, details=""):
+    db.execute(
+        """INSERT INTO task_events(task_id, event_type, from_status, to_status, actor, details)
+           VALUES(?,?,?,?,?,?)""",
+        (int(task_id), str(event_type)[:40],
+         str(from_status) if from_status is not None else None,
+         str(to_status) if to_status is not None else None,
+         str(actor or "sistema")[:80], str(details or "")[:8000]),
+    )
+
+
+def list_task_events(task_id, limit=100):
+    with connection() as db:
+        exists = db.execute("SELECT id FROM department_tasks WHERE id=?", (int(task_id),)).fetchone()
+        if not exists:
+            return None
+        rows = db.execute(
+            """SELECT * FROM task_events WHERE task_id=?
+               ORDER BY created_at DESC, id DESC LIMIT ?""",
+            (int(task_id), max(1, min(int(limit), 200))),
+        ).fetchall()
+    return [dict(row) for row in reversed(rows)]
+
+
+def update_department_task(task_id, status, result=None, actor="usuario"):
+    """Atualiza tarefa e registra evento auditável na mesma transação."""
+    allowed = {"pendente", "em_andamento", "em_revisao", "bloqueada", "concluida", "cancelada"}
+    transitions = {
+        "pendente": {"em_andamento", "bloqueada", "cancelada"},
+        "em_andamento": {"em_revisao", "bloqueada", "concluida", "cancelada"},
+        "em_revisao": {"em_andamento", "concluida", "bloqueada"},
+        "bloqueada": {"pendente", "em_andamento", "cancelada"},
+        "concluida": set(), "cancelada": set(),
+    }
     if status not in allowed:
         raise ValueError("Status de tarefa inválido.")
     with connection() as db:
+        row = db.execute("SELECT status, result FROM department_tasks WHERE id=?", (int(task_id),)).fetchone()
+        if not row:
+            return False
+        previous = row["status"]
+        if status != previous and status not in transitions.get(previous, set()):
+            raise ValueError(f"Transição não permitida: {previous} -> {status}.")
+        next_result = result if result is not None else row["result"]
         cur = db.execute(
-            """UPDATE department_tasks
-               SET status=?,
-                   result=COALESCE(?, result),
-                   updated_at=CURRENT_TIMESTAMP,
-                   completed_at=CASE WHEN ?='concluida'
-                                     THEN COALESCE(completed_at, CURRENT_TIMESTAMP)
-                                     ELSE NULL END
+            """UPDATE department_tasks SET status=?, result=?, updated_at=CURRENT_TIMESTAMP,
+               completed_at=CASE WHEN ?='concluida'
+                                 THEN COALESCE(completed_at, CURRENT_TIMESTAMP) ELSE NULL END
                WHERE id=?""",
-            (status, result, status, int(task_id)),
+            (status, next_result, status, int(task_id)),
         )
+        if cur.rowcount:
+            event_type = "status_changed" if status != previous else "result_updated"
+            _insert_task_event(db, task_id, event_type, previous, status, actor, result or "")
         return cur.rowcount > 0
 
 

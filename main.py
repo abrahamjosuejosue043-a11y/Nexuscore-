@@ -433,28 +433,34 @@ def resolve_director_project_with_history(
     current_project_id: Optional[int] = None,
     history: Optional[list[dict]] = None,
 ):
-    """Recover an explicitly named project from this conversation only when the user says 'current project'."""
-    project_id, note, projects = resolve_director_project(text, current_project_id)
-    if project_id is not None or note or current_project_id is not None:
-        return project_id, note, projects
-
+    """Resolve current-project references from this conversation before parsing names."""
     normalized = normalize_project_reference(text)
-    refers_to_current = any(
-        phrase in normalized
-        for phrase in ("projeto atual", "projeto corrente", "este projeto", "esse projeto")
-    )
-    if not refers_to_current:
-        return project_id, note, projects
+    refers_to_current = bool(re.search(
+        r"\b(?:projeto atual|projeto corrente|este projeto|esse projeto)\b",
+        normalized,
+    ))
 
-    # Use only the user's own earlier messages in this same conversation.
-    for message in reversed(history or []):
-        if str(message.get("role") or "").lower() != "user":
-            continue
-        previous_text = str(message.get("content") or "")
-        previous_id, previous_note, previous_projects = resolve_director_project(previous_text)
-        if previous_id is not None or previous_note:
-            return previous_id, previous_note, previous_projects
-    return project_id, note, projects
+    # Explicit current-project language takes precedence over the generic
+    # 'projeto <resto da frase>' name parser.
+    if refers_to_current:
+        if current_project_id is not None:
+            return int(current_project_id), None, storage.projects(limit=300)
+
+        # Only an explicit project reference in a prior user message in this
+        # same conversation can establish the context. Assistant text is not
+        # an authority for project selection.
+        for message in reversed(history or []):
+            if str(message.get("role") or "").lower() not in {"user", "usuario"}:
+                continue
+            previous_text = str(message.get("content") or "")
+            previous_id, previous_note, previous_projects = resolve_director_project(
+                previous_text
+            )
+            if previous_id is not None or previous_note:
+                return previous_id, previous_note, previous_projects
+        return None, None, storage.projects(limit=300)
+
+    return resolve_director_project(text, current_project_id)
 
 
 def build_director_data_context(project_id: Optional[int], project_resolution_note: Optional[str] = None, available_projects: Optional[list[dict]] = None) -> str:

@@ -1118,6 +1118,14 @@ async function loadProjects(){
      el.appendChild(select);
     }else{
      meta.textContent="Rejeitado em: "+project.rejected_at+" · Exclusão prevista: "+project.purge_after;
+     const restore=document.createElement("button");restore.type="button";restore.className="btn";restore.textContent="Restaurar para aprovação";
+     restore.addEventListener("click",async()=>{
+      if(!window.confirm("Restaurar \""+project.title+"\" para a fila de aprovação do CEO?"))return;
+      restore.disabled=true;
+      try{await api("/api/projetos/"+project.id+"/restaurar",{method:"POST",body:JSON.stringify({})});await loadProjects();}
+      catch(error){alert(error.message);restore.disabled=false;}
+     });
+     el.appendChild(restore);
     }
     box.appendChild(el);
    });

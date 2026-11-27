@@ -19,6 +19,11 @@ class StorageTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp_dir.cleanup()
 
+    def _approved_project(self, title, summary):
+        project_id = self.storage.save_project(title, summary)
+        self.storage.decide_project(project_id, "aprovado", actor="ceo")
+        return project_id
+
     def test_save_and_read_conversation(self):
         self.storage.save_message("user", "geral", "Teste de persistência")
         items = self.storage.messages(10)
@@ -165,7 +170,7 @@ class StorageTests(unittest.TestCase):
         self.assertNotIn(engineering_id, marketing_ids)
 
     def test_shared_memory_prompt_scope_prevents_cross_project_context(self):
-        project_a = self.storage.save_project("Projeto memória A", "Escopo A.")
+        project_a = self._approved_project("Projeto memória A", "Escopo A.")
         project_b = self.storage.save_project("Projeto memória B", "Escopo B.")
         global_id = self.storage.save_shared_memory(
             "Regra global", "Registrar decisões importantes.", "processo", "todos"

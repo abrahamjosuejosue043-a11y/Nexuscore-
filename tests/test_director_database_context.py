@@ -127,6 +127,36 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         )
         self.assertIsNone(project_id)
         self.assertIn("não encontrei um projeto cadastrado", note.lower())
+    def test_director_recovers_current_project_from_same_conversation_history(self):
+        conversation_id = "test-director-project-continuity"
+        storage.ensure_conversation(conversation_id, "Teste de continuidade", "diretoria")
+        storage.save_message(
+            "user", "diretoria",
+            "Localize o projeto pelo nome Projeto A e consulte os planos.",
+            conversation_id=conversation_id,
+        )
+        history = storage.conversation_messages(conversation_id, limit=20)
+        project_id, note, _ = main.resolve_director_project_with_history(
+            "Detalhe o plano #2 do projeto atual.",
+            current_project_id=None,
+            history=history,
+        )
+        self.assertEqual(project_id, self.project_id)
+        self.assertIsNone(note)
+
+    def test_director_does_not_recover_project_from_assistant_only_history(self):
+        history = [{
+            "role": "assistant",
+            "content": "O projeto Projeto A tem ID 1.",
+        }]
+        project_id, note, _ = main.resolve_director_project_with_history(
+            "Consulte o projeto atual.",
+            current_project_id=None,
+            history=history,
+        )
+        self.assertIsNone(project_id)
+        self.assertIsNone(note)
+
     def test_database_read_failure_does_not_fabricate_a_count(self):
         with patch.object(storage, "list_work_plans", side_effect=RuntimeError("db unavailable")):
             context = main.build_director_data_context(self.project_id)

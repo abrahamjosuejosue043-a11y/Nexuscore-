@@ -741,8 +741,16 @@ async def gerar_plano_diretoria(
         raw, model = await chamar_groq(prompt, json_mode=True)
         data = json.loads(raw)
     except ProviderError as exc:
+        logger.warning(
+            "Falha ao gerar plano de trabalho com provedor: status=%s projeto_id=%s motivo=%s",
+            exc.status_code, request.projeto_id, exc.message,
+        )
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
     except (ValueError, TypeError):
+        logger.warning(
+            "Diretoria retornou JSON inválido para plano de trabalho: projeto_id=%s",
+            request.projeto_id,
+        )
         raise HTTPException(status_code=502, detail="A Diretoria não retornou um plano JSON válido.")
     if not isinstance(data, dict):
         raise HTTPException(status_code=502, detail="A Diretoria retornou um formato de plano inválido.")
@@ -774,9 +782,20 @@ async def gerar_plano_diretoria(
             title[:160], request.objetivo.strip(), summary[:8000],
             request.projeto_id, items,
         )
+        plan = storage.get_work_plan(plan_id)
+        if not plan:
+            raise RuntimeError("Plano criado, mas não foi recuperado após a persistência.")
     except ValueError:
         raise HTTPException(status_code=404, detail="Projeto não encontrado.")
-    plan = storage.get_work_plan(plan_id)
+    except Exception as exc:
+        logger.exception(
+            "Falha ao persistir ou recuperar plano de trabalho: projeto_id=%s",
+            request.projeto_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Não foi possível persistir o plano de trabalho. Nenhuma aprovação foi realizada.",
+        ) from exc
     return {"plan": plan, "modelo": model, "status": "rascunho_aguardando_aprovacao"}
 
 

@@ -92,6 +92,22 @@ class CEOProjectApprovalTests(unittest.TestCase):
 
     def test_rejection_sets_exactly_24_hours_and_expiry_deletes_project_but_keeps_audit(self):
         project_id = self._create_project()
+        with storage.connection() as db:
+            db.execute(
+                """INSERT INTO department_tasks(title,description,assigned_department,project_id)
+                   VALUES(?,?,?,?)""",
+                ("Tarefa histórica", "Deve sobreviver à exclusão do projeto.", "programacao", project_id),
+            )
+            plan_cursor = db.execute(
+                """INSERT INTO work_plans(title,objective,summary,project_id)
+                   VALUES(?,?,?,?)""",
+                ("Plano histórico", "Objetivo", "Resumo", project_id),
+            )
+            db.execute(
+                """INSERT INTO work_plan_items(plan_id,title,description,assigned_department)
+                   VALUES(?,?,?,?)""",
+                (plan_cursor.lastrowid, "Item histórico", "Descrição", "programacao"),
+            )
         rejected = self.client.post(
             f"/api/projetos/{project_id}/rejeitar", headers=self.headers
         )
@@ -122,6 +138,22 @@ class CEOProjectApprovalTests(unittest.TestCase):
         self.assertIsNotNone(audit["deleted_at"])
         self.assertEqual(audit["project_title"], "Projeto aguardando CEO")
         self.assertEqual(audit["actor"], "ceo")
+        with storage.connection() as db:
+            preserved_task = db.execute(
+                "SELECT COUNT(*) AS total FROM department_tasks WHERE project_id=?",
+                (project_id,),
+            ).fetchone()["total"]
+            preserved_plan = db.execute(
+                "SELECT COUNT(*) AS total FROM work_plans WHERE project_id=?",
+                (project_id,),
+            ).fetchone()["total"]
+            preserved_items = db.execute(
+                """SELECT COUNT(*) AS total FROM work_plan_items
+                   WHERE plan_id=(SELECT id FROM work_plans WHERE title='Plano histórico')"""
+            ).fetchone()["total"]
+        self.assertEqual(preserved_task, 1)
+        self.assertEqual(preserved_plan, 1)
+        self.assertEqual(preserved_items, 1)
 
     def test_cleanup_does_not_delete_approved_or_pending_projects(self):
         pending_id = self._create_project()

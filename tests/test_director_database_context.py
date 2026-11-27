@@ -44,7 +44,7 @@ class DirectorDatabaseContextTests(unittest.TestCase):
 
     def test_director_context_reads_real_plan_status_and_items_count(self):
         context = main.build_director_data_context(self.project_id)
-        self.assertIn("Projeto ativo: #", context)
+        self.assertIn("Projeto identificado: #", context)
         self.assertIn("Planos encontrados neste projeto: 1", context)
         self.assertIn("rejeitado=1", context)
         self.assertIn(f"Plano #{self.plan_id}", context)
@@ -56,10 +56,10 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertEqual(sum(counts.values()), 1)
 
     def test_unlinked_conversation_does_not_read_other_projects(self):
-        with patch.object(storage, "projects") as projects:
-            context = main.build_director_data_context(None)
-        projects.assert_not_called()
-        self.assertIn("nenhuma conversa/projeto está vinculado", context)
+        context = main.build_director_data_context(None)
+        self.assertIn("nenhum projeto foi identificado", context)
+        self.assertIn("Projeto A", context)
+        self.assertIn("Projeto B", context)
 
     def test_database_context_is_only_injected_for_director(self):
         context = main.build_director_data_context(self.project_id)
@@ -74,6 +74,35 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertIn("DADOS OPERACIONAIS CONSULTADOS NO BANCO", director_prompt)
         self.assertNotIn("DADOS OPERACIONAIS CONSULTADOS NO BANCO", engineering_prompt)
 
+    def test_director_resolves_project_by_id(self):
+        project_id, note, projects = main.resolve_director_project(
+            f"Consulte o projeto #{self.project_id}"
+        )
+        self.assertEqual(project_id, self.project_id)
+        self.assertIsNone(note)
+
+    def test_director_resolves_project_by_full_or_short_name(self):
+        project_id, note, _ = main.resolve_director_project("Analise o Projeto A")
+        self.assertEqual(project_id, self.project_id)
+        self.assertIsNone(note)
+
+    def test_director_uses_existing_project_when_no_new_reference_is_given(self):
+        project_id, note, _ = main.resolve_director_project(
+            "Quantos planos existem?", current_project_id=self.project_id
+        )
+        self.assertEqual(project_id, self.project_id)
+        self.assertIsNone(note)
+
+    def test_director_asks_when_project_name_is_ambiguous(self):
+        storage.save_project("Projeto A", "Segundo projeto com nome duplicado.")
+        project_id, note, _ = main.resolve_director_project("Analise Projeto A")
+        self.assertIsNone(project_id)
+        self.assertIn("mais de um projeto", note)
+
+    def test_director_does_not_guess_unknown_project_id(self):
+        project_id, note, _ = main.resolve_director_project("Consulte o projeto #9999")
+        self.assertIsNone(project_id)
+        self.assertIn("não encontrei projeto", note.lower())
     def test_database_read_failure_does_not_fabricate_a_count(self):
         with patch.object(storage, "list_work_plans", side_effect=RuntimeError("db unavailable")):
             context = main.build_director_data_context(self.project_id)

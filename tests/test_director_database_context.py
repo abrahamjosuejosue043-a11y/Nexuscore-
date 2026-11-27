@@ -50,6 +50,11 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertIn(f"Plano #{self.plan_id}", context)
         self.assertNotIn(f"Plano #{self.other_plan_id}", context)
 
+    def test_status_counts_include_all_plans_without_list_limit(self):
+        counts = storage.work_plan_status_counts(self.project_id)
+        self.assertEqual(counts, {"rejeitado": 1})
+        self.assertEqual(sum(counts.values()), 1)
+
     def test_unlinked_conversation_does_not_read_other_projects(self):
         with patch.object(storage, "projects") as projects:
             context = main.build_director_data_context(None)

@@ -423,6 +423,8 @@ def resolve_director_project(text: str, current_project_id: Optional[int] = None
         candidates = ", ".join(f"{p.get('title')} · #{p.get('id')}" for p in matches)
         return None, f"Encontrei mais de um projeto compatível: {candidates}. Pergunte qual deles o proprietário quis dizer.", projects
 
+    if project_phrase and project_phrase not in {"atual", "este", "esse", "meu", "nosso"}:
+        return None, f"Não encontrei um projeto cadastrado que corresponda a '{project_phrase}'. Pergunte ao proprietário qual projeto ele quis dizer.", projects
     return (int(current_project_id) if current_project_id is not None else None), None, projects
 
 

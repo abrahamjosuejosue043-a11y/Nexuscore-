@@ -396,7 +396,7 @@ def resolve_director_project(text: str, current_project_id: Optional[int] = None
         return None, f"Não encontrei projeto com ID #{requested_id}.", projects
 
     project_phrase = ""
-    mention = re.search(r"\\b(?:projeto|project)\\s+(?:n(?:umero|o)?\\s*)?(.+)", message)
+    mention = re.search(r"\b(?:projeto|project)\s+(?:n(?:umero|o)?\s*)?(.+)", message)
     if mention:
         project_phrase = mention.group(1).strip()
     matches = []

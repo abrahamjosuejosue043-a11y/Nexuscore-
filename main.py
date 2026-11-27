@@ -384,12 +384,12 @@ def resolve_director_project(text: str, current_project_id: Optional[int] = None
     projects = storage.projects(limit=300)
     message = normalize_project_reference(text)
     id_match = re.search(
-        r"\b(?:projeto|project)\s*(?:n(?:umero|o)?\s*)?#?\s*(\d+)\b|#\s*(\d+)\b",
+        r"\b(?:projeto|project)\s*(?:n(?:umero|o)?\s*)?#?\s*(\d+)\b",
         str(text or ""),
         flags=re.IGNORECASE,
     )
     if id_match:
-        requested_id = int(id_match.group(1) or id_match.group(2))
+        requested_id = int(id_match.group(1))
         match = next((p for p in projects if int(p.get("id") or 0) == requested_id), None)
         if match:
             return requested_id, None, projects
@@ -398,7 +398,7 @@ def resolve_director_project(text: str, current_project_id: Optional[int] = None
     matches = []
     for project in projects:
         title = normalize_project_reference(project.get("title") or "")
-        if title and re.search(r"(?<![a-z0-9])" + re.escape(title) + r"(?![a-z0-9])", message):
+        if title and (re.search(r"(?<![a-z0-9])" + re.escape(title) + r"(?![a-z0-9])", message) or (len(message.split()) >= 2 and title.startswith(message))):
             matches.append(project)
     if matches:
         longest = max(len(normalize_project_reference(p.get("title") or "")) for p in matches)

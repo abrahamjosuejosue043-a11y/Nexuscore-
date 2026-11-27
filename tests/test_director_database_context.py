@@ -103,6 +103,20 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         project_id, note, _ = main.resolve_director_project("Consulte o projeto #9999")
         self.assertIsNone(project_id)
         self.assertIn("não encontrei projeto", note.lower())
+    def test_director_resolves_project_by_name_prefix(self):
+        storage.save_project("Teste de Persistência de Planos no PostgreSQL", "Projeto de teste.")
+        project_id, note, _ = main.resolve_director_project(
+            "Consulte o projeto Teste de Persistência e conte os planos."
+        )
+        self.assertIsNotNone(project_id)
+        self.assertIsNone(note)
+
+    def test_plan_number_does_not_get_mistaken_for_project_number(self):
+        project_id, note, _ = main.resolve_director_project(
+            "Consulte o plano #2", current_project_id=self.project_id
+        )
+        self.assertEqual(project_id, self.project_id)
+        self.assertIsNone(note)
     def test_database_read_failure_does_not_fabricate_a_count(self):
         with patch.object(storage, "list_work_plans", side_effect=RuntimeError("db unavailable")):
             context = main.build_director_data_context(self.project_id)

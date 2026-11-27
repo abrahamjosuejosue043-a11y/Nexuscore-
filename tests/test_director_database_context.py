@@ -144,6 +144,15 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertEqual(project_id, self.project_id)
         self.assertIsNone(note)
 
+    def test_current_project_reference_accepts_validated_conversation_project_fallback(self):
+        project_id, note, _ = main.resolve_director_project_with_history(
+            "Continue a análise do projeto atual. Consulte o plano #2.",
+            current_project_id=self.project_id,
+            history=[],
+        )
+        self.assertEqual(project_id, self.project_id)
+        self.assertIsNone(note)
+
     def test_current_project_phrase_is_resolved_before_trailing_instruction_text(self):
         storage.ensure_conversation("test-current-project-order", "Teste", "diretoria")
         storage.save_message(

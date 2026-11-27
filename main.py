@@ -382,7 +382,7 @@ def normalize_project_reference(value: str) -> str:
 
 def resolve_director_project(text: str, current_project_id: Optional[int] = None):
     """Resolve explicit project ID/name deterministically; never guess on ambiguity."""
-    projects = storage.projects(limit=300)
+    projects = storage.projects(limit=300, approval_status="aprovado")
     message = normalize_project_reference(text)
     id_match = re.search(
         r"\b(?:projeto|project)\s*(?:n(?:umero|o)?\s*)?#?\s*(\d+)\b"
@@ -447,7 +447,7 @@ def resolve_director_project_with_history(
     # 'projeto <resto da frase>' name parser.
     if refers_to_current:
         if current_project_id is not None:
-            return int(current_project_id), None, storage.projects(limit=300)
+            return int(current_project_id), None, storage.projects(limit=300, approval_status="aprovado")
 
         # Only an explicit project reference in a prior user message in this
         # same conversation can establish the context. Assistant text is not
@@ -461,7 +461,7 @@ def resolve_director_project_with_history(
             )
             if previous_id is not None or previous_note:
                 return previous_id, previous_note, previous_projects
-        return None, None, storage.projects(limit=300)
+        return None, None, storage.projects(limit=300, approval_status="aprovado")
 
     return resolve_director_project(text, current_project_id)
 
@@ -476,7 +476,7 @@ def resolve_director_plan_id(text: str) -> Optional[int]:
 def build_director_data_context(project_id: Optional[int], project_resolution_note: Optional[str] = None, available_projects: Optional[list[dict]] = None, requested_plan_id: Optional[int] = None) -> str:
     """Monta um snapshot somente de leitura do projeto ativo e seus planos."""
     if project_id is None:
-        projects = available_projects if available_projects is not None else storage.projects(limit=300)
+        projects = available_projects if available_projects is not None else storage.projects(limit=300, approval_status="aprovado")
         lines = [
             "CONSULTA AO BANCO: nenhum projeto foi identificado para esta mensagem.",
             "Projetos cadastrados (identifique por nome exato ou número; não escolha por conta própria):",
@@ -491,7 +491,7 @@ def build_director_data_context(project_id: Optional[int], project_resolution_no
         lines.append("Se a solicitação depender de um projeto específico, pergunte qual projeto o proprietário quer consultar. Não misture dados de projetos.")
         return "\n".join(lines)
     try:
-        project_rows = storage.projects(limit=300)
+        project_rows = storage.projects(limit=300, approval_status="aprovado")
         project = next(
             (item for item in project_rows if int(item.get("id") or 0) == int(project_id)),
             None,
@@ -731,8 +731,8 @@ async def orquestrador(
     # resolved for this exact conversation. Validate it before using it as
     # a fallback when the persisted session link is absent.
     if agent_type == "diretoria" and current_project_id is None and project_id is not None:
-        if not storage.project_exists(project_id):
-            raise HTTPException(status_code=404, detail="Projeto informado para esta conversa não foi encontrado.")
+        if not storage.project_is_approved(project_id):
+            raise HTTPException(status_code=404, detail="Projeto não encontrado ou ainda não aprovado pelo CEO.")
         current_project_id = int(project_id)
     history = storage.conversation_messages(conversation_id, limit=20)
     if agent_type == "diretoria":

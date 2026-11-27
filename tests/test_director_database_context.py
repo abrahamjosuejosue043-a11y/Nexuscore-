@@ -144,6 +144,22 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertEqual(project_id, self.project_id)
         self.assertIsNone(note)
 
+    def test_current_project_phrase_is_resolved_before_trailing_instruction_text(self):
+        storage.ensure_conversation("test-current-project-order", "Teste", "diretoria")
+        storage.save_message(
+            "user", "diretoria",
+            "Localize o projeto pelo nome Projeto A e consulte os planos.",
+            conversation_id="test-current-project-order",
+        )
+        history = storage.conversation_messages("test-current-project-order", limit=20)
+        project_id, note, _ = main.resolve_director_project_with_history(
+            "Continue a análise do projeto atual. Consulte o plano #2 e apresente o objetivo.",
+            current_project_id=None,
+            history=history,
+        )
+        self.assertEqual(project_id, self.project_id)
+        self.assertIsNone(note)
+
     def test_director_does_not_recover_project_from_assistant_only_history(self):
         history = [{
             "role": "assistant",

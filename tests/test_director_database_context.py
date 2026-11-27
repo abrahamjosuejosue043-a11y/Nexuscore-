@@ -117,6 +117,12 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         )
         self.assertEqual(project_id, self.project_id)
         self.assertIsNone(note)
+    def test_director_does_not_fall_back_to_current_project_for_unknown_name(self):
+        project_id, note, _ = main.resolve_director_project(
+            "Consulte o projeto que ainda não foi cadastrado.", current_project_id=self.project_id
+        )
+        self.assertIsNone(project_id)
+        self.assertIn("não encontrei um projeto cadastrado", note.lower())
     def test_database_read_failure_does_not_fabricate_a_count(self):
         with patch.object(storage, "list_work_plans", side_effect=RuntimeError("db unavailable")):
             context = main.build_director_data_context(self.project_id)

@@ -21,6 +21,7 @@ class ConversationManagementTests(unittest.TestCase):
         self.project_id = storage.save_project(
             "Projeto de conversas", "Projeto usado nos testes de gerenciamento de conversas."
         )
+        storage.decide_project(self.project_id, "aprovado", actor="ceo")
         self.conversation_id = "conversation-management-test"
         storage.ensure_conversation(
             self.conversation_id, "Conversa de teste", "diretoria"

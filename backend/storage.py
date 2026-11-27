@@ -957,7 +957,7 @@ def decide_project(project_id, decision, actor="ceo"):
             purge_time if _database_url()
             else purge_time.strftime("%Y-%m-%d %H:%M:%S") if purge_time else None
         )
-        db.execute(
+        updated = db.execute(
             """UPDATE projects
                SET approval_status=?, approved_at=?, rejected_at=?, purge_after=?,
                    updated_at=CURRENT_TIMESTAMP
@@ -970,6 +970,8 @@ def decide_project(project_id, decision, actor="ceo"):
                 int(project_id),
             ),
         )
+        if updated.rowcount != 1:
+            return False
         db.execute(
             """INSERT INTO project_decisions
                (project_id,project_title,project_summary,decision,actor,decided_at,purge_after)
@@ -985,6 +987,41 @@ def decide_project(project_id, decision, actor="ceo"):
             "decided_at": decided_at,
             "purge_after": purge_after,
         }
+
+
+def restore_rejected_project(project_id, actor="ceo"):
+    """Retorna um projeto rejeitado à fila antes do vencimento de 24 horas."""
+    with connection() as db:
+        project = db.execute(
+            """SELECT id,title,summary FROM projects
+               WHERE id=? AND approval_status='rejeitado'
+                 AND purge_after IS NOT NULL AND purge_after > CURRENT_TIMESTAMP""",
+            (int(project_id),),
+        ).fetchone()
+        if not project:
+            return False
+        from datetime import datetime, timezone
+        decided_at = datetime.now(timezone.utc).replace(microsecond=0)
+        decided_value = decided_at if _database_url() else decided_at.strftime("%Y-%m-%d %H:%M:%S")
+        updated = db.execute(
+            """UPDATE projects SET approval_status='aguardando_aprovacao',
+                   rejected_at=NULL,purge_after=NULL,updated_at=CURRENT_TIMESTAMP
+               WHERE id=? AND approval_status='rejeitado'
+                 AND purge_after > CURRENT_TIMESTAMP""",
+            (int(project_id),),
+        )
+        if updated.rowcount != 1:
+            return False
+        db.execute(
+            """INSERT INTO project_decisions
+               (project_id,project_title,project_summary,decision,actor,decided_at)
+               VALUES(?,?,?,?,?,?)""",
+            (
+                int(project_id), project["title"], project["summary"],
+                "rejeicao_revertida", actor, decided_value,
+            ),
+        )
+        return {"id": int(project_id), "status": "aguardando_aprovacao"}
 
 
 def purge_expired_rejected_projects():

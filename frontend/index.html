@@ -338,6 +338,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
  .view .field input,.view .field textarea,.view .field select{transition:none}
 }
 
+form.composer[data-chat="diretoria"] .project-context-select{display:none!important}
 </style>
 </head>
 <body>
@@ -689,7 +690,7 @@ async function sendChat(type,form){
   const imagens=await Promise.all(files.map(fileAsDataUrl));
   const data=await api("/api/chat",{method:"POST",body:JSON.stringify({
    texto:text||"Analise detalhadamente as imagens anexadas.",tipo:type,imagens,conversa_id:conversationId,
-   project_id:getSelectedProject(type)?Number(getSelectedProject(type)):null
+   project_id:type==="diretoria"?null:(getSelectedProject(type)?Number(getSelectedProject(type)):null)
   })});
   setActiveConversation(type,data.conversa_id||conversationId);
   restoredConversationIds.add(data.conversa_id||conversationId);

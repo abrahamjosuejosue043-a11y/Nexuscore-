@@ -1340,6 +1340,17 @@ async def rejeitar_projeto(project_id: int, x_admin_token: Optional[str] = Heade
     return {**result, "exclusao_automatica_em_horas": 24}
 
 
+@app.post("/api/projetos/{project_id}/restaurar")
+async def restaurar_projeto(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = storage.restore_rejected_project(project_id, actor="ceo")
+    if result is False:
+        if not storage.project_exists(project_id):
+            raise HTTPException(status_code=404, detail="Projeto não encontrado ou já excluído.")
+        raise HTTPException(status_code=409, detail="O prazo de recuperação expirou ou o projeto não está rejeitado.")
+    return result
+
+
 @app.patch("/api/projetos/{project_id}")
 async def atualizar_projeto(project_id: int, request: dict, x_admin_token: Optional[str] = Header(default=None)):
     require_admin_token(x_admin_token)

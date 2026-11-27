@@ -147,6 +147,18 @@ def initialize():
                 status TEXT NOT NULL DEFAULT 'planejado',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)""",
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'aprovado'",
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ",
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMPTZ",
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS purge_after TIMESTAMPTZ",
+            """CREATE TABLE IF NOT EXISTS project_decisions (
+                id BIGSERIAL PRIMARY KEY, project_id BIGINT NOT NULL,
+                project_title TEXT NOT NULL, project_summary TEXT NOT NULL,
+                decision TEXT NOT NULL, actor TEXT NOT NULL,
+                decided_at TIMESTAMPTZ NOT NULL, purge_after TIMESTAMPTZ,
+                deleted_at TIMESTAMPTZ)""",
+            "CREATE INDEX IF NOT EXISTS idx_projects_approval_status ON projects(approval_status, purge_after)",
+            "CREATE INDEX IF NOT EXISTS idx_project_decisions_project ON project_decisions(project_id, decided_at)",
             """CREATE TABLE IF NOT EXISTS artifacts (
                 id BIGSERIAL PRIMARY KEY, title TEXT NOT NULL, filename TEXT NOT NULL,
                 format TEXT NOT NULL, mime_type TEXT NOT NULL, content BYTEA NOT NULL,
@@ -242,6 +254,22 @@ def initialize():
             summary TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'planejado',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)""")
+        project_columns = {row["name"] for row in db.execute("PRAGMA table_info(projects)").fetchall()}
+        if "approval_status" not in project_columns:
+            db.execute("ALTER TABLE projects ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'aprovado'")
+        if "approved_at" not in project_columns:
+            db.execute("ALTER TABLE projects ADD COLUMN approved_at TEXT")
+        if "rejected_at" not in project_columns:
+            db.execute("ALTER TABLE projects ADD COLUMN rejected_at TEXT")
+        if "purge_after" not in project_columns:
+            db.execute("ALTER TABLE projects ADD COLUMN purge_after TEXT")
+        db.execute("""CREATE TABLE IF NOT EXISTS project_decisions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL,
+            project_title TEXT NOT NULL, project_summary TEXT NOT NULL,
+            decision TEXT NOT NULL, actor TEXT NOT NULL,
+            decided_at TEXT NOT NULL, purge_after TEXT, deleted_at TEXT)""")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_projects_approval_status ON projects(approval_status, purge_after)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_project_decisions_project ON project_decisions(project_id, decided_at)")
         db.execute("""CREATE TABLE IF NOT EXISTS artifacts (
             id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL,
             filename TEXT NOT NULL, format TEXT NOT NULL, mime_type TEXT NOT NULL,
@@ -870,22 +898,115 @@ def ideas(limit=100):
 
 def save_project(title, summary, status="planejado"):
     with connection() as db:
-        cur = db.execute("INSERT INTO projects(title,summary,status) VALUES(?,?,?)",
-                         (title, summary, status))
+        cur = db.execute(
+            """INSERT INTO projects(title,summary,status,approval_status)
+               VALUES(?,?,?,'aguardando_aprovacao')""",
+            (title, summary, status),
+        )
         return cur.lastrowid
 
 
-def projects(limit=100):
+def projects(limit=100, approval_status=None):
     with connection() as db:
-        rows = db.execute("SELECT * FROM projects ORDER BY id DESC LIMIT ?",
-                          (max(1, min(int(limit), 300)),)).fetchall()
+        if approval_status:
+            rows = db.execute(
+                "SELECT * FROM projects WHERE approval_status=? ORDER BY id DESC LIMIT ?",
+                (approval_status, max(1, min(int(limit), 300))),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT * FROM projects ORDER BY id DESC LIMIT ?",
+                (max(1, min(int(limit), 300)),),
+            ).fetchall()
     return [dict(row) for row in rows]
+
+
+def project_is_approved(project_id):
+    with connection() as db:
+        row = db.execute(
+            "SELECT 1 FROM projects WHERE id=? AND approval_status='aprovado'",
+            (int(project_id),),
+        ).fetchone()
+    return row is not None
+
+
+def decide_project(project_id, decision, actor="ceo"):
+    if decision not in {"aprovado", "rejeitado"}:
+        raise ValueError("Decisão de projeto inválida.")
+    with connection() as db:
+        project = db.execute(
+            "SELECT id,title,summary,approval_status FROM projects WHERE id=?",
+            (int(project_id),),
+        ).fetchone()
+        if not project:
+            return None
+        if project["approval_status"] != "aguardando_aprovacao":
+            return False
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        decided_at = now.strftime("%Y-%m-%d %H:%M:%S")
+        purge_after = (
+            (now + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+            if decision == "rejeitado" else None
+        )
+        db.execute(
+            """UPDATE projects
+               SET approval_status=?, approved_at=?, rejected_at=?, purge_after=?,
+                   updated_at=CURRENT_TIMESTAMP
+               WHERE id=? AND approval_status='aguardando_aprovacao'""",
+            (
+                decision,
+                decided_at if decision == "aprovado" else None,
+                decided_at if decision == "rejeitado" else None,
+                purge_after,
+                int(project_id),
+            ),
+        )
+        db.execute(
+            """INSERT INTO project_decisions
+               (project_id,project_title,project_summary,decision,actor,decided_at,purge_after)
+               VALUES(?,?,?,?,?,?,?)""",
+            (
+                int(project_id), project["title"], project["summary"],
+                decision, actor, decided_at, purge_after,
+            ),
+        )
+        return {
+            "id": int(project_id),
+            "status": decision,
+            "decided_at": decided_at,
+            "purge_after": purge_after,
+        }
+
+
+def purge_expired_rejected_projects():
+    """Exclui projetos rejeitados após 24h e conserva o histórico da decisão."""
+    with connection() as db:
+        expired = db.execute(
+            """SELECT id FROM projects
+               WHERE approval_status='rejeitado'
+                 AND purge_after IS NOT NULL
+                 AND purge_after <= CURRENT_TIMESTAMP
+               ORDER BY id"""
+        ).fetchall()
+        deleted_ids = [int(row["id"]) for row in expired]
+        for project_id in deleted_ids:
+            db.execute(
+                """UPDATE project_decisions SET deleted_at=CURRENT_TIMESTAMP
+                   WHERE project_id=? AND decision='rejeitado' AND deleted_at IS NULL""",
+                (project_id,),
+            )
+            db.execute("DELETE FROM projects WHERE id=? AND approval_status='rejeitado'", (project_id,))
+    return deleted_ids
 
 
 def update_project(project_id, status):
     with connection() as db:
-        cur = db.execute("UPDATE projects SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                         (status, int(project_id)))
+        cur = db.execute(
+            """UPDATE projects SET status=?, updated_at=CURRENT_TIMESTAMP
+               WHERE id=? AND approval_status='aprovado'""",
+            (status, int(project_id)),
+        )
         return cur.rowcount > 0
 
 

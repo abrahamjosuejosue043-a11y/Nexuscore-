@@ -648,7 +648,11 @@ async def orquestrador(
         )
         # Trocar explicitamente de projeto inicia uma conversa nova para não misturar
         # histórico, tarefas ou memórias do projeto anterior.
-        if resolved_project_id is not None and current_project_id is not None and int(resolved_project_id) != int(current_project_id):
+        if (
+            (resolved_project_id is not None and current_project_id is not None
+             and int(resolved_project_id) != int(current_project_id))
+            or (project_resolution_note and current_project_id is not None)
+        ):
             conversation_id = str(uuid.uuid4())
             session = storage.ensure_conversation(conversation_id, conversation_title, agent_type)
             current_project_id = None

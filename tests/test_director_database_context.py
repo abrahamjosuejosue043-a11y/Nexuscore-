@@ -54,6 +54,32 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertNotIn(f"Plano #{self.other_plan_id}", context)
         self.assertNotIn("Objetivo do plano B.", context)
 
+    def test_director_extracts_explicit_plan_number(self):
+        self.assertEqual(main.resolve_director_plan_id("Consulte o plano #2."), 2)
+        self.assertEqual(main.resolve_director_plan_id("Detalhe o plano nº 2."), 2)
+        self.assertIsNone(main.resolve_director_plan_id("Consulte o projeto #2."))
+
+    def test_director_context_fetches_requested_plan_directly(self):
+        context = main.build_director_data_context(
+            self.project_id, requested_plan_id=self.plan_id
+        )
+        self.assertIn(f"Consulta direta do plano solicitado #{self.plan_id} concluída.", context)
+        self.assertIn("Objetivo do plano A.", context)
+        self.assertNotIn("Objetivo do plano B.", context)
+
+    def test_director_context_does_not_leak_plan_from_another_project(self):
+        context = main.build_director_data_context(
+            self.project_id, requested_plan_id=self.other_plan_id
+        )
+        self.assertIn("está associado a outro projeto", context)
+        self.assertNotIn("Objetivo do plano B.", context)
+
+    def test_director_context_reports_missing_requested_plan(self):
+        context = main.build_director_data_context(
+            self.project_id, requested_plan_id=999999
+        )
+        self.assertIn("Plano #999999 não encontrado", context)
+
     def test_status_counts_include_all_plans_without_list_limit(self):
         counts = storage.work_plan_status_counts(self.project_id)
         self.assertEqual(counts, {"rejeitado": 1})

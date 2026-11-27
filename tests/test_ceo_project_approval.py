@@ -156,6 +156,30 @@ class CEOProjectApprovalTests(unittest.TestCase):
         self.assertEqual(preserved_plan, 1)
         self.assertEqual(preserved_items, 1)
 
+    def test_rejected_project_can_be_restored_before_24_hour_expiry(self):
+        project_id = self._create_project()
+        rejected = self.client.post(
+            f"/api/projetos/{project_id}/rejeitar", headers=self.headers
+        )
+        self.assertEqual(rejected.status_code, 200)
+
+        restored = self.client.post(
+            f"/api/projetos/{project_id}/restaurar", headers=self.headers
+        )
+        self.assertEqual(restored.status_code, 200)
+        self.assertEqual(restored.json()["status"], "aguardando_aprovacao")
+        self.assertEqual(len(storage.projects(approval_status="aguardando_aprovacao")), 1)
+        with storage.connection() as db:
+            decisions = db.execute(
+                "SELECT decision FROM project_decisions WHERE project_id=? ORDER BY id",
+                (project_id,),
+            ).fetchall()
+        self.assertEqual(
+            [row["decision"] for row in decisions],
+            ["rejeitado", "rejeicao_revertida"],
+        )
+        self.assertEqual(storage.purge_expired_rejected_projects(), [])
+
     def test_cleanup_does_not_delete_approved_or_pending_projects(self):
         pending_id = self._create_project()
         approved_id = self._create_project()

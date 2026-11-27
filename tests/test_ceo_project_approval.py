@@ -156,6 +156,16 @@ class CEOProjectApprovalTests(unittest.TestCase):
         self.assertEqual(preserved_plan, 1)
         self.assertEqual(preserved_items, 1)
 
+    def test_unapproved_project_cannot_receive_manual_tasks(self):
+        project_id = self._create_project()
+        with self.assertRaisesRegex(ValueError, "aprovado pelo CEO"):
+            storage.create_department_task(
+                "Tarefa bloqueada",
+                "Projeto pendente não pode receber tarefas.",
+                "programacao",
+                project_id=project_id,
+            )
+
     def test_rejected_project_can_be_restored_before_24_hour_expiry(self):
         project_id = self._create_project()
         rejected = self.client.post(

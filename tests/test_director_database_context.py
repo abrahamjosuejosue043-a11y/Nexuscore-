@@ -16,7 +16,7 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.previous_database_url = os.environ.pop("DATABASE_URL", None)
         storage.DB_PATH = os.path.join(self.temp_dir.name, "director-context.db")
         storage.initialize()
-        self.project_id = storage.save_project("Projeto A", "Projeto usado no teste.")
+        self.project_id = self._approved_project("Projeto A", "Projeto usado no teste.")
         self.other_project_id = storage.save_project("Projeto B", "Projeto separado.")
         self.items = [{
             "title": "Validar leitura",
@@ -41,6 +41,11 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         else:
             os.environ.pop("DATABASE_URL", None)
         self.temp_dir.cleanup()
+
+    def _approved_project(self, title, summary):
+        project_id = storage.save_project(title, summary)
+        storage.decide_project(project_id, "aprovado", actor="ceo")
+        return project_id
 
     def test_director_context_reads_real_plan_status_and_items_count(self):
         context = main.build_director_data_context(self.project_id)

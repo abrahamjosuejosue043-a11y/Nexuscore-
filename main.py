@@ -384,12 +384,12 @@ def resolve_director_project(text: str, current_project_id: Optional[int] = None
     projects = storage.projects(limit=300)
     message = normalize_project_reference(text)
     id_match = re.search(
-        r"\b(?:projeto|project)\s*(?:n(?:umero|o)?\s*)?#?\s*(\d+)\b",
+        r"\b(?:projeto|project)\s*(?:n(?:umero|o)?\s*)?#?\s*(\d+)\b|(?<!plano )#\s*(\d+)\b",
         str(text or ""),
         flags=re.IGNORECASE,
     )
     if id_match:
-        requested_id = int(id_match.group(1))
+        requested_id = int(id_match.group(1) or id_match.group(2))
         match = next((p for p in projects if int(p.get("id") or 0) == requested_id), None)
         if match:
             return requested_id, None, projects

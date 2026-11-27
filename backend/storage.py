@@ -598,6 +598,17 @@ def list_work_plans(limit=50, project_id=None, status=None):
     return plans
 
 
+def work_plan_status_counts(project_id):
+    """Conta todos os planos por estado em um projeto, sem limite de paginação."""
+    with connection() as db:
+        rows = db.execute(
+            """SELECT status, COUNT(*) AS total
+               FROM work_plans WHERE project_id=? GROUP BY status""",
+            (int(project_id),),
+        ).fetchall()
+    return {str(row["status"]): int(row["total"]) for row in rows}
+
+
 def approve_work_plan(plan_id):
     """Aprova um plano uma única vez e cria as tarefas delegadas atomicamente."""
     with connection() as db:

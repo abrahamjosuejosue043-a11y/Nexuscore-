@@ -395,10 +395,25 @@ def resolve_director_project(text: str, current_project_id: Optional[int] = None
             return requested_id, None, projects
         return None, f"Não encontrei projeto com ID #{requested_id}.", projects
 
+    project_phrase = ""
+    mention = re.search(r"\\b(?:projeto|project)\\s+(?:n(?:umero|o)?\\s*)?(.+)", message)
+    if mention:
+        project_phrase = mention.group(1).strip()
     matches = []
     for project in projects:
         title = normalize_project_reference(project.get("title") or "")
-        if title and (re.search(r"(?<![a-z0-9])" + re.escape(title) + r"(?![a-z0-9])", message) or (len(message.split()) >= 2 and title.startswith(message))):
+        phrase_words = project_phrase.split()
+        partial_match = False
+        if title and len(phrase_words) >= 2:
+            for size in range(2, min(5, len(phrase_words) + 1)):
+                candidate = " ".join(phrase_words[:size])
+                if title.startswith(candidate):
+                    partial_match = True
+                    break
+        if title and (
+            re.search(r"(?<![a-z0-9])" + re.escape(title) + r"(?![a-z0-9])", message)
+            or partial_match
+        ):
             matches.append(project)
     if matches:
         longest = max(len(normalize_project_reference(p.get("title") or "")) for p in matches)

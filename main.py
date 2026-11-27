@@ -1189,8 +1189,9 @@ async def criar_tarefa(
             conversation_id=request.conversa_id,
             project_id=request.projeto_id,
         )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    except ValueError as exc:
+        status_code = 409 if "aprovado pelo CEO" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return {"id": task_id, "status": "criada", "departamento": departamento}
 
 

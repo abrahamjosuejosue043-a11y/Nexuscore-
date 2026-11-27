@@ -391,17 +391,14 @@ def build_director_data_context(project_id: Optional[int]) -> str:
                 f"CONSULTA AO BANCO: o projeto ativo #{int(project_id)} não foi encontrado. "
                 "Não invente dados; informe a inconsistência."
             )
-        plans = storage.list_work_plans(limit=100, project_id=int(project_id))
-        status_counts = {"rascunho": 0, "aprovado": 0, "rejeitado": 0}
-        for plan in plans:
-            status = str(plan.get("status") or "").lower()
-            if status in status_counts:
-                status_counts[status] += 1
+        status_counts = storage.work_plan_status_counts(int(project_id))
+        plans = storage.list_work_plans(limit=30, project_id=int(project_id))
+        total_plans = sum(status_counts.values())
         lines = [
             "DADOS OPERACIONAIS CONSULTADOS NO BANCO (somente leitura; fonte factual):",
             f"Projeto ativo: #{project_id} — {str(project.get('title') or 'Sem título')}.",
             f"Status do projeto: {str(project.get('status') or 'não informado')}.",
-            f"Planos encontrados neste projeto: {len(plans)}.",
+            f"Planos encontrados neste projeto: {total_plans}.",
             "Contagem de planos: " + ", ".join(
                 f"{key}={value}" for key, value in status_counts.items()
             ) + ".",
@@ -409,7 +406,7 @@ def build_director_data_context(project_id: Optional[int]) -> str:
             "Projetos usam seus próprios estados; planos usam rascunho, aprovado ou rejeitado.",
         ]
         if plans:
-            lines.append("Planos registrados (mais recentes primeiro):")
+            lines.append("Amostra dos planos registrados (até 30 mais recentes):")
             for plan in plans[:30]:
                 items = plan.get("items") or []
                 lines.append(

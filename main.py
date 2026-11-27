@@ -18,6 +18,7 @@ IMPORTANTE:
 import os
 import re
 import time
+import asyncio
 import hmac
 import uuid
 import logging
@@ -858,9 +859,39 @@ def require_admin_token(token: Optional[str]) -> None:
 
 
 
+_project_cleanup_task = None
+
+
+async def _project_cleanup_loop():
+    while True:
+        try:
+            deleted_ids = await asyncio.to_thread(storage.purge_expired_rejected_projects)
+            if deleted_ids:
+                logging.info("Projetos rejeitados expirados removidos: %s", deleted_ids)
+        except Exception:
+            logging.exception("Falha ao processar exclusão automática de projetos rejeitados.")
+        await asyncio.sleep(60)
+
+
 @app.on_event("startup")
 async def initialize_persistent_storage():
+    global _project_cleanup_task
     storage.initialize()
+    storage.purge_expired_rejected_projects()
+    if _project_cleanup_task is None or _project_cleanup_task.done():
+        _project_cleanup_task = asyncio.create_task(_project_cleanup_loop())
+
+
+@app.on_event("shutdown")
+async def stop_project_cleanup_loop():
+    global _project_cleanup_task
+    if _project_cleanup_task is not None:
+        _project_cleanup_task.cancel()
+        try:
+            await _project_cleanup_task
+        except asyncio.CancelledError:
+            pass
+        _project_cleanup_task = None
 
 @app.get("/api/saude")
 async def saude():
@@ -1008,6 +1039,8 @@ async def gerar_plano_diretoria(
     require_admin_token(x_admin_token)
     if not storage.project_exists(request.projeto_id):
         raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if not storage.project_is_approved(request.projeto_id):
+        raise HTTPException(status_code=409, detail="O projeto precisa ser aprovado pelo CEO antes de gerar planos.")
     prompt = (
         "Você é a Diretoria do Nexuscore AI. Transforme o objetivo em um plano de trabalho "
         "realista, dividido em tarefas claras e delegáveis. Não execute nada, não diga que "
@@ -1262,9 +1295,17 @@ async def criar_ideia(request: dict, x_admin_token: Optional[str] = Header(defau
 
 
 @app.get("/api/projetos")
-async def listar_projetos(limit: int = 100, x_admin_token: Optional[str] = Header(default=None)):
+async def listar_projetos(
+    limit: int = 100,
+    approval_status: Optional[str] = None,
+    x_admin_token: Optional[str] = Header(default=None),
+):
     require_admin_token(x_admin_token)
-    return {"items": storage.projects(limit)}
+    allowed = {"aguardando_aprovacao", "aprovado", "rejeitado"}
+    if approval_status and approval_status not in allowed:
+        raise HTTPException(status_code=422, detail="Filtro de aprovação inválido.")
+    return {"items": storage.projects(limit, approval_status=approval_status)}
+
 
 @app.post("/api/projetos")
 async def criar_projeto(request: dict, x_admin_token: Optional[str] = Header(default=None)):
@@ -1274,7 +1315,30 @@ async def criar_projeto(request: dict, x_admin_token: Optional[str] = Header(def
     if not titulo or not resumo:
         raise HTTPException(status_code=422, detail="Informe nome e descrição do projeto.")
     project_id = storage.save_project(titulo[:200], resumo[:10000])
-    return {"id": project_id, "status": "criado"}
+    return {"id": project_id, "status": "aguardando_aprovacao"}
+
+
+@app.post("/api/projetos/{project_id}/aprovar")
+async def aprovar_projeto(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = storage.decide_project(project_id, "aprovado", actor="ceo")
+    if result is None:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if result is False:
+        raise HTTPException(status_code=409, detail="Somente projetos aguardando aprovação podem ser aprovados.")
+    return result
+
+
+@app.post("/api/projetos/{project_id}/rejeitar")
+async def rejeitar_projeto(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = storage.decide_project(project_id, "rejeitado", actor="ceo")
+    if result is None:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if result is False:
+        raise HTTPException(status_code=409, detail="Somente projetos aguardando aprovação podem ser rejeitados.")
+    return {**result, "exclusao_automatica_em_horas": 24}
+
 
 @app.patch("/api/projetos/{project_id}")
 async def atualizar_projeto(project_id: int, request: dict, x_admin_token: Optional[str] = Header(default=None)):

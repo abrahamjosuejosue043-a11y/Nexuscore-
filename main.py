@@ -816,7 +816,7 @@ async def listar_tarefas(
 ):
     require_admin_token(x_admin_token)
     departamentos = {"geral", "diretoria", "programacao", "publicidade"}
-    statuses = {"pendente", "em_andamento", "bloqueada", "concluida"}
+    statuses = {"pendente", "em_andamento", "em_revisao", "bloqueada", "concluida", "cancelada"}
     if departamento and departamento not in departamentos:
         raise HTTPException(status_code=422, detail="Departamento inválido.")
     if status and status not in statuses:
@@ -864,15 +864,28 @@ async def atualizar_tarefa(
     x_admin_token: Optional[str] = Header(default=None),
 ):
     require_admin_token(x_admin_token)
-    statuses = {"pendente", "em_andamento", "bloqueada", "concluida"}
+    statuses = {"pendente", "em_andamento", "em_revisao", "bloqueada", "concluida", "cancelada"}
     status = request.status.strip().lower()
     if status not in statuses:
         raise HTTPException(status_code=422, detail="Status inválido.")
     if request.resultado is not None and len(request.resultado) > 8000:
         raise HTTPException(status_code=422, detail="Resultado muito longo.")
-    if not storage.update_department_task(task_id, status, request.resultado):
+    try:
+        updated = storage.update_department_task(task_id, status, request.resultado, actor="proprietario")
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not updated:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
     return {"id": task_id, "status": status, "atualizada": True}
+
+
+@app.get("/api/tarefas/{task_id}/historico")
+async def historico_tarefa(task_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    events = storage.list_task_events(task_id)
+    if events is None:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    return {"task_id": task_id, "items": events}
 
 
 @app.get("/api/memoria")

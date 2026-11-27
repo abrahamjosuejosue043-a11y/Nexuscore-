@@ -286,6 +286,32 @@ class StorageTests(unittest.TestCase):
         self.assertIsNotNone(completed["completed_at"])
         self.assertEqual(completed["result"], "Testes revisados e aprovados.")
 
+    def test_task_lifecycle_records_audit_and_rejects_invalid_transitions(self):
+        task_id = self.storage.create_department_task("Tarefa com auditoria", "Validar ciclo de vida.", "programacao", "alta", created_by="diretoria")
+        events = self.storage.list_task_events(task_id)
+        self.assertEqual(events[0]["event_type"], "created")
+        self.assertTrue(self.storage.update_department_task(task_id, "em_andamento", "Execução iniciada.", actor="engenharia"))
+        self.assertTrue(self.storage.update_department_task(task_id, "em_revisao", "Entrega enviada.", actor="engenharia"))
+        with self.assertRaises(ValueError):
+            self.storage.update_department_task(task_id, "cancelada", "Cancelamento inválido.", actor="proprietario")
+        self.assertTrue(self.storage.update_department_task(task_id, "concluida", "Revisão aprovada.", actor="diretoria"))
+        with self.assertRaises(ValueError):
+            self.storage.update_department_task(task_id, "em_andamento", "Reabrir tarefa.", actor="engenharia")
+        events = self.storage.list_task_events(task_id)
+        self.assertEqual([event["to_status"] for event in events], ["pendente", "em_andamento", "em_revisao", "concluida"])
+        self.assertEqual(events[1]["actor"], "engenharia")
+        self.assertEqual(events[-1]["actor"], "diretoria")
+
+    def test_cancelled_task_is_terminal_and_audited(self):
+        task_id = self.storage.create_department_task("Tarefa cancelável", "Testar cancelamento.", "programacao", "media")
+        self.assertTrue(self.storage.update_department_task(task_id, "cancelada", "Cancelada pelo proprietário.", actor="proprietario"))
+        with self.assertRaises(ValueError):
+            self.storage.update_department_task(task_id, "pendente")
+        self.assertEqual(self.storage.list_task_events(task_id)[-1]["actor"], "proprietario")
+
+    def test_task_history_returns_none_for_missing_task(self):
+        self.assertIsNone(self.storage.list_task_events(987654321))
+
     def test_department_tasks_can_be_isolated_by_conversation_and_project(self):
         project_11 = self.storage.save_project("Projeto tarefa 11", "Escopo de teste.")
         project_22 = self.storage.save_project("Projeto tarefa 22", "Escopo de teste.")

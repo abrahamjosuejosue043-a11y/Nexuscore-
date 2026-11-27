@@ -18,6 +18,7 @@ IMPORTANTE:
 import os
 import re
 import time
+import asyncio
 import hmac
 import uuid
 import logging
@@ -381,7 +382,7 @@ def normalize_project_reference(value: str) -> str:
 
 def resolve_director_project(text: str, current_project_id: Optional[int] = None):
     """Resolve explicit project ID/name deterministically; never guess on ambiguity."""
-    projects = storage.projects(limit=300)
+    projects = storage.projects(limit=300, approval_status="aprovado")
     message = normalize_project_reference(text)
     id_match = re.search(
         r"\b(?:projeto|project)\s*(?:n(?:umero|o)?\s*)?#?\s*(\d+)\b"
@@ -446,7 +447,7 @@ def resolve_director_project_with_history(
     # 'projeto <resto da frase>' name parser.
     if refers_to_current:
         if current_project_id is not None:
-            return int(current_project_id), None, storage.projects(limit=300)
+            return int(current_project_id), None, storage.projects(limit=300, approval_status="aprovado")
 
         # Only an explicit project reference in a prior user message in this
         # same conversation can establish the context. Assistant text is not
@@ -460,7 +461,7 @@ def resolve_director_project_with_history(
             )
             if previous_id is not None or previous_note:
                 return previous_id, previous_note, previous_projects
-        return None, None, storage.projects(limit=300)
+        return None, None, storage.projects(limit=300, approval_status="aprovado")
 
     return resolve_director_project(text, current_project_id)
 
@@ -475,7 +476,7 @@ def resolve_director_plan_id(text: str) -> Optional[int]:
 def build_director_data_context(project_id: Optional[int], project_resolution_note: Optional[str] = None, available_projects: Optional[list[dict]] = None, requested_plan_id: Optional[int] = None) -> str:
     """Monta um snapshot somente de leitura do projeto ativo e seus planos."""
     if project_id is None:
-        projects = available_projects if available_projects is not None else storage.projects(limit=300)
+        projects = available_projects if available_projects is not None else storage.projects(limit=300, approval_status="aprovado")
         lines = [
             "CONSULTA AO BANCO: nenhum projeto foi identificado para esta mensagem.",
             "Projetos cadastrados (identifique por nome exato ou número; não escolha por conta própria):",
@@ -490,7 +491,7 @@ def build_director_data_context(project_id: Optional[int], project_resolution_no
         lines.append("Se a solicitação depender de um projeto específico, pergunte qual projeto o proprietário quer consultar. Não misture dados de projetos.")
         return "\n".join(lines)
     try:
-        project_rows = storage.projects(limit=300)
+        project_rows = storage.projects(limit=300, approval_status="aprovado")
         project = next(
             (item for item in project_rows if int(item.get("id") or 0) == int(project_id)),
             None,
@@ -730,8 +731,8 @@ async def orquestrador(
     # resolved for this exact conversation. Validate it before using it as
     # a fallback when the persisted session link is absent.
     if agent_type == "diretoria" and current_project_id is None and project_id is not None:
-        if not storage.project_exists(project_id):
-            raise HTTPException(status_code=404, detail="Projeto informado para esta conversa não foi encontrado.")
+        if not storage.project_is_approved(project_id):
+            raise HTTPException(status_code=404, detail="Projeto não encontrado ou ainda não aprovado pelo CEO.")
         current_project_id = int(project_id)
     history = storage.conversation_messages(conversation_id, limit=20)
     if agent_type == "diretoria":
@@ -858,9 +859,39 @@ def require_admin_token(token: Optional[str]) -> None:
 
 
 
+_project_cleanup_task = None
+
+
+async def _project_cleanup_loop():
+    while True:
+        try:
+            deleted_ids = await asyncio.to_thread(storage.purge_expired_rejected_projects)
+            if deleted_ids:
+                logging.info("Projetos rejeitados expirados removidos: %s", deleted_ids)
+        except Exception:
+            logging.exception("Falha ao processar exclusão automática de projetos rejeitados.")
+        await asyncio.sleep(60)
+
+
 @app.on_event("startup")
 async def initialize_persistent_storage():
+    global _project_cleanup_task
     storage.initialize()
+    storage.purge_expired_rejected_projects()
+    if _project_cleanup_task is None or _project_cleanup_task.done():
+        _project_cleanup_task = asyncio.create_task(_project_cleanup_loop())
+
+
+@app.on_event("shutdown")
+async def stop_project_cleanup_loop():
+    global _project_cleanup_task
+    if _project_cleanup_task is not None:
+        _project_cleanup_task.cancel()
+        try:
+            await _project_cleanup_task
+        except asyncio.CancelledError:
+            pass
+        _project_cleanup_task = None
 
 @app.get("/api/saude")
 async def saude():
@@ -1008,6 +1039,8 @@ async def gerar_plano_diretoria(
     require_admin_token(x_admin_token)
     if not storage.project_exists(request.projeto_id):
         raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if not storage.project_is_approved(request.projeto_id):
+        raise HTTPException(status_code=409, detail="O projeto precisa ser aprovado pelo CEO antes de gerar planos.")
     prompt = (
         "Você é a Diretoria do Nexuscore AI. Transforme o objetivo em um plano de trabalho "
         "realista, dividido em tarefas claras e delegáveis. Não execute nada, não diga que "
@@ -1156,8 +1189,9 @@ async def criar_tarefa(
             conversation_id=request.conversa_id,
             project_id=request.projeto_id,
         )
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    except ValueError as exc:
+        status_code = 409 if "aprovado pelo CEO" in str(exc) else 404
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return {"id": task_id, "status": "criada", "departamento": departamento}
 
 
@@ -1262,9 +1296,17 @@ async def criar_ideia(request: dict, x_admin_token: Optional[str] = Header(defau
 
 
 @app.get("/api/projetos")
-async def listar_projetos(limit: int = 100, x_admin_token: Optional[str] = Header(default=None)):
+async def listar_projetos(
+    limit: int = 100,
+    approval_status: Optional[str] = None,
+    x_admin_token: Optional[str] = Header(default=None),
+):
     require_admin_token(x_admin_token)
-    return {"items": storage.projects(limit)}
+    allowed = {"aguardando_aprovacao", "aprovado", "rejeitado"}
+    if approval_status and approval_status not in allowed:
+        raise HTTPException(status_code=422, detail="Filtro de aprovação inválido.")
+    return {"items": storage.projects(limit, approval_status=approval_status)}
+
 
 @app.post("/api/projetos")
 async def criar_projeto(request: dict, x_admin_token: Optional[str] = Header(default=None)):
@@ -1274,7 +1316,41 @@ async def criar_projeto(request: dict, x_admin_token: Optional[str] = Header(def
     if not titulo or not resumo:
         raise HTTPException(status_code=422, detail="Informe nome e descrição do projeto.")
     project_id = storage.save_project(titulo[:200], resumo[:10000])
-    return {"id": project_id, "status": "criado"}
+    return {"id": project_id, "status": "aguardando_aprovacao"}
+
+
+@app.post("/api/projetos/{project_id}/aprovar")
+async def aprovar_projeto(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = storage.decide_project(project_id, "aprovado", actor="ceo")
+    if result is None:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if result is False:
+        raise HTTPException(status_code=409, detail="Somente projetos aguardando aprovação podem ser aprovados.")
+    return result
+
+
+@app.post("/api/projetos/{project_id}/rejeitar")
+async def rejeitar_projeto(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = storage.decide_project(project_id, "rejeitado", actor="ceo")
+    if result is None:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if result is False:
+        raise HTTPException(status_code=409, detail="Somente projetos aguardando aprovação podem ser rejeitados.")
+    return {**result, "exclusao_automatica_em_horas": 24}
+
+
+@app.post("/api/projetos/{project_id}/restaurar")
+async def restaurar_projeto(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = storage.restore_rejected_project(project_id, actor="ceo")
+    if result is False:
+        if not storage.project_exists(project_id):
+            raise HTTPException(status_code=404, detail="Projeto não encontrado ou já excluído.")
+        raise HTTPException(status_code=409, detail="O prazo de recuperação expirou ou o projeto não está rejeitado.")
+    return result
+
 
 @app.patch("/api/projetos/{project_id}")
 async def atualizar_projeto(project_id: int, request: dict, x_admin_token: Optional[str] = Header(default=None)):

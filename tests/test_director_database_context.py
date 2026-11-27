@@ -16,8 +16,8 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.previous_database_url = os.environ.pop("DATABASE_URL", None)
         storage.DB_PATH = os.path.join(self.temp_dir.name, "director-context.db")
         storage.initialize()
-        self.project_id = storage.save_project("Projeto A", "Projeto usado no teste.")
-        self.other_project_id = storage.save_project("Projeto B", "Projeto separado.")
+        self.project_id = self._approved_project("Projeto A", "Projeto usado no teste.")
+        self.other_project_id = self._approved_project("Projeto B", "Projeto separado.")
         self.items = [{
             "title": "Validar leitura",
             "description": "Verificar a recuperação dos dados do plano.",
@@ -41,6 +41,11 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         else:
             os.environ.pop("DATABASE_URL", None)
         self.temp_dir.cleanup()
+
+    def _approved_project(self, title, summary):
+        project_id = storage.save_project(title, summary)
+        storage.decide_project(project_id, "aprovado", actor="ceo")
+        return project_id
 
     def test_director_context_reads_real_plan_status_and_items_count(self):
         context = main.build_director_data_context(self.project_id)
@@ -124,7 +129,7 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertIsNone(note)
 
     def test_director_asks_when_project_name_is_ambiguous(self):
-        storage.save_project("Projeto A", "Segundo projeto com nome duplicado.")
+        self._approved_project("Projeto A", "Segundo projeto com nome duplicado.")
         project_id, note, _ = main.resolve_director_project("Analise Projeto A")
         self.assertIsNone(project_id)
         self.assertIn("mais de um projeto", note)
@@ -134,7 +139,7 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertIsNone(project_id)
         self.assertIn("não encontrei projeto", note.lower())
     def test_director_resolves_project_by_name_prefix(self):
-        storage.save_project("Teste de Persistência de Planos no PostgreSQL", "Projeto de teste.")
+        self._approved_project("Teste de Persistência de Planos no PostgreSQL", "Projeto de teste.")
         project_id, note, _ = main.resolve_director_project(
             "Consulte o projeto Teste de Persistência e conte os planos."
         )

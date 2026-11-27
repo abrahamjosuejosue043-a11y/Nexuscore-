@@ -52,6 +52,7 @@ class WorkPlanPersistenceTests(unittest.TestCase):
             "Projeto de teste de persistência",
             "Projeto isolado usado exclusivamente pelos testes automatizados.",
         )
+        storage.decide_project(self.project_id, "aprovado", actor="ceo")
 
     def tearDown(self):
         storage.DB_PATH = self.previous_db_path

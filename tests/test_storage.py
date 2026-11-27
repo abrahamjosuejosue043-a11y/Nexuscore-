@@ -19,6 +19,11 @@ class StorageTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp_dir.cleanup()
 
+    def _approved_project(self, title, summary):
+        project_id = self.storage.save_project(title, summary)
+        self.storage.decide_project(project_id, "aprovado", actor="ceo")
+        return project_id
+
     def test_save_and_read_conversation(self):
         self.storage.save_message("user", "geral", "Teste de persistência")
         items = self.storage.messages(10)
@@ -165,8 +170,8 @@ class StorageTests(unittest.TestCase):
         self.assertNotIn(engineering_id, marketing_ids)
 
     def test_shared_memory_prompt_scope_prevents_cross_project_context(self):
-        project_a = self.storage.save_project("Projeto memória A", "Escopo A.")
-        project_b = self.storage.save_project("Projeto memória B", "Escopo B.")
+        project_a = self._approved_project("Projeto memória A", "Escopo A.")
+        project_b = self._approved_project("Projeto memória B", "Escopo B.")
         global_id = self.storage.save_shared_memory(
             "Regra global", "Registrar decisões importantes.", "processo", "todos"
         )
@@ -213,7 +218,7 @@ class StorageTests(unittest.TestCase):
             )
 
     def test_conversation_can_be_linked_to_an_existing_project(self):
-        project_id = self.storage.save_project(
+        project_id = self._approved_project(
             "Projeto vinculado", "Projeto usado para testar o contexto da conversa."
         )
         conversation_id = "conversation-project-link"
@@ -313,8 +318,8 @@ class StorageTests(unittest.TestCase):
         self.assertIsNone(self.storage.list_task_events(987654321))
 
     def test_department_tasks_can_be_isolated_by_conversation_and_project(self):
-        project_11 = self.storage.save_project("Projeto tarefa 11", "Escopo de teste.")
-        project_22 = self.storage.save_project("Projeto tarefa 22", "Escopo de teste.")
+        project_11 = self._approved_project("Projeto tarefa 11", "Escopo de teste.")
+        project_22 = self._approved_project("Projeto tarefa 22", "Escopo de teste.")
         conversation_a = self.storage.create_department_task(
             "Tarefa conversa A", "Contexto exclusivo da conversa A.",
             "programacao", "alta", conversation_id="conversation-a", project_id=project_11,
@@ -349,7 +354,7 @@ class StorageTests(unittest.TestCase):
         )
 
     def test_work_plan_requires_approval_before_delegation(self):
-        project_id = self.storage.save_project("Projeto plano", "Projeto para testar a Diretoria.")
+        project_id = self._approved_project("Projeto plano", "Projeto para testar a Diretoria.")
         items = [
             {"title": "Analisar requisitos", "description": "Entregar requisitos e critérios.", "department": "diretoria", "priority": "alta"},
             {"title": "Implementar solução", "description": "Entregar código testado.", "department": "programacao", "priority": "alta"},
@@ -381,7 +386,7 @@ class StorageTests(unittest.TestCase):
         self.assertIsNone(self.storage.approve_work_plan(plan_id))
 
     def test_rejected_work_plan_never_creates_department_tasks(self):
-        project_id = self.storage.save_project("Projeto rejeitado", "Projeto de teste.")
+        project_id = self._approved_project("Projeto rejeitado", "Projeto de teste.")
         plan_id = self.storage.create_work_plan(
             "Plano não aprovado", "Objetivo que será rejeitado.", "Resumo.",
             project_id,
@@ -400,7 +405,7 @@ class StorageTests(unittest.TestCase):
         self.assertFalse(self.storage.reject_work_plan(plan_id))
 
     def test_project_tasks_are_visible_only_inside_matching_project_context(self):
-        project_id = self.storage.save_project("Projeto tarefa", "Contexto de tarefas.")
+        project_id = self._approved_project("Projeto tarefa", "Contexto de tarefas.")
         shared = self.storage.create_department_task(
             "Tarefa compartilhada do projeto", "Disponível nas conversas do projeto.",
             "programacao", "alta", project_id=project_id,

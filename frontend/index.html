@@ -399,8 +399,8 @@ form.composer[data-chat="diretoria"] .project-context-select{display:none!import
 </section>
 <section class="view" id="view-projeto">
  <div class="view-head"><div><h2>Projetos</h2><p>Transforme uma ideia em um registro de trabalho acompanhado.</p></div><span class="tag">Área de planejamento</span></div>
- <div class="notice">Projetos são registros próprios, separados do Banco de Ideias. Para criar e acompanhar projetos, configure o token administrativo em Conexões.</div>
- <div class="panel"><h3>Novo projeto</h3><div class="field"><label for="project-title">Nome do projeto</label><input id="project-title" placeholder="Ex.: Lançamento do novo produto"></div><div class="field"><label for="project-summary">Objetivo e descrição</label><textarea id="project-summary" placeholder="Descreva o resultado esperado, etapas e observações..."></textarea></div><div class="actions"><button class="btn primary" id="save-project">Criar projeto</button><button class="btn" id="project-to-director">Pedir análise da Diretoria</button></div><div id="project-status" class="hint"></div></div><div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Projetos registrados</h2><p>Acompanhe o andamento e atualize o status.</p></div><button class="btn" id="load-projects">Atualizar</button></div><div id="projects-result" class="list"><div class="empty">Carregando projetos...</div></div>
+ <div class="notice">Novos projetos entram na fila de aprovação do CEO. Projetos aprovados ficam disponíveis para a Diretoria e os departamentos. Projetos rejeitados são excluídos automaticamente após 24 horas; o histórico da decisão é preservado.</div>
+ <div class="panel"><h3>Submeter projeto para aprovação</h3><div class="field"><label for="project-title">Nome do projeto</label><input id="project-title" placeholder="Ex.: Lançamento do novo produto"></div><div class="field"><label for="project-summary">Objetivo e descrição</label><textarea id="project-summary" placeholder="Descreva o resultado esperado, etapas e observações..."></textarea></div><div class="actions"><button class="btn primary" id="save-project">Enviar para aprovação do CEO</button><button class="btn" id="project-to-director">Pedir análise da Diretoria</button></div><div id="project-status" class="hint"></div></div><div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Fila de aprovação e projetos</h2><p>Aprove ou rejeite propostas e acompanhe projetos ativos.</p></div><button class="btn" id="load-projects">Atualizar</button></div><div id="projects-result" class="list"><div class="empty">Carregando projetos...</div></div>
 </section>
 <section class="view" id="view-tarefas">
  <div class="view-head"><div><h2>Coordenação de tarefas</h2><p>A Diretoria encaminha atividades; cada departamento consulta sua fila e registra o resultado.</p></div><button class="btn" id="load-tasks">Atualizar</button></div>
@@ -515,7 +515,7 @@ async function refreshProjectSelectors(){
  const selects=document.querySelectorAll(".project-context-select");
  if(!selects.length)return;
  try{
-  const data=await api("/api/projetos?limit=200");
+  const data=await api("/api/projetos?limit=200&approval_status=aprovado");
   const projects=data.items||[];
   selects.forEach(select=>{
    const type=select.closest("form")?.dataset.chat,current=getSelectedProject(type);
@@ -879,7 +879,7 @@ function taskStatusLabel(value){
 async function loadPlanProjects(){
  const select=$("plan-project"),taskSelect=$("task-project");if(!select)return;
  try{
-  const data=await api("/api/projetos?limit=200"),projects=data.items||[];
+  const data=await api("/api/projetos?limit=200&approval_status=aprovado"),projects=data.items||[];
   select.replaceChildren(new Option("Selecione um projeto",""));
   projects.forEach(project=>select.add(new Option(project.title+" · #"+project.id,String(project.id))));
   select.disabled=!projects.length;
@@ -1007,7 +1007,7 @@ function memoryCategoryLabel(value){
 async function loadMemoryProjects(){
  const select=$("memory-project");if(!select)return;
  try{
-  const data=await api("/api/projetos?limit=200");
+  const data=await api("/api/projetos?limit=200&approval_status=aprovado");
   select.replaceChildren(new Option("Global · todos os projetos",""));
   (data.items||[]).forEach(project=>select.add(new Option(project.title+" · #"+project.id,String(project.id))));
   select.disabled=false;
@@ -1068,9 +1068,72 @@ async function loadIdeas(){const box=$("ideas-result");box.innerHTML='<div class
 $("load-history").addEventListener("click",loadHistory);$("load-ideas").addEventListener("click",loadIdeas);
 async function saveIdea(title,summary,priority){if(!adminToken)throw new Error("Informe o token administrativo em Conexões antes de salvar.");return api("/api/ideias",{method:"POST",body:JSON.stringify({titulo:title,resumo:summary,prioridade:priority})});}
 $("save-idea").addEventListener("click",async()=>{const status=$("idea-status");try{await saveIdea($("idea-title").value.trim(),$("idea-summary").value.trim(),$("idea-priority").value);status.textContent="Ideia salva no banco do serviço.";status.style.color="var(--green)";$("idea-title").value="";$("idea-summary").value="";loadIdeas();}catch(e){status.textContent=e.message;status.style.color="var(--red)";}});
-async function loadProjects(){const box=$("projects-result");if(!box)return;box.innerHTML='<div class="empty">Carregando projetos...</div>';try{const d=await api("/api/projetos");box.innerHTML="";if(!d.items?.length){box.innerHTML='<div class="empty">Nenhum projeto criado ainda.</div>';return;}d.items.forEach(project=>{const el=document.createElement("article");el.className="item";const title=document.createElement("strong");title.textContent=project.title;const p=document.createElement("p");p.textContent=project.summary;const meta=document.createElement("small");meta.textContent="Criado: "+project.created_at+" · Atualizado: "+project.updated_at;const select=document.createElement("select");select.style.marginTop="10px";select.style.maxWidth="220px";[["planejado","Planejado"],["em_andamento","Em andamento"],["concluido","Concluído"],["pausado","Pausado"]].forEach(([v,l])=>{const option=document.createElement("option");option.value=v;option.textContent=l;select.appendChild(option);});select.value=project.status;select.addEventListener("change",async()=>{try{await api("/api/projetos/"+project.id,{method:"PATCH",body:JSON.stringify({status:select.value})});meta.textContent="Status atualizado · "+new Date().toLocaleString("pt-BR");}catch(e){alert(e.message);select.value=project.status;}});el.append(title,p,meta,select);box.appendChild(el);});}catch(e){box.innerHTML="";const n=document.createElement("div");n.className="notice error";n.textContent=e.message;box.appendChild(n);}}
+async function loadProjects(){
+ const box=$("projects-result");if(!box)return;
+ box.innerHTML='<div class="empty">Carregando projetos...</div>';
+ try{
+  const d=await api("/api/projetos?limit=300");const items=d.items||[];box.replaceChildren();
+  if(!items.length){box.innerHTML='<div class="empty">Nenhum projeto registrado.</div>';return;}
+  const sections=[
+   ["aguardando_aprovacao","Aguardando sua aprovação"],
+   ["aprovado","Projetos aprovados"],
+   ["rejeitado","Rejeitados — aguardando exclusão"]
+  ];
+  sections.forEach(([status,label])=>{
+   const group=items.filter(project=>(project.approval_status||"aprovado")===status);
+   if(!group.length)return;
+   const heading=document.createElement("h3");heading.textContent=label;heading.style.margin="18px 0 8px";box.appendChild(heading);
+   group.forEach(project=>{
+    const el=document.createElement("article");el.className="item";
+    const title=document.createElement("strong");title.textContent=project.title+" · #"+project.id;
+    const p=document.createElement("p");p.textContent=project.summary;
+    const meta=document.createElement("small");
+    meta.textContent="Criado: "+project.created_at+" · Atualizado: "+project.updated_at;
+    el.append(title,p,meta);
+    if(status==="aguardando_aprovacao"){
+     const actions=document.createElement("div");actions.className="actions";
+     const approve=document.createElement("button");approve.type="button";approve.className="btn primary";approve.textContent="Aprovar";
+     approve.addEventListener("click",async()=>{
+      if(!window.confirm("Aprovar o projeto \""+project.title+"\"? Ele ficará disponível para a Diretoria e os departamentos."))return;
+      approve.disabled=true;
+      try{await api("/api/projetos/"+project.id+"/aprovar",{method:"POST",body:JSON.stringify({})});await loadProjects();await refreshProjectSelectors();}
+      catch(error){alert(error.message);approve.disabled=false;}
+     });
+     const reject=document.createElement("button");reject.type="button";reject.className="btn";reject.textContent="Rejeitar";
+     reject.addEventListener("click",async()=>{
+      if(!window.confirm("Rejeitar \""+project.title+"\"? O projeto será excluído automaticamente em 24 horas. O histórico da decisão será preservado."))return;
+      reject.disabled=true;
+      try{const result=await api("/api/projetos/"+project.id+"/rejeitar",{method:"POST",body:JSON.stringify({})});alert("Projeto rejeitado. Exclusão automática após 24 horas (a partir de "+result.decided_at+").");await loadProjects();}
+      catch(error){alert(error.message);reject.disabled=false;}
+     });
+     actions.append(approve,reject);el.appendChild(actions);
+    }else if(status==="aprovado"){
+     const select=document.createElement("select");select.style.marginTop="10px";select.style.maxWidth="220px";
+     [["planejado","Planejado"],["em_andamento","Em andamento"],["concluido","Concluído"],["pausado","Pausado"]].forEach(([v,l])=>select.add(new Option(l,v)));
+     select.value=project.status;
+     select.addEventListener("change",async()=>{
+      try{await api("/api/projetos/"+project.id,{method:"PATCH",body:JSON.stringify({status:select.value})});meta.textContent="Status atualizado · "+new Date().toLocaleString("pt-BR");}
+      catch(error){alert(error.message);select.value=project.status;}
+     });
+     el.appendChild(select);
+    }else{
+     meta.textContent="Rejeitado em: "+project.rejected_at+" · Exclusão prevista: "+project.purge_after;
+     const restore=document.createElement("button");restore.type="button";restore.className="btn";restore.textContent="Restaurar para aprovação";
+     restore.addEventListener("click",async()=>{
+      if(!window.confirm("Restaurar \""+project.title+"\" para a fila de aprovação do CEO?"))return;
+      restore.disabled=true;
+      try{await api("/api/projetos/"+project.id+"/restaurar",{method:"POST",body:JSON.stringify({})});await loadProjects();}
+      catch(error){alert(error.message);restore.disabled=false;}
+     });
+     el.appendChild(restore);
+    }
+    box.appendChild(el);
+   });
+  });
+ }catch(error){box.replaceChildren();const n=document.createElement("div");n.className="notice error";n.textContent=error.message;box.appendChild(n);}
+}
 $("load-projects")?.addEventListener("click",loadProjects);
-$("save-project").addEventListener("click",async()=>{const status=$("project-status");try{const title=$("project-title").value.trim(),summary=$("project-summary").value.trim();if(!title||!summary)throw new Error("Preencha o nome e a descrição do projeto.");await api("/api/projetos",{method:"POST",body:JSON.stringify({titulo:title,resumo:summary})});status.textContent="Projeto criado e salvo no banco do serviço.";status.style.color="var(--green)";$("project-title").value="";$("project-summary").value="";loadProjects();}catch(e){status.textContent=e.message;status.style.color="var(--red)";}});
+$("save-project").addEventListener("click",async()=>{const status=$("project-status");try{const title=$("project-title").value.trim(),summary=$("project-summary").value.trim();if(!title||!summary)throw new Error("Preencha o nome e a descrição do projeto.");await api("/api/projetos",{method:"POST",body:JSON.stringify({titulo:title,resumo:summary})});status.textContent="Projeto enviado para a fila de aprovação do CEO.";status.style.color="var(--green)";$("project-title").value="";$("project-summary").value="";loadProjects();}catch(e){status.textContent=e.message;status.style.color="var(--red)";}});
 $("project-to-director").addEventListener("click",()=>{const title=$("project-title").value.trim(),summary=$("project-summary").value.trim();if(!title||!summary){$("project-status").textContent="Preencha o nome e a descrição primeiro.";return;}showView("diretoria");$("texto-diretoria").value="Analise este projeto, proponha etapas, riscos, prioridades e próximos passos.\nProjeto: "+title+"\nDescrição: "+summary;$("texto-diretoria").focus();});
 $("send-email").addEventListener("click",async()=>{const s=$("email-status");s.textContent="Enviando...";try{const d=await api("/api/email/enviar",{method:"POST",body:JSON.stringify({destinatario:$("email-to").value,assunto:$("email-subject").value,texto:$("email-body").value})});s.textContent="E-mail enviado para "+d.destinatario;s.style.color="var(--green)";}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});
 $("analyze-email").addEventListener("click",async()=>{const s=$("email-status");s.textContent="Analisando...";try{const d=await api("/api/email/analisar",{method:"POST",body:JSON.stringify({assunto:$("email-subject").value,texto:$("email-body").value})});s.textContent="Análise concluída e registrada como ideia.";s.style.color="var(--green)";$("email-results").textContent=d.analise||"";}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});

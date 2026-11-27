@@ -144,6 +144,24 @@ class DirectorDatabaseContextTests(unittest.TestCase):
         self.assertEqual(project_id, self.project_id)
         self.assertIsNone(note)
 
+    def test_director_resolves_compact_project_id_alias(self):
+        project_id, note, _ = main.resolve_director_project("id2")
+        self.assertEqual(project_id, self.other_project_id)
+        self.assertIsNone(note)
+
+    def test_director_resolves_spaced_project_id_alias(self):
+        project_id, note, _ = main.resolve_director_project("ID 2")
+        self.assertEqual(project_id, self.other_project_id)
+        self.assertIsNone(note)
+
+    def test_plan_number_is_not_mistaken_for_project_id(self):
+        project_id, note, _ = main.resolve_director_project(
+            "Consulte o plano #2.",
+            current_project_id=self.project_id,
+        )
+        self.assertEqual(project_id, self.project_id)
+        self.assertIsNone(note)
+
     def test_current_project_reference_accepts_validated_conversation_project_fallback(self):
         project_id, note, _ = main.resolve_director_project_with_history(
             "Continue a análise do projeto atual. Consulte o plano #2.",

@@ -436,7 +436,7 @@ def resolve_director_project_with_history(
     """Resolve current-project references from this conversation before parsing names."""
     normalized = normalize_project_reference(text)
     refers_to_current = bool(re.search(
-        r"\\b(?:projeto atual|projeto corrente|este projeto|esse projeto)\\b",
+        r"\b(?:projeto atual|projeto corrente|este projeto|esse projeto)\b",
         normalized,
     ))
 

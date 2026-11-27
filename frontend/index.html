@@ -879,7 +879,7 @@ function taskStatusLabel(value){
 async function loadPlanProjects(){
  const select=$("plan-project"),taskSelect=$("task-project");if(!select)return;
  try{
-  const data=await api("/api/projetos?limit=200"),projects=data.items||[];
+  const data=await api("/api/projetos?limit=200&approval_status=aprovado"),projects=data.items||[];
   select.replaceChildren(new Option("Selecione um projeto",""));
   projects.forEach(project=>select.add(new Option(project.title+" · #"+project.id,String(project.id))));
   select.disabled=!projects.length;
@@ -1007,7 +1007,7 @@ function memoryCategoryLabel(value){
 async function loadMemoryProjects(){
  const select=$("memory-project");if(!select)return;
  try{
-  const data=await api("/api/projetos?limit=200");
+  const data=await api("/api/projetos?limit=200&approval_status=aprovado");
   select.replaceChildren(new Option("Global · todos os projetos",""));
   (data.items||[]).forEach(project=>select.add(new Option(project.title+" · #"+project.id,String(project.id))));
   select.disabled=false;
@@ -1125,7 +1125,7 @@ async function loadProjects(){
  }catch(error){box.replaceChildren();const n=document.createElement("div");n.className="notice error";n.textContent=error.message;box.appendChild(n);}
 }
 $("load-projects")?.addEventListener("click",loadProjects);
-$("save-project").addEventListener("click",async()=>{const status=$("project-status");try{const title=$("project-title").value.trim(),summary=$("project-summary").value.trim();if(!title||!summary)throw new Error("Preencha o nome e a descrição do projeto.");await api("/api/projetos",{method:"POST",body:JSON.stringify({titulo:title,resumo:summary})});status.textContent="Projeto criado e salvo no banco do serviço.";status.style.color="var(--green)";$("project-title").value="";$("project-summary").value="";loadProjects();}catch(e){status.textContent=e.message;status.style.color="var(--red)";}});
+$("save-project").addEventListener("click",async()=>{const status=$("project-status");try{const title=$("project-title").value.trim(),summary=$("project-summary").value.trim();if(!title||!summary)throw new Error("Preencha o nome e a descrição do projeto.");await api("/api/projetos",{method:"POST",body:JSON.stringify({titulo:title,resumo:summary})});status.textContent="Projeto enviado para a fila de aprovação do CEO.";status.style.color="var(--green)";$("project-title").value="";$("project-summary").value="";loadProjects();}catch(e){status.textContent=e.message;status.style.color="var(--red)";}});
 $("project-to-director").addEventListener("click",()=>{const title=$("project-title").value.trim(),summary=$("project-summary").value.trim();if(!title||!summary){$("project-status").textContent="Preencha o nome e a descrição primeiro.";return;}showView("diretoria");$("texto-diretoria").value="Analise este projeto, proponha etapas, riscos, prioridades e próximos passos.\nProjeto: "+title+"\nDescrição: "+summary;$("texto-diretoria").focus();});
 $("send-email").addEventListener("click",async()=>{const s=$("email-status");s.textContent="Enviando...";try{const d=await api("/api/email/enviar",{method:"POST",body:JSON.stringify({destinatario:$("email-to").value,assunto:$("email-subject").value,texto:$("email-body").value})});s.textContent="E-mail enviado para "+d.destinatario;s.style.color="var(--green)";}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});
 $("analyze-email").addEventListener("click",async()=>{const s=$("email-status");s.textContent="Analisando...";try{const d=await api("/api/email/analisar",{method:"POST",body:JSON.stringify({assunto:$("email-subject").value,texto:$("email-body").value})});s.textContent="Análise concluída e registrada como ideia.";s.style.color="var(--green)";$("email-results").textContent=d.analise||"";}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});

@@ -488,6 +488,15 @@ function setActiveConversation(type,id){
  activeConversationIds[type]=id||null;
  try{if(id)localStorage.setItem(activeConversationKey(type),id);else localStorage.removeItem(activeConversationKey(type));}catch(e){}
 }
+function directorProjectKey(conversationId){return "nexuscore_director_project_"+conversationId;}
+function getDirectorProject(conversationId){
+ try{const value=Number(localStorage.getItem(directorProjectKey(conversationId)));return Number.isInteger(value)&&value>0?value:null;}
+ catch(e){return null;}
+}
+function setDirectorProject(conversationId,projectId){
+ try{if(conversationId&&Number.isInteger(Number(projectId))&&Number(projectId)>0)localStorage.setItem(directorProjectKey(conversationId),String(Number(projectId)));}
+ catch(e){}
+}
 function makeConversationId(){
  if(window.crypto?.randomUUID)return window.crypto.randomUUID();
  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==="x"?r:(r&3|8)).toString(16);});
@@ -690,10 +699,12 @@ async function sendChat(type,form){
   const imagens=await Promise.all(files.map(fileAsDataUrl));
   const data=await api("/api/chat",{method:"POST",body:JSON.stringify({
    texto:text||"Analise detalhadamente as imagens anexadas.",tipo:type,imagens,conversa_id:conversationId,
-   project_id:type==="diretoria"?null:(getSelectedProject(type)?Number(getSelectedProject(type)):null)
+   project_id:type==="diretoria"?(getDirectorProject(conversationId)||null):(getSelectedProject(type)?Number(getSelectedProject(type)):null)
   })});
-  setActiveConversation(type,data.conversa_id||conversationId);
-  restoredConversationIds.add(data.conversa_id||conversationId);
+  const resolvedConversationId=data.conversa_id||conversationId;
+  setActiveConversation(type,resolvedConversationId);
+  if(type==="diretoria"&&data.projeto_id)setDirectorProject(resolvedConversationId,data.projeto_id);
+  restoredConversationIds.add(resolvedConversationId);
   renderAssistantText(pending,data.resposta||"O provedor respondeu sem conteúdo. Tente novamente.");
   const meta=[data.cerebro,data.modelo||"",data.origem,data.tempo_ms?data.tempo_ms+" ms":""].filter(Boolean).join(" · ");
   if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;pending.appendChild(m);}

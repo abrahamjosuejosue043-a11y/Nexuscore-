@@ -691,6 +691,13 @@ async def orquestrador(
     current_project_id = session.get("project_id") if session else None
     project_resolution_note = None
     available_projects = None
+    # The browser may return the project ID that this server previously
+    # resolved for this exact conversation. Validate it before using it as
+    # a fallback when the persisted session link is absent.
+    if agent_type == "diretoria" and current_project_id is None and project_id is not None:
+        if not storage.project_exists(project_id):
+            raise HTTPException(status_code=404, detail="Projeto informado para esta conversa não foi encontrado.")
+        current_project_id = int(project_id)
     history = storage.conversation_messages(conversation_id, limit=20)
     if agent_type == "diretoria":
         resolved_project_id, project_resolution_note, available_projects = resolve_director_project_with_history(

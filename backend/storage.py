@@ -944,10 +944,11 @@ def decide_project(project_id, decision, actor="ceo"):
             return False
         from datetime import datetime, timedelta, timezone
         now = datetime.now(timezone.utc).replace(microsecond=0)
-        decided_at = now.strftime("%Y-%m-%d %H:%M:%S")
+        decided_at = now if _database_url() else now.strftime("%Y-%m-%d %H:%M:%S")
+        purge_time = now + timedelta(hours=24) if decision == "rejeitado" else None
         purge_after = (
-            (now + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
-            if decision == "rejeitado" else None
+            purge_time if _database_url()
+            else purge_time.strftime("%Y-%m-%d %H:%M:%S") if purge_time else None
         )
         db.execute(
             """UPDATE projects

@@ -465,7 +465,14 @@ def resolve_director_project_with_history(
     return resolve_director_project(text, current_project_id)
 
 
-def build_director_data_context(project_id: Optional[int], project_resolution_note: Optional[str] = None, available_projects: Optional[list[dict]] = None) -> str:
+def resolve_director_plan_id(text: str) -> Optional[int]:
+    """Extrai somente um identificador explicitamente associado à palavra plano."""
+    normalized = normalize_project_reference(text)
+    match = re.search(r"\bplano\s+(?:n(?:umero|o)\s+)?#?(\d+)\b", normalized)
+    return int(match.group(1)) if match else None
+
+
+def build_director_data_context(project_id: Optional[int], project_resolution_note: Optional[str] = None, available_projects: Optional[list[dict]] = None, requested_plan_id: Optional[int] = None) -> str:
     """Monta um snapshot somente de leitura do projeto ativo e seus planos."""
     if project_id is None:
         projects = available_projects if available_projects is not None else storage.projects(limit=300)
@@ -473,6 +480,8 @@ def build_director_data_context(project_id: Optional[int], project_resolution_no
             "CONSULTA AO BANCO: nenhum projeto foi identificado para esta mensagem.",
             "Projetos cadastrados (identifique por nome exato ou número; não escolha por conta própria):",
         ]
+        if requested_plan_id is not None:
+            lines.append(f"O plano #{requested_plan_id} foi solicitado, mas é necessário identificar o projeto antes de consultar seus dados.")
         lines.extend(f"- {item.get('title')} · #{item.get('id')}" for item in projects)
         if not projects:
             lines.append("Ainda não há projetos cadastrados.")
@@ -493,20 +502,44 @@ def build_director_data_context(project_id: Optional[int], project_resolution_no
             )
         status_counts = storage.work_plan_status_counts(int(project_id))
         plans = storage.list_work_plans(limit=30, project_id=int(project_id))
+        requested_plan_note = None
+        if requested_plan_id is not None:
+            requested_plan = storage.get_work_plan(int(requested_plan_id))
+            if requested_plan is None:
+                requested_plan_note = f"Plano #{requested_plan_id} não encontrado no banco de dados."
+            elif int(requested_plan.get("project_id") or 0) != int(project_id):
+                requested_plan_note = (
+                    f"Plano #{requested_plan_id} existe, mas está associado a outro projeto. "
+                    "Por isolamento, seus detalhes não foram incluídos nesta consulta."
+                )
+                plans = []
+            else:
+                plans = [requested_plan]
+                requested_plan_note = f"Consulta direta do plano solicitado #{requested_plan_id} concluída."
+        logger.info(
+            "Director DB snapshot: project_id=%s plan_count=%s status_counts=%s requested_plan_id=%s",
+            int(project_id), sum(status_counts.values()), status_counts, requested_plan_id,
+        )
         total_plans = sum(status_counts.values())
         lines = [
             "DADOS OPERACIONAIS CONSULTADOS NO BANCO (somente leitura; fonte factual):",
             f"Projeto identificado: #{project_id} — {str(project.get('title') or 'Sem título')}.",
             f"Status do projeto: {str(project.get('status') or 'não informado')}.",
             f"Planos encontrados neste projeto: {total_plans}.",
-            "Contagem de planos: " + ", ".join(
-                f"{key}={value}" for key, value in status_counts.items()
+            "Contagem de planos: " + (
+                ", ".join(f"{key}={value}" for key, value in status_counts.items())
+                if status_counts else "nenhum registro"
             ) + ".",
             "Distinção: status do projeto e status de plano são campos diferentes. "
             "Projetos usam seus próprios estados; planos usam rascunho, aprovado ou rejeitado.",
         ]
+        if requested_plan_note:
+            lines.append(requested_plan_note)
         if plans:
-            lines.append("Amostra dos planos registrados (até 30 mais recentes):")
+            lines.append(
+                "Detalhes do plano solicitado:" if requested_plan_id is not None
+                else "Amostra dos planos registrados (até 30 mais recentes):"
+            )
             for plan in plans[:30]:
                 items = plan.get("items") or []
                 objective = str(plan.get("objective") or "").strip()
@@ -753,7 +786,12 @@ async def orquestrador(
         if task.get("status") != "concluida"
     ][:8]
     director_data_context = (
-        build_director_data_context(active_project_id, project_resolution_note, available_projects)
+        build_director_data_context(
+            active_project_id,
+            project_resolution_note,
+            available_projects,
+            requested_plan_id=resolve_director_plan_id(text),
+        )
         if agent_type == "diretoria" else None
     )
     prompt = build_prompt(

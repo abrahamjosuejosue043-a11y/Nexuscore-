@@ -428,6 +428,35 @@ def resolve_director_project(text: str, current_project_id: Optional[int] = None
     return (int(current_project_id) if current_project_id is not None else None), None, projects
 
 
+def resolve_director_project_with_history(
+    text: str,
+    current_project_id: Optional[int] = None,
+    history: Optional[list[dict]] = None,
+):
+    """Recover an explicitly named project from this conversation only when the user says 'current project'."""
+    project_id, note, projects = resolve_director_project(text, current_project_id)
+    if project_id is not None or note or current_project_id is not None:
+        return project_id, note, projects
+
+    normalized = normalize_project_reference(text)
+    refers_to_current = any(
+        phrase in normalized
+        for phrase in ("projeto atual", "projeto corrente", "este projeto", "esse projeto")
+    )
+    if not refers_to_current:
+        return project_id, note, projects
+
+    # Use only the user's own earlier messages in this same conversation.
+    for message in reversed(history or []):
+        if str(message.get("role") or "").lower() != "user":
+            continue
+        previous_text = str(message.get("content") or "")
+        previous_id, previous_note, previous_projects = resolve_director_project(previous_text)
+        if previous_id is not None or previous_note:
+            return previous_id, previous_note, previous_projects
+    return project_id, note, projects
+
+
 def build_director_data_context(project_id: Optional[int], project_resolution_note: Optional[str] = None, available_projects: Optional[list[dict]] = None) -> str:
     """Monta um snapshot somente de leitura do projeto ativo e seus planos."""
     if project_id is None:
@@ -656,9 +685,10 @@ async def orquestrador(
     current_project_id = session.get("project_id") if session else None
     project_resolution_note = None
     available_projects = None
+    history = storage.conversation_messages(conversation_id, limit=20)
     if agent_type == "diretoria":
-        resolved_project_id, project_resolution_note, available_projects = resolve_director_project(
-            text, current_project_id=current_project_id
+        resolved_project_id, project_resolution_note, available_projects = resolve_director_project_with_history(
+            text, current_project_id=current_project_id, history=history
         )
         # Trocar explicitamente de projeto inicia uma conversa nova para não misturar
         # histórico, tarefas ou memórias do projeto anterior.
@@ -688,7 +718,6 @@ async def orquestrador(
                 session = storage.get_conversation(conversation_id)
         active_project_id = session.get("project_id") if session else None
     # O histórico e as tarefas permanecem vinculados à conversa atual.
-    history = storage.conversation_messages(conversation_id, limit=8)
     available_memories = storage.shared_memories(
         limit=50,
         department=agent_type,

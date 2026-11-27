@@ -396,7 +396,9 @@ def set_conversation_project(conversation_id, project_id):
     value = int(project_id) if project_id is not None else None
     with connection() as db:
         if value is not None:
-            exists = db.execute("SELECT id FROM projects WHERE id=?", (value,)).fetchone()
+            exists = db.execute(
+                "SELECT id FROM projects WHERE id=? AND approval_status='aprovado'", (value,)
+            ).fetchone()
             if not exists:
                 return False
         cur = db.execute(
@@ -618,8 +620,13 @@ def create_work_plan(title, objective, summary, project_id, items, conversation_
     """Cria um plano em rascunho e seus itens; nada é delegado antes da aprovação."""
     value = int(project_id)
     with connection() as db:
-        if not db.execute("SELECT id FROM projects WHERE id=?", (value,)).fetchone():
+        project = db.execute(
+            "SELECT id,approval_status FROM projects WHERE id=?", (value,)
+        ).fetchone()
+        if not project:
             raise ValueError("Projeto não encontrado.")
+        if project["approval_status"] != "aprovado":
+            raise ValueError("O projeto precisa ser aprovado pelo CEO antes de receber planos.")
         cur = db.execute(
             """INSERT INTO work_plans(title, objective, summary, project_id, status, conversation_id)
                VALUES(?,?,?,?, 'rascunho', ?)""",

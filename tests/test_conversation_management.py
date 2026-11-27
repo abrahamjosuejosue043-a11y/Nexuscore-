@@ -1,10 +1,13 @@
 """Tests for safe conversation history clearing and deletion."""
 
+import asyncio
 import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from backend import storage
+import main
 
 
 class ConversationManagementTests(unittest.TestCase):
@@ -101,6 +104,28 @@ class ConversationManagementTests(unittest.TestCase):
         self.assertEqual(int(plans[0]["id"]), self.plan_id)
         self.assertIsNone(plans[0]["conversation_id"])
         self.assertEqual(plans[0]["items"][0]["title"], "Item preservado")
+
+    def test_clear_history_api_requires_admin_and_keeps_conversation(self):
+        with patch.object(main, "require_admin_token") as authorization:
+            result = asyncio.run(
+                main.limpar_mensagens_conversa(self.conversation_id, "test-admin-token")
+            )
+        authorization.assert_called_once_with("test-admin-token")
+        self.assertEqual(result["status"], "historico_limpo")
+        self.assertTrue(result["conversa_preservada"])
+        self.assertIsNotNone(storage.get_conversation(self.conversation_id))
+        self.assertEqual(storage.conversation_messages(self.conversation_id), [])
+
+    def test_delete_conversation_api_requires_admin_and_reports_preserved_records(self):
+        with patch.object(main, "require_admin_token") as authorization:
+            result = asyncio.run(
+                main.excluir_conversa(self.conversation_id, "test-admin-token")
+            )
+        authorization.assert_called_once_with("test-admin-token")
+        self.assertEqual(result["status"], "conversa_excluida")
+        self.assertTrue(result["dados_operacionais_preservados"])
+        self.assertEqual(result["tasks_preserved"], 1)
+        self.assertEqual(result["plans_preserved"], 1)
 
     def test_clear_and_delete_return_none_for_unknown_conversation(self):
         self.assertIsNone(storage.clear_conversation_messages("does-not-exist"))

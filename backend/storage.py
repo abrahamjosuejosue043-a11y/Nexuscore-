@@ -437,6 +437,69 @@ def conversation_messages(conversation_id, limit=500):
     return [dict(row) for row in rows]
 
 
+def clear_conversation_messages(conversation_id):
+    """Apaga somente as mensagens; mantém a conversa, projeto, tarefas e planos."""
+    conversation_id = str(conversation_id)
+    with connection() as db:
+        exists = db.execute(
+            "SELECT id FROM chat_sessions WHERE id=?", (conversation_id,)
+        ).fetchone()
+        if not exists:
+            return None
+        cur = db.execute(
+            "DELETE FROM conversations WHERE conversation_id=?", (conversation_id,)
+        )
+        deleted_count = max(0, int(cur.rowcount or 0))
+        db.execute(
+            "UPDATE chat_sessions SET updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (conversation_id,),
+        )
+        return deleted_count
+
+
+def delete_conversation(conversation_id):
+    """Apaga mensagens e cabeçalho da conversa, preservando tarefas e planos."""
+    conversation_id = str(conversation_id)
+    with connection() as db:
+        exists = db.execute(
+            "SELECT id FROM chat_sessions WHERE id=?", (conversation_id,)
+        ).fetchone()
+        if not exists:
+            return None
+        message_count = db.execute(
+            "SELECT COUNT(*) AS total FROM conversations WHERE conversation_id=?",
+            (conversation_id,),
+        ).fetchone()["total"]
+        task_count = db.execute(
+            "SELECT COUNT(*) AS total FROM department_tasks WHERE conversation_id=?",
+            (conversation_id,),
+        ).fetchone()["total"]
+        plan_count = db.execute(
+            "SELECT COUNT(*) AS total FROM work_plans WHERE conversation_id=?",
+            (conversation_id,),
+        ).fetchone()["total"]
+
+        # Operações e histórico operacional são preservados; somente se remove
+        # o vínculo com a conversa que será excluída.
+        db.execute(
+            "UPDATE department_tasks SET conversation_id=NULL WHERE conversation_id=?",
+            (conversation_id,),
+        )
+        db.execute(
+            "UPDATE work_plans SET conversation_id=NULL WHERE conversation_id=?",
+            (conversation_id,),
+        )
+        db.execute(
+            "DELETE FROM conversations WHERE conversation_id=?", (conversation_id,)
+        )
+        db.execute("DELETE FROM chat_sessions WHERE id=?", (conversation_id,))
+        return {
+            "messages_deleted": int(message_count or 0),
+            "tasks_preserved": int(task_count or 0),
+            "plans_preserved": int(plan_count or 0),
+        }
+
+
 def rename_conversation(conversation_id, title):
     with connection() as db:
         cur = db.execute(

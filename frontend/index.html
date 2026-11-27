@@ -431,7 +431,7 @@ form.composer[data-chat="diretoria"] .project-context-select{display:none!import
 </section>
 <section class="view" id="view-historico">
  <div class="view-head"><div><h2>Conversas</h2><p>Cada assunto tem seu próprio histórico, título e agente responsável.</p></div><div class="actions"><button class="btn" id="new-conversation">Nova conversa</button><button class="btn" id="load-history">Atualizar</button></div></div>
- <div class="notice">O Nexuscore cria um título automaticamente a partir da primeira mensagem. Você pode renomear cada conversa e retomá-la quando precisar.</div>
+ <div class="notice">Você pode abrir, renomear ou limpar as mensagens de uma conversa mantendo o registro. Excluir remove a conversa e suas mensagens; tarefas e planos relacionados são preservados, mas deixam de apontar para a conversa excluída.</div>
  <div id="history-result" class="list"><div class="empty">Informe o token administrativo em Conexões para consultar suas conversas.</div></div>
 </section>
 <section class="view" id="view-memoria">
@@ -792,6 +792,50 @@ async function renameSavedConversation(item){
   await loadHistory();
  }catch(error){alert(error.message);}
 }
+function forgetDeletedConversationInBrowser(conversationId){
+ CHAT_TYPES.forEach(type=>{
+  if(getActiveConversation(type)===conversationId){
+   setActiveConversation(type,null);
+   setSelectedProject(type,"");
+   clearChat(type);
+  }
+ });
+ restoredConversationIds.delete(conversationId);
+ try{localStorage.removeItem(directorProjectKey(conversationId));}catch(e){}
+}
+async function clearSavedConversation(item){
+ const count=Number(item.message_count||0);
+ if(!window.confirm(
+  "Limpar o histórico de \""+(item.title||"esta conversa")+"\"?\n\n"+
+  "Todas as mensagens serão apagadas. A conversa, o projeto associado, as tarefas e os planos serão preservados. Esta ação não pode ser desfeita."
+ ))return;
+ try{
+  const result=await api("/api/conversas/"+encodeURIComponent(item.id)+"/mensagens",{method:"DELETE"});
+  const activeType=CHAT_TYPES.find(type=>getActiveConversation(type)===item.id);
+  if(activeType){
+   renderConversationMessages(activeType,[]);
+   restoredConversationIds.add(item.id);
+  }
+  await loadHistory();
+  alert("Histórico limpo. "+Number(result.mensagens_excluidas??count)+" mensagem(ns) excluída(s). A conversa foi preservada.");
+ }catch(error){alert(error.message);}
+}
+async function deleteSavedConversation(item){
+ if(!window.confirm(
+  "Excluir completamente a conversa \""+(item.title||"sem título")+"\"?\n\n"+
+  "As mensagens e o registro da conversa serão apagados. Tarefas e planos relacionados serão preservados, mas perderão o vínculo com esta conversa. Esta ação não pode ser desfeita."
+ ))return;
+ try{
+  const result=await api("/api/conversas/"+encodeURIComponent(item.id),{method:"DELETE"});
+  forgetDeletedConversationInBrowser(item.id);
+  await loadHistory();
+  alert(
+   "Conversa excluída. Mensagens removidas: "+Number(result.messages_deleted||0)+
+   ". Tarefas preservadas: "+Number(result.tasks_preserved||0)+
+   ". Planos preservados: "+Number(result.plans_preserved||0)+"."
+  );
+ }catch(error){alert(error.message);}
+}
 async function loadHistory(){
  const box=$("history-result");
  box.innerHTML='<div class="empty">Carregando conversas...</div>';
@@ -813,7 +857,13 @@ async function loadHistory(){
    open.addEventListener("click",()=>openSavedConversation(item.id).catch(error=>alert(error.message)));
    const rename=document.createElement("button");rename.type="button";rename.className="btn";rename.textContent="Renomear";
    rename.addEventListener("click",()=>renameSavedConversation(item));
-   actions.append(open,rename);card.append(copy,actions);box.appendChild(card);
+   const clear=document.createElement("button");clear.type="button";clear.className="btn";clear.textContent="Limpar histórico";
+   clear.disabled=count===0;clear.title=count===0?"Esta conversa já está sem mensagens":"Apagar as mensagens e manter a conversa";
+   clear.addEventListener("click",()=>clearSavedConversation(item));
+   const remove=document.createElement("button");remove.type="button";remove.className="btn danger";remove.textContent="Excluir";
+   remove.title="Excluir esta conversa e suas mensagens";
+   remove.addEventListener("click",()=>deleteSavedConversation(item));
+   actions.append(open,rename,clear,remove);card.append(copy,actions);box.appendChild(card);
   });
  }catch(error){
   box.replaceChildren();const n=document.createElement("div");n.className="notice error";n.textContent=error.message;box.appendChild(n);

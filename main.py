@@ -912,6 +912,23 @@ async def listar_conversas(limit: int = 100, x_admin_token: Optional[str] = Head
     return {"items": storage.list_conversations(limit)}
 
 
+@app.delete("/api/conversas/{conversa_id}/mensagens")
+async def limpar_mensagens_conversa(
+    conversa_id: str,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    deleted_count = storage.clear_conversation_messages(conversa_id)
+    if deleted_count is None:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    return {
+        "id": conversa_id,
+        "mensagens_excluidas": deleted_count,
+        "status": "historico_limpo",
+        "conversa_preservada": True,
+    }
+
+
 @app.get("/api/conversas/{conversa_id}")
 async def abrir_conversa(conversa_id: str, x_admin_token: Optional[str] = Header(default=None)):
     require_admin_token(x_admin_token)
@@ -921,6 +938,23 @@ async def abrir_conversa(conversa_id: str, x_admin_token: Optional[str] = Header
     return {
         "conversation": item,
         "messages": storage.conversation_messages(conversa_id),
+    }
+
+
+@app.delete("/api/conversas/{conversa_id}")
+async def excluir_conversa(
+    conversa_id: str,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    result = storage.delete_conversation(conversa_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    return {
+        "id": conversa_id,
+        **result,
+        "status": "conversa_excluida",
+        "dados_operacionais_preservados": True,
     }
 
 

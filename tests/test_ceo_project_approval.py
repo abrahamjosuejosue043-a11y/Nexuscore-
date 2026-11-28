@@ -156,6 +156,52 @@ class CEOProjectApprovalTests(unittest.TestCase):
         self.assertEqual(preserved_plan, 1)
         self.assertEqual(preserved_items, 1)
 
+    def test_approved_project_can_be_canceled_and_restored(self):
+        project_id = self._create_project()
+        self.client.post(f"/api/projetos/{project_id}/aprovar", headers=self.headers)
+        canceled = self.client.post(
+            f"/api/projetos/{project_id}/cancelar", headers=self.headers
+        )
+        self.assertEqual(canceled.status_code, 200)
+        data = canceled.json()
+        self.assertEqual(data["status"], "cancelado")
+        self.assertEqual(data["exclusao_automatica_em_horas"], 24)
+        self.assertFalse(storage.project_is_approved(project_id))
+        decided_at = datetime.strptime(data["decided_at"], "%Y-%m-%d %H:%M:%S")
+        purge_after = datetime.strptime(data["purge_after"], "%Y-%m-%d %H:%M:%S")
+        self.assertEqual((purge_after - decided_at).total_seconds(), 24 * 60 * 60)
+        blocked = self.client.post(
+            "/api/planos/gerar",
+            json={"objetivo": "Não deve gerar plano", "projeto_id": project_id},
+            headers=self.headers,
+        )
+        self.assertEqual(blocked.status_code, 409)
+        restored = self.client.post(
+            f"/api/projetos/{project_id}/restaurar", headers=self.headers
+        )
+        self.assertEqual(restored.status_code, 200)
+        self.assertEqual(restored.json()["status"], "aprovado")
+        self.assertTrue(storage.project_is_approved(project_id))
+
+    def test_expired_canceled_project_is_deleted_but_audit_is_preserved(self):
+        project_id = self._create_project()
+        self.client.post(f"/api/projetos/{project_id}/aprovar", headers=self.headers)
+        self.client.post(f"/api/projetos/{project_id}/cancelar", headers=self.headers)
+        with storage.connection() as db:
+            db.execute(
+                "UPDATE projects SET purge_after='2000-01-01 00:00:00' WHERE id=?",
+                (project_id,),
+            )
+        self.assertEqual(storage.purge_expired_rejected_projects(), [project_id])
+        self.assertFalse(storage.project_exists(project_id))
+        with storage.connection() as db:
+            audit = db.execute(
+                "SELECT * FROM project_decisions WHERE project_id=? AND decision='cancelado'",
+                (project_id,),
+            ).fetchone()
+        self.assertIsNotNone(audit)
+        self.assertIsNotNone(audit["deleted_at"])
+
     def test_unapproved_project_cannot_receive_manual_tasks(self):
         project_id = self._create_project()
         with self.assertRaisesRegex(ValueError, "aprovado pelo CEO"):

@@ -66,6 +66,10 @@ def calculate_project_progress(tasks, department_weights=None):
         tasks = []
     if isinstance(tasks, (str, bytes)):
         raise ValueError("A lista de tarefas é inválida.")
+    try:
+        tasks = list(tasks)
+    except TypeError as exc:
+        raise ValueError("A lista de tarefas é inválida.") from exc
 
     grouped = defaultdict(list)
     total_tasks = 0

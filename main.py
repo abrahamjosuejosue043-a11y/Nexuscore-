@@ -38,6 +38,7 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from backend import storage
+from backend.progress import calculate_project_progress
 from backend.agent_tools import configured_groq_tools, agent_tools_status
 
 
@@ -1219,6 +1220,27 @@ async def atualizar_tarefa(
     return {"id": task_id, "status": status, "atualizada": True}
 
 
+@app.post("/api/tarefas/{task_id}/validar")
+async def validar_entrega_diretoria(
+    task_id: int, x_admin_token: Optional[str] = Header(default=None)
+):
+    require_admin_token(x_admin_token)
+    try:
+        updated = storage.update_department_task(
+            task_id, "concluida", actor="diretoria"
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not updated:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    return {
+        "id": task_id,
+        "status": "concluida",
+        "validada_por": "diretoria",
+        "atualizada": True,
+    }
+
+
 @app.get("/api/tarefas/{task_id}/historico")
 async def historico_tarefa(task_id: int, x_admin_token: Optional[str] = Header(default=None)):
     require_admin_token(x_admin_token)
@@ -1349,6 +1371,30 @@ async def definir_pesos_departamentos(
         code = 404 if "não encontrado" in str(exc) else 409
         raise HTTPException(status_code=code, detail=str(exc)) from exc
     return {"project_id": project_id, "items": items, "total_peso": sum(float(x["weight"]) for x in items)}
+
+
+@app.get("/api/projetos/{project_id}/progresso")
+async def progresso_projeto(
+    project_id: int, x_admin_token: Optional[str] = Header(default=None)
+):
+    require_admin_token(x_admin_token)
+    data = storage.project_progress_inputs(project_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if data["project"]["approval_status"] != "aprovado":
+        raise HTTPException(status_code=409, detail="Somente projetos aprovados possuem progresso operacional.")
+    try:
+        progress = calculate_project_progress(
+            data["tasks"], data["department_weights"]
+        )
+    except ValueError as exc:
+        logger.exception("Falha ao calcular progresso do projeto %s", project_id)
+        raise HTTPException(status_code=500, detail="Não foi possível calcular o progresso do projeto.") from exc
+    return {
+        "project_id": project_id,
+        "project_title": data["project"]["title"],
+        **progress,
+    }
 
 
 @app.post("/api/projetos/{project_id}/aprovar")

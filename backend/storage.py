@@ -776,6 +776,18 @@ def create_work_plan(title, objective, summary, project_id, items, conversation_
     return plan_id
 
 
+def find_work_plan_by_request(project_id, conversation_id, objective):
+    """Finds an exact prior dispatch to make chat retries idempotent."""
+    with connection() as db:
+        row = db.execute(
+            """SELECT * FROM work_plans
+               WHERE project_id=? AND conversation_id=? AND objective=?
+               ORDER BY id DESC LIMIT 1""",
+            (int(project_id), str(conversation_id), str(objective).strip()),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def get_work_plan(plan_id):
     with connection() as db:
         row = db.execute("SELECT * FROM work_plans WHERE id=?", (int(plan_id),)).fetchone()

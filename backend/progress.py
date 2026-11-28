@@ -49,8 +49,9 @@ def _task_weight(task):
 def calculate_project_progress(tasks, department_weights=None):
     """Calculate weighted progress by department and for the whole project.
 
-    Only tasks in the `concluida` state count as completed. In particular,
-    `em_revisao` does not count until the Directorate accepts the delivery.
+    Only tasks in `concluida` state with `directorate_validated=True` count as
+    completed. A completed-looking task without the Directorate audit marker is
+    treated as under review. `em_revisao` never counts as complete.
     Cancelled tasks are excluded from task denominators.
 
     `department_weights` may include departments with no tasks yet. Such
@@ -60,7 +61,8 @@ def calculate_project_progress(tasks, department_weights=None):
 
     Task records use the existing storage field names:
     `assigned_department`, `status`, `priority`; an optional `weight`
-    field is supported for future persisted task weights.
+    field is supported for persisted task weights. Project progress inputs must
+    also include `directorate_validated`, derived from the task audit trail.
     """
     if tasks is None:
         tasks = []
@@ -88,8 +90,16 @@ def calculate_project_progress(tasks, department_weights=None):
         if status in CANCELLED_STATUSES:
             cancelled_tasks += 1
             continue
+        # A conclusão de tarefas vinculadas a projetos só conta após
+        # validação explícita da Diretoria registrada no histórico.
+        directorate_validated = bool(task.get("directorate_validated", False))
+        effective_status = (
+            "em_revisao"
+            if status == COMPLETED_STATUS and not directorate_validated
+            else status
+        )
         grouped[department].append({
-            "status": status,
+            "status": effective_status,
             "weight": _task_weight(task),
         })
 

@@ -351,6 +351,98 @@ def normalize_type(value: str) -> str:
     return value
 
 
+def is_explicit_execution_request(text: str) -> bool:
+    """Recognizes clear execute/delegate commands, not questions about how to execute."""
+    normalized = normalize_project_reference(text)
+    if not normalized:
+        return False
+    if re.match(r"^(?:como|o que|qual|quais|por que|porque|explique|me explique|pode explicar)\b", normalized):
+        return False
+    return bool(re.search(
+        r"\b(?:execute|executar|implemente|implementar|comece|comecar|inicie|iniciar|"
+        r"coloque em pratica|colocar em pratica|automatize|automatizar|"
+        r"trabalhe nisso|trabalhar nisso|avance com|prossiga com|pode comecar|"
+        r"pode executar|pode implementar|inicie o trabalho|iniciar o trabalho)\b",
+        normalized,
+    ))
+
+
+async def generate_and_dispatch_director_plan(
+    objective: str, project_id: int, conversation_id: str
+) -> tuple[dict, list[int], bool, str]:
+    """Creates and delegates a validated plan; exact retries reuse the prior plan."""
+    existing = storage.find_work_plan_by_request(
+        project_id, conversation_id, objective
+    )
+    if existing:
+        plan_id = int(existing["id"])
+        if existing.get("status") == "rascunho":
+            task_ids = storage.approve_work_plan(plan_id) or []
+        else:
+            task_ids = [
+                int(task["id"])
+                for task in storage.list_department_tasks(limit=200, project_id=project_id)
+                if int(task.get("plan_id") or 0) == plan_id
+            ]
+        return storage.get_work_plan(plan_id), task_ids, True, "reutilizado"
+
+    prompt = (
+        "Você é a Diretoria operacional do Nexuscore AI. Converta o objetivo do proprietário "
+        "em um plano executável, específico e realista. Esta chamada autoriza somente o "
+        "planejamento e a delegação interna de tarefas; não autoriza pagamentos, compras, "
+        "acesso a contas externas, envio de mensagens, alterações legais, publicação ou deploy. "
+        "Essas ações devem virar tarefas bloqueadas aguardando aprovação humana. "
+        "Não solicite nem inclua senhas, tokens ou chaves. "
+        "Responda somente JSON válido com a estrutura: "
+        '{"titulo":"...","resumo":"...","tarefas":[{"titulo":"...","descricao":"...",'
+        '"departamento":"diretoria|programacao|publicidade|geral","prioridade":"alta|media|baixa"}]}. '
+        "Crie de 3 a 8 tarefas. Cada descrição deve definir entrega concreta, critérios de aceitação "
+        "e evidência esperada. Ordene por dependência. Não alegue que as tarefas já foram executadas. "
+        "Objetivo do proprietário:\n" + str(objective).strip()
+    )
+    raw, model = await chamar_groq(prompt, json_mode=True)
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError) as exc:
+        raise ProviderError("Groq", "A Diretoria não retornou um plano JSON válido.", 502) from exc
+    if not isinstance(data, dict):
+        raise ProviderError("Groq", "A Diretoria retornou um plano em formato inválido.", 502)
+    title = str(data.get("titulo") or "").strip()
+    summary = str(data.get("resumo") or "").strip()
+    raw_items = data.get("tarefas")
+    if not title or not summary or not isinstance(raw_items, list) or not 3 <= len(raw_items) <= 8:
+        raise ProviderError("Groq", "O plano não atende à estrutura exigida de 3 a 8 tarefas.", 502)
+    departments = {"diretoria", "programacao", "publicidade", "geral"}
+    priorities = {"alta", "media", "baixa"}
+    items = []
+    for item in raw_items:
+        if not isinstance(item, dict):
+            raise ProviderError("Groq", "Uma tarefa do plano veio em formato inválido.", 502)
+        department = str(item.get("departamento") or "").strip().lower()
+        priority = str(item.get("prioridade") or "media").strip().lower()
+        task_title = str(item.get("titulo") or "").strip()
+        description = str(item.get("descricao") or "").strip()
+        if department not in departments or priority not in priorities or not task_title or not description:
+            raise ProviderError("Groq", "Uma tarefa do plano contém campos inválidos.", 502)
+        items.append({
+            "title": task_title[:160],
+            "description": description[:8000],
+            "department": department,
+            "priority": priority,
+        })
+    plan_id = storage.create_work_plan(
+        title[:160], str(objective).strip(), summary[:8000],
+        int(project_id), items, conversation_id=conversation_id,
+    )
+    task_ids = storage.approve_work_plan(plan_id)
+    if task_ids is None:
+        raise ProviderError("Nexuscore", "O plano foi salvo, mas não pôde ser delegado automaticamente.", 409)
+    plan = storage.get_work_plan(plan_id)
+    if not plan:
+        raise ProviderError("Nexuscore", "O plano foi delegado, mas não pôde ser recuperado para confirmação.", 500)
+    return plan, task_ids, False, model
+
+
 def select_shared_memories(text: str, memories: list[dict], limit: int = 6) -> list[dict]:
     """Seleciona memórias por sobreposição lexical simples, sem serviço externo de embeddings."""
     stopwords = {
@@ -729,6 +821,8 @@ async def orquestrador(
         raise HTTPException(status_code=422, detail="O texto da mensagem está vazio.")
 
     agent_type = normalize_type(tipo)
+    execution_requested = (not imagens) and agent_type in {"geral", "diretoria"} and is_explicit_execution_request(text)
+    director_mode = agent_type == "diretoria" or execution_requested
     conversation_id = str(conversa_id or uuid.uuid4())
     conversation_title = build_conversation_title(text)
     session = storage.ensure_conversation(conversation_id, conversation_title, agent_type)
@@ -738,12 +832,12 @@ async def orquestrador(
     # The browser may return the project ID that this server previously
     # resolved for this exact conversation. Validate it before using it as
     # a fallback when the persisted session link is absent.
-    if agent_type == "diretoria" and current_project_id is None and project_id is not None:
+    if director_mode and current_project_id is None and project_id is not None:
         if not storage.project_is_approved(project_id):
             raise HTTPException(status_code=404, detail="Projeto não encontrado ou ainda não aprovado pelo CEO.")
         current_project_id = int(project_id)
     history = storage.conversation_messages(conversation_id, limit=20)
-    if agent_type == "diretoria":
+    if director_mode:
         resolved_project_id, project_resolution_note, available_projects = resolve_director_project_with_history(
             text, current_project_id=current_project_id, history=history
         )
@@ -801,16 +895,95 @@ async def orquestrador(
             available_projects,
             requested_plan_id=resolve_director_plan_id(text),
         )
-        if agent_type == "diretoria" else None
+        if director_mode else None
     )
+    prompt_agent_type = "diretoria" if director_mode else agent_type
     prompt = build_prompt(
         text,
-        agent_type,
+        prompt_agent_type,
         conversation_history=history,
         shared_memories=selected_memories,
         department_tasks=assigned_tasks,
         director_data_context=director_data_context,
     )
+
+    if execution_requested:
+        if active_project_id is None:
+            approved = available_projects or []
+            if project_resolution_note:
+                answer = project_resolution_note + " Nenhuma tarefa foi criada."
+            elif approved:
+                options = ", ".join(
+                    f"{item.get('title')} · #{item.get('id')}" for item in approved[:20]
+                )
+                answer = (
+                    "Posso organizar e encaminhar esse trabalho automaticamente. "
+                    "Antes, preciso saber em qual projeto aprovado ele deve ficar. "
+                    "Diga o nome ou número do projeto. Projetos disponíveis: " + options
+                )
+            else:
+                answer = (
+                    "Ainda não há projeto aprovado para receber esse trabalho. "
+                    "Cadastre um projeto e aprove-o uma vez; depois disso, a Diretoria "
+                    "poderá distribuir as tarefas operacionais sem pedir aprovação de cada plano."
+                )
+            storage.save_message("user", agent_type, text, conversation_id=conversation_id)
+            storage.save_message("assistant", agent_type, answer, "Nexuscore", conversation_id=conversation_id)
+            return {
+                "resposta": answer, "origem": "nexuscore", "cerebro": "Diretoria",
+                "modelo": None, "tempo_ms": int((time.perf_counter() - started) * 1000),
+                "conversa_id": conversation_id,
+                "titulo_conversa": session["title"] if session else conversation_title,
+                "projeto_id": None, "delegado_automaticamente": False,
+            }
+        try:
+            plan, task_ids, reused, model = await generate_and_dispatch_director_plan(
+                text, int(active_project_id), conversation_id
+            )
+        except ProviderError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"mensagem": "A Diretoria não conseguiu encaminhar o trabalho.",
+                        "motivos": [exc.message],
+                        "orientacao": "Nenhuma tarefa foi marcada como concluída. Revise a solicitação e tente novamente."},
+            ) from exc
+        except Exception as exc:
+            logger.exception("Falha na delegação automática: project_id=%s", active_project_id)
+            raise HTTPException(status_code=500, detail="Não foi possível concluir a delegação automática.") from exc
+        departments = {}
+        for task in storage.list_department_tasks(limit=200, project_id=int(active_project_id)):
+            if int(task.get("plan_id") or 0) == int(plan["id"]):
+                name = str(task.get("assigned_department") or "geral")
+                departments[name] = departments.get(name, 0) + 1
+        department_names = {
+            "diretoria": "Diretoria", "programacao": "Engenharia",
+            "publicidade": "Marketing", "geral": "Nexuscore",
+        }
+        breakdown = ", ".join(
+            f"{department_names.get(name, name)}: {count}"
+            for name, count in sorted(departments.items())
+        ) or "tarefas encaminhadas"
+        action_word = "reutilizei o plano existente" if reused else "criei e encaminhei o plano"
+        answer = (
+            f"A Diretoria {action_word} **#{plan['id']}** para o projeto "
+            f"**{plan.get('title') or 'selecionado'}**. Foram encaminhadas "
+            f"**{len(task_ids)} tarefas** ({breakdown}).\n\n"
+            "O plano não precisa de uma segunda aprovação operacional. As tarefas agora "
+            "estão na fila dos departamentos. A execução real, a alteração de arquivos e "
+            "a validação de entregas serão registradas separadamente; nada será declarado "
+            "concluído sem evidência."
+        )
+        storage.save_message("user", agent_type, text, conversation_id=conversation_id)
+        storage.save_message("assistant", agent_type, answer, "Nexuscore", conversation_id=conversation_id)
+        return {
+            "resposta": answer, "origem": "nexuscore", "cerebro": "Diretoria",
+            "modelo": model, "tempo_ms": int((time.perf_counter() - started) * 1000),
+            "conversa_id": conversation_id,
+            "titulo_conversa": session["title"] if session else conversation_title,
+            "projeto_id": active_project_id, "plano_id": int(plan["id"]),
+            "tarefas_criadas": task_ids, "delegado_automaticamente": True,
+            "reutilizado": reused,
+        }
 
     # Groq é o único provedor de inteligência do Nexuscore.
     # Para imagens, usa o modelo multimodal dedicado da própria Groq.

@@ -1341,6 +1341,17 @@ async def rejeitar_projeto(project_id: int, x_admin_token: Optional[str] = Heade
     return {**result, "exclusao_automatica_em_horas": 24}
 
 
+@app.post("/api/projetos/{project_id}/cancelar")
+async def cancelar_projeto_aprovado(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = storage.cancel_approved_project(project_id, actor="ceo")
+    if result is None:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if result is False:
+        raise HTTPException(status_code=409, detail="Somente projetos aprovados podem ser encerrados.")
+    return {**result, "exclusao_automatica_em_horas": 24}
+
+
 @app.post("/api/projetos/{project_id}/restaurar")
 async def restaurar_projeto(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
     require_admin_token(x_admin_token)

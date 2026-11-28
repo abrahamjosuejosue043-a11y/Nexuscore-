@@ -1865,6 +1865,18 @@ async def baixar_arquivo(artifact_id: int, x_admin_token: Optional[str] = Header
 async def chat(request: ChatRequest, http_request: Request):
     client_ip = http_request.client.host if http_request.client else None
     enforce_chat_rate_limit(client_ip)
+    execution_command = (
+        not request.imagens
+        and normalize_type(request.tipo) in {"geral", "diretoria"}
+        and is_explicit_execution_request(request.texto)
+    )
+    if execution_command and admin_session_expiry(
+        http_request.cookies.get(ADMIN_SESSION_COOKIE)
+    ) is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Autentique sua sessão administrativa de 48 horas para autorizar a distribuição automática de tarefas.",
+        )
     for image_data in request.imagens:
         if len(image_data) > 8_000_000:
             raise HTTPException(status_code=413, detail="Imagem muito grande. Reduza a imagem antes de enviar.")

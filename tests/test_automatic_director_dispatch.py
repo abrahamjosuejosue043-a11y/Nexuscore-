@@ -44,6 +44,8 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.old_path = storage.DB_PATH
         self.old_database_url = os.environ.pop("DATABASE_URL", None)
+        self.old_admin_token = os.environ.get("ADMIN_TOKEN")
+        os.environ["ADMIN_TOKEN"] = "test-admin-token"
         storage.DB_PATH = os.path.join(self.temp_dir.name, "auto-dispatch.db")
         storage.initialize()
         self.project_id = storage.save_project(
@@ -59,7 +61,17 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
             os.environ["DATABASE_URL"] = self.old_database_url
         else:
             os.environ.pop("DATABASE_URL", None)
+        if self.old_admin_token is not None:
+            os.environ["ADMIN_TOKEN"] = self.old_admin_token
+        else:
+            os.environ.pop("ADMIN_TOKEN", None)
         self.temp_dir.cleanup()
+
+    def _login(self, client):
+        response = client.post(
+            "/api/auth/login", json={"token": "test-admin-token"}
+        )
+        self.assertEqual(response.status_code, 200, response.text)
 
     def _plan_response(self):
         return AsyncMock(return_value=(json.dumps(VALID_PLAN), "test-model"))
@@ -85,7 +97,8 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
         model = self._plan_response()
         with patch("main.chamar_groq", new=model):
             with TestClient(main.app) as client:
-                response = client.post("/api/chat", json=self._request(objective))
+                self._login(client)
+                response = client.post("/api/chat", json=self._request(objective), headers={"Origin": "http://testserver"})
 
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
@@ -110,11 +123,14 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
         model = self._plan_response()
         with patch("main.chamar_groq", new=model):
             with TestClient(main.app) as client:
+                self._login(client)
                 first = client.post(
-                    "/api/chat", json=self._request(objective, conversation_id)
+                    "/api/chat", json=self._request(objective, conversation_id),
+                    headers={"Origin": "http://testserver"},
                 )
                 second = client.post(
-                    "/api/chat", json=self._request(objective, conversation_id)
+                    "/api/chat", json=self._request(objective, conversation_id),
+                    headers={"Origin": "http://testserver"},
                 )
 
         self.assertEqual(first.status_code, 200, first.text)
@@ -128,14 +144,30 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
         model = self._plan_response()
         with patch("main.chamar_groq", new=model):
             with TestClient(main.app) as client:
+                self._login(client)
                 response = client.post(
                     "/api/chat",
                     json=self._request("Execute o trabalho e organize as próximas entregas."),
+                    headers={"Origin": "http://testserver"},
                 )
 
         self.assertEqual(response.status_code, 200, response.text)
         self.assertFalse(response.json()["delegado_automaticamente"])
         self.assertIn("projeto", response.json()["resposta"].lower())
+        self.assertEqual(self._counts(), (0, 0))
+        model.assert_not_awaited()
+
+    def test_execute_command_requires_admin_session(self):
+        objective = (
+            f"Execute o trabalho no projeto #{self.project_id}: "
+            "organize as próximas entregas."
+        )
+        model = self._plan_response()
+        with patch("main.chamar_groq", new=model):
+            with TestClient(main.app) as client:
+                response = client.post("/api/chat", json=self._request(objective))
+
+        self.assertEqual(response.status_code, 401, response.text)
         self.assertEqual(self._counts(), (0, 0))
         model.assert_not_awaited()
 

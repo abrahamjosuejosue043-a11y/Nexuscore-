@@ -702,7 +702,7 @@ def project_progress_inputs(project_id):
                           WHERE audit_event.task_id=task.id
                             AND audit_event.event_type='status_changed'
                             AND audit_event.to_status='concluida'
-                            AND audit_event.actor='diretoria'
+                            AND audit_event.actor IN ('diretoria','diretoria_ia')
                       ) THEN 1 ELSE 0 END AS directorate_validated
                FROM department_tasks task
                WHERE task.project_id=?
@@ -839,7 +839,7 @@ def work_plan_status_counts(project_id):
     return {str(row["status"]): int(row["total"]) for row in rows}
 
 
-def approve_work_plan(plan_id):
+def approve_work_plan(plan_id, auto_dispatch=False):
     """Aprova um plano uma única vez e cria as tarefas delegadas atomicamente."""
     with connection() as db:
         claimed = db.execute(
@@ -872,7 +872,12 @@ def approve_work_plan(plan_id):
                 ),
             )
             task_ids.append(cur.lastrowid)
-            _insert_task_event(db, cur.lastrowid, "delegated", None, "pendente", "diretoria", f"Tarefa delegada pelo plano #{int(plan_id)}.")
+            event_type = "delegated_auto" if auto_dispatch else "delegated"
+            event_details = (
+                f"Tarefa delegada automaticamente pelo plano #{int(plan_id)}."
+                if auto_dispatch else f"Tarefa delegada pelo plano #{int(plan_id)}."
+            )
+            _insert_task_event(db, cur.lastrowid, event_type, None, "pendente", "diretoria", event_details)
         db.execute(
             """UPDATE work_plans SET status='aprovado', approved_at=CURRENT_TIMESTAMP,
                updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='aprovando'""",
@@ -899,6 +904,39 @@ def _insert_task_event(db, task_id, event_type, from_status, to_status, actor, d
          str(to_status) if to_status is not None else None,
          str(actor or "sistema")[:80], str(details or "")[:8000]),
     )
+
+
+def claim_next_automated_task():
+    """Atomically claims one pending task explicitly delegated for automatic execution."""
+    with connection() as db:
+        row = db.execute(
+            """SELECT task.* FROM department_tasks task
+               WHERE task.status='pendente'
+                 AND EXISTS (
+                     SELECT 1 FROM task_events event
+                     WHERE event.task_id=task.id AND event.event_type='delegated_auto'
+                 )
+               ORDER BY CASE task.priority WHEN 'alta' THEN 0 WHEN 'media' THEN 1 ELSE 2 END,
+                        task.created_at ASC, task.id ASC
+               LIMIT 1"""
+        ).fetchone()
+        if not row:
+            return None
+        previous = str(row["status"])
+        cur = db.execute(
+            """UPDATE department_tasks SET status='em_andamento',
+               updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pendente'""",
+            (int(row["id"]),),
+        )
+        if cur.rowcount != 1:
+            return None
+        _insert_task_event(
+            db, int(row["id"]), "status_changed", previous, "em_andamento",
+            "executor_ia", "Execução automática iniciada pelo departamento responsável.",
+        )
+        task = dict(row)
+        task["status"] = "em_andamento"
+        return task
 
 
 def list_task_events(task_id, limit=100):
@@ -944,7 +982,7 @@ def update_department_task(task_id, status, result=None, actor="usuario"):
         ):
             raise ValueError("Registre as evidências da entrega nesta atualização antes de enviá-la para revisão.")
         if project_linked and status == "concluida":
-            if actor != "diretoria":
+            if actor not in {"diretoria", "diretoria_ia"}:
                 raise ValueError("Tarefas de projeto só podem ser concluídas após validação da Diretoria.")
             if previous != "em_revisao":
                 raise ValueError("A tarefa precisa estar em revisão para validação da Diretoria.")

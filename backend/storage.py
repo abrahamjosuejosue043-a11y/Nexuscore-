@@ -924,8 +924,13 @@ def update_department_task(task_id, status, result=None, actor="usuario"):
         previous = row["status"]
         project_linked = row["project_id"] is not None
         next_result = result if result is not None else row["result"]
-        if project_linked and status == "em_revisao" and not str(next_result or "").strip():
-            raise ValueError("Registre as evidências da entrega antes de enviá-la para revisão.")
+        if (
+            project_linked
+            and status == "em_revisao"
+            and status != previous
+            and not str(result or "").strip()
+        ):
+            raise ValueError("Registre as evidências da entrega nesta atualização antes de enviá-la para revisão.")
         if project_linked and status == "concluida":
             if actor != "diretoria":
                 raise ValueError("Tarefas de projeto só podem ser concluídas após validação da Diretoria.")

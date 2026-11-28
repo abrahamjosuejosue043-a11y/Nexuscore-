@@ -361,8 +361,10 @@ def is_explicit_execution_request(text: str) -> bool:
     return bool(re.search(
         r"\b(?:execute|executar|implemente|implementar|comece|comecar|inicie|iniciar|"
         r"coloque em pratica|colocar em pratica|automatize|automatizar|"
-        r"trabalhe nisso|trabalhar nisso|avance com|prossiga com|pode comecar|"
-        r"pode executar|pode implementar|inicie o trabalho|iniciar o trabalho)\b",
+        r"trabalhe nisso|trabalhar nisso|continue trabalhando|continuar trabalhando|"
+        r"pode continuar trabalhando|continue com o desenvolvimento|pode seguir com o desenvolvimento|"
+        r"avance com|prossiga com|pode comecar|pode executar|pode implementar|"
+        r"inicie o trabalho|iniciar o trabalho|luz verde para)\b",
         normalized,
     ))
 
@@ -377,14 +379,28 @@ async def generate_and_dispatch_director_plan(
     if existing:
         plan_id = int(existing["id"])
         if existing.get("status") == "rascunho":
-            task_ids = storage.approve_work_plan(plan_id) or []
-        else:
+            task_ids = storage.approve_work_plan(plan_id)
+            refreshed = storage.get_work_plan(plan_id)
+            if task_ids is None and refreshed and refreshed.get("status") == "aprovado":
+                task_ids = [
+                    int(task["id"])
+                    for task in storage.list_department_tasks(limit=200, project_id=project_id)
+                    if int(task.get("plan_id") or 0) == plan_id
+                ]
+            if task_ids is None:
+                raise ProviderError("Nexuscore", "O plano anterior não pôde ser retomado com segurança.", 409)
+        elif existing.get("status") == "aprovado":
             task_ids = [
                 int(task["id"])
                 for task in storage.list_department_tasks(limit=200, project_id=project_id)
                 if int(task.get("plan_id") or 0) == plan_id
             ]
-        return storage.get_work_plan(plan_id), task_ids, True, "reutilizado"
+        else:
+            raise ProviderError("Nexuscore", "Já existe uma solicitação idêntica em estado que exige revisão.", 409)
+        plan = storage.get_work_plan(plan_id)
+        if not plan:
+            raise ProviderError("Nexuscore", "O plano anterior não foi encontrado após a consulta.", 500)
+        return plan, task_ids, True, "reutilizado"
 
     prompt = (
         "Você é a Diretoria operacional do Nexuscore AI. Converta o objetivo do proprietário "

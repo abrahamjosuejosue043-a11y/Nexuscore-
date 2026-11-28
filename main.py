@@ -465,6 +465,16 @@ def automatic_execution_enabled() -> bool:
     return configured in {"1", "true", "yes", "on"} and bool(get_secret("GROQ_API_KEY"))
 
 
+def automatic_execution_daily_limit() -> int:
+    """Maximum number of automated task attempts per UTC day (1–100)."""
+    try:
+        configured = int(os.getenv("NEXUSCORE_MAX_TASKS_PER_DAY", "10"))
+    except (TypeError, ValueError):
+        logger.warning("NEXUSCORE_MAX_TASKS_PER_DAY inválido; usando limite padrão de 10.")
+        configured = 10
+    return max(1, min(configured, 100))
+
+
 def automated_task_block_reason(task: dict) -> Optional[str]:
     """Keeps code changes and external side effects out of the text-only executor."""
     department = str(task.get("assigned_department") or "geral").strip().lower()
@@ -1307,7 +1317,10 @@ async def _department_execution_loop():
     """Single in-process worker; it only claims tasks marked delegated_auto."""
     while True:
         try:
-            task = await asyncio.to_thread(storage.claim_next_automated_task)
+            task = await asyncio.to_thread(
+                storage.claim_next_automated_task,
+                daily_limit=automatic_execution_daily_limit(),
+            )
             if task:
                 result = await execute_claimed_automated_task(task)
                 logger.info(
@@ -1372,6 +1385,7 @@ async def saude():
         "execucao_automatica": {
             "ativa": automatic_execution_enabled(),
             "escopo": "entregas textuais com revisão automática; código e ações externas ficam bloqueados",
+            "limite_diario_tarefas": automatic_execution_daily_limit(),
         },
     }
 
@@ -1660,7 +1674,9 @@ async def resumo_execucao_automatica(
     require_admin_token(x_admin_token)
     return {
         "enabled": automatic_execution_enabled(),
-        **storage.automated_execution_summary(),
+        **storage.automated_execution_summary(
+            daily_limit=automatic_execution_daily_limit()
+        ),
     }
 
 

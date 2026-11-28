@@ -50,7 +50,8 @@ Persistência:
 - `GET /api/saude`: estado público da API.
 - `GET /api/diagnostico`: diagnóstico protegido por `X-Admin-Token`.
 - `GET /api/engenharia/github/status` e `GET /api/engenharia/github/arquivo?path=...`: status e leitura restrita do repositório, protegidos por `X-Admin-Token`.
-- `POST /api/engenharia/diagnosticar`: diagnóstico técnico com até quatro arquivos autorizados do repositório, protegido por `X-Admin-Token`; somente leitura, sem executar testes ou alterar código.\n- `POST /api/engenharia/propor-alteracao`: gera e valida uma prévia de diff com até quatro arquivos autorizados; não grava no GitHub, não cria branch/PR e não executa testes.
+- `POST /api/engenharia/diagnosticar`: diagnóstico técnico com até quatro arquivos autorizados do repositório, protegido por `X-Admin-Token`; somente leitura, sem executar testes ou alterar código.
+- `POST /api/engenharia/propor-alteracao`: gera e valida uma prévia de diff com até quatro arquivos autorizados; não grava no GitHub, não cria branch/PR e não executa testes.
 - `POST /api/chat`: conversa e análise de até três imagens via Groq; possui limite básico de 20 solicitações por IP em janela móvel de 60 segundos por processo.
 - `GET /api/conversas`: lista de conversas protegida; `GET/PATCH /api/conversas/{id}` abre e renomeia uma conversa.
 - `GET/POST/DELETE /api/memoria`: memória compartilhada protegida; DELETE arquiva sem remover fisicamente.

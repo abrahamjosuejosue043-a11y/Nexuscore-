@@ -20,6 +20,8 @@ import re
 import time
 import asyncio
 import hmac
+import hashlib
+import secrets
 import uuid
 import logging
 import json
@@ -34,7 +36,7 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from backend import storage
@@ -147,7 +149,7 @@ allowed_origins = list(dict.fromkeys([
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -211,6 +213,10 @@ class EmailRequest(BaseModel):
     texto: str = Field(default="", max_length=MAX_INPUT_CHARS)
     assunto: str = Field(default="", max_length=300)
     destinatario: str = Field(default="", max_length=320)
+
+
+class AdminLoginRequest(BaseModel):
+    token: str = Field(..., min_length=1, max_length=512)
 
 
 # ---------------------------------------------------------------------------
@@ -855,6 +861,87 @@ def require_admin_token(token: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Acesso administrativo não autorizado.")
 
 
+# Sessões administrativas: o token original nunca é armazenado no navegador.
+ADMIN_SESSION_COOKIE = "nexuscore_admin_session"
+ADMIN_SESSION_TTL_SECONDS = 48 * 60 * 60
+
+
+def _admin_session_signing_key() -> Optional[bytes]:
+    secret = get_secret("ADMIN_TOKEN")
+    if not secret:
+        return None
+    return hmac.new(
+        secret.encode("utf-8"),
+        b"nexuscore-admin-session-v1",
+        hashlib.sha256,
+    ).digest()
+
+
+def create_admin_session_token(now: Optional[float] = None) -> tuple[str, int]:
+    key = _admin_session_signing_key()
+    if key is None:
+        raise HTTPException(status_code=503, detail="A autenticação administrativa não está configurada.")
+    expires_at = int((time.time() if now is None else now) + ADMIN_SESSION_TTL_SECONDS)
+    payload = f"{expires_at}.{secrets.token_urlsafe(24)}"
+    signature = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload}.{signature}", expires_at
+
+
+def admin_session_expiry(session_token: Optional[str], now: Optional[float] = None) -> Optional[int]:
+    key = _admin_session_signing_key()
+    if key is None or not session_token:
+        return None
+    try:
+        expires_text, nonce, supplied_signature = str(session_token).split(".", 2)
+        expires_at = int(expires_text)
+    except (ValueError, TypeError):
+        return None
+    if not nonce or expires_at <= int(time.time() if now is None else now):
+        return None
+    payload = f"{expires_text}.{nonce}"
+    expected_signature = hmac.new(key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(supplied_signature, expected_signature):
+        return None
+    return expires_at
+
+
+def _admin_cookie_options(request: Request) -> dict:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    secure = request.url.scheme == "https" or forwarded_proto == "https"
+    return {
+        "path": "/",
+        "httponly": True,
+        "secure": secure,
+        "samesite": "none" if secure else "lax",
+    }
+
+
+@app.middleware("http")
+async def authenticate_admin_cookie(request: Request, call_next):
+    session_token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    if admin_session_expiry(session_token) is not None:
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            origin = request.headers.get("origin", "").rstrip("/")
+            forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+            host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+            same_origin = bool(origin and host and origin == f"{forwarded_proto or request.url.scheme}://{host}")
+            if not origin or (origin not in allowed_origins and not same_origin):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Origem não autorizada para esta sessão administrativa."},
+                )
+        expected = get_secret("ADMIN_TOKEN")
+        if expected:
+            headers = [
+                (name, value)
+                for name, value in request.scope.get("headers", [])
+                if name.lower() != b"x-admin-token"
+            ]
+            headers.append((b"x-admin-token", expected.encode("utf-8")))
+            request.scope["headers"] = headers
+    return await call_next(request)
+
+
 # ---------------------------------------------------------------------------
 # Rotas de API
 # ---------------------------------------------------------------------------
@@ -913,6 +1000,31 @@ async def saude():
         "modelo_vision": GROQ_VISION_MODEL,
         "modelo_groq_confirmado_por_resposta": False,
     }
+
+
+@app.post("/api/auth/login")
+async def admin_login(payload: AdminLoginRequest, request: Request, response: Response):
+    require_admin_token(payload.token)
+    session_token, expires_at = create_admin_session_token()
+    response.set_cookie(
+        key=ADMIN_SESSION_COOKIE,
+        value=session_token,
+        max_age=ADMIN_SESSION_TTL_SECONDS,
+        **_admin_cookie_options(request),
+    )
+    return {"authenticated": True, "expires_at": expires_at, "expires_in_seconds": ADMIN_SESSION_TTL_SECONDS}
+
+
+@app.get("/api/auth/status")
+async def admin_session_status(request: Request):
+    expires_at = admin_session_expiry(request.cookies.get(ADMIN_SESSION_COOKIE))
+    return {"authenticated": expires_at is not None, "expires_at": expires_at}
+
+
+@app.post("/api/auth/logout")
+async def admin_logout(request: Request, response: Response):
+    response.delete_cookie(key=ADMIN_SESSION_COOKIE, **_admin_cookie_options(request))
+    return {"authenticated": False}
 
 
 @app.get("/api/diagnostico")

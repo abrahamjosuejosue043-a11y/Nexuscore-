@@ -464,7 +464,7 @@ form.composer[data-chat="diretoria"] .project-context-select{display:none!import
 <section class="view" id="view-config">
  <div class="view-head"><div><h2>Conexões e sistema</h2><p>Diagnóstico da API e acesso às funções administrativas.</p></div><button class="btn" id="run-diagnostic">Executar diagnóstico</button></div>
  <div class="status-grid"><div class="status-card"><small>API Nexuscore</small><strong id="api-state">Verificando...</strong></div><div class="status-card"><small>Inteligência principal</small><strong id="groq-state">Verificando Groq...</strong></div><div class="status-card"><small>Modelo de texto</small><strong id="text-model-state">—</strong></div><div class="status-card"><small>Modelo visual</small><strong id="vision-model-state">—</strong></div><div class="status-card"><small>Geração de imagens</small><strong>Não disponível na Groq API</strong></div></div>
- <div class="panel"><h3>Acesso administrativo</h3><p class="muted" style="font-size:12px">O token protege histórico, banco de ideias e e-mail. Configure-o no Render como ADMIN_TOKEN e informe o mesmo valor aqui. O token fica apenas nesta sessão do navegador.</p><div class="token-row"><input id="admin-token" type="password" autocomplete="off" placeholder="Token administrativo"><button class="btn" id="toggle-token">Mostrar</button><button class="btn primary" id="save-token">Usar token</button></div><div id="token-status" class="hint"></div></div>
+ <div class="panel"><h3>Acesso administrativo</h3><p class="muted" style="font-size:12px">Informe o token uma vez. O servidor cria uma sessão protegida por cookie, válida por 48 horas. O token não fica salvo no navegador nem acessível ao JavaScript.</p><div class="token-row"><input id="admin-token" type="password" autocomplete="current-password" placeholder="Token administrativo"><button class="btn" id="toggle-token">Mostrar</button><button class="btn primary" id="save-token">Entrar</button><button class="btn" id="logout-token">Sair</button></div><div id="token-status" class="hint"></div></div>
  <div class="panel" style="margin-top:14px"><h3>Diagnóstico detalhado</h3><div id="diagnostic-result" class="muted" style="font-size:13px">Execute o diagnóstico para verificar as conexões.</div></div>
  <div class="panel" style="margin-top:14px"><h3>Limites conhecidos do ambiente</h3><p class="muted" style="font-size:12px;margin-bottom:0">A Groq oferece análise visual, OCR e interpretação de imagens, mas sua API não gera imagens a partir de texto. O Nexuscore não usa outro provedor para geração de imagens. O serviço está no plano gratuito do Render. A persistência está configurada no Neon PostgreSQL; confira o estado da conexão no diagnóstico detalhado. Os perfis de Diretoria, Engenharia e Marketing usam instruções diferentes, mas ainda não formam uma cadeia multiagente autônoma.</p></div>
 </section>
@@ -501,10 +501,8 @@ function makeConversationId(){
  if(window.crypto?.randomUUID)return window.crypto.randomUUID();
  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==="x"?r:(r&3|8)).toString(16);});
 }
-let adminToken="";
-try{adminToken=sessionStorage.getItem("nexuscore_admin_token")||"";}catch(e){}
-$("admin-token").value=adminToken;
-function headers(json=false){const h={};if(json)h["Content-Type"]="application/json";if(adminToken)h["X-Admin-Token"]=adminToken;return h;}
+let adminAuthenticated=false;
+function headers(json=false){const h={};if(json)h["Content-Type"]="application/json";return h;}
 function safe(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 const AGENT_VOICE_PROFILE={geral:{pitch:1.02,rate:1.0},diretoria:{pitch:0.88,rate:0.94},programacao:{pitch:1.08,rate:0.98},publicidade:{pitch:1.18,rate:1.04}};
@@ -602,7 +600,7 @@ addComposerTools();
 
 function detailMessage(detail){if(typeof detail==="string")return detail;if(detail&&typeof detail==="object"){const bits=[detail.mensagem,...(detail.motivos||[]),detail.orientacao].filter(Boolean);return bits.join("\n")||JSON.stringify(detail);}return "O servidor retornou um erro sem explicação.";}
 const API_BASE=window.Capacitor?.isNativePlatform?.()?"https://nexuscore-1-ljbi.onrender.com":"";
-async function api(url,options={}){const response=await fetch(API_BASE+url,{...options,headers:{...headers(options.body!==undefined),...(options.headers||{})}});const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{};}catch(e){data={detail:raw||"Resposta inválida do servidor."};}if(!response.ok)throw new Error(detailMessage(data.detail)||("Falha HTTP "+response.status));return data;}
+async function api(url,options={}){const response=await fetch(API_BASE+url,{...options,credentials:"include",headers:{...headers(options.body!==undefined),...(options.headers||{})}});const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{};}catch(e){data={detail:raw||"Resposta inválida do servidor."};}if(response.status===401){adminAuthenticated=false;const status=$("token-status");if(status)status.textContent="Sessão administrativa expirada ou inválida. Entre novamente.";}if(!response.ok)throw new Error(detailMessage(data.detail)||("Falha HTTP "+response.status));return data;}
 function showView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id==="view-"+name));document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));if(name==="historico")loadHistory();if(name==="tarefas"){loadTasks();loadPlans();}if(name==="memoria")loadMemory();if(name==="ideias")loadIdeas();if(name==="projeto")loadProjects();if(name==="arquivos")loadArtifacts();if(CHAT_TYPES.includes(name))restoreActiveConversation(name);}document.querySelectorAll("[data-open-view]").forEach(el=>el.addEventListener("click",()=>showView(el.dataset.openView)));
 document.querySelectorAll(".nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
 function addBubble(chat,text,kind="assistant",meta=""){const empty=chat.querySelector(".welcome");if(empty)empty.remove();const el=document.createElement("div");el.className="bubble "+kind;el.textContent=text;if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;el.appendChild(m);}chat.appendChild(el);chat.scrollTop=chat.scrollHeight;return el;}
@@ -739,7 +737,7 @@ async function downloadArtifact(id,filename,button){
 }
 $("generate-artifact").addEventListener("click",async()=>{
  const status=$("artifact-status"),button=$("generate-artifact"),titulo=$("artifact-title").value.trim(),instrucoes=$("artifact-instructions").value.trim(),formato=$("artifact-format").value;
- if(!adminToken){status.textContent="Informe o token administrativo em Conexões para criar e guardar arquivos.";status.style.color="var(--amber)";return;}
+ if(!adminAuthenticated){status.textContent="Informe o token administrativo em Conexões para criar e guardar arquivos.";status.style.color="var(--amber)";return;}
  if(!titulo||!instrucoes){status.textContent="Informe o nome do arquivo e o que deve ser criado.";status.style.color="var(--red)";return;}
  button.disabled=true;button.textContent="Criando...";status.textContent="A IA está preparando o documento.";
  try{const data=await api("/api/arquivos/gerar",{method:"POST",body:JSON.stringify({titulo,instrucoes,formato})});status.textContent="Arquivo criado e registrado: "+data.filename+" · "+Math.max(1,Math.round(data.bytes/1024))+" KB";status.style.color="var(--green)";$("artifact-title").value="";$("artifact-instructions").value="";await loadArtifacts();}
@@ -747,8 +745,32 @@ $("generate-artifact").addEventListener("click",async()=>{
  finally{button.disabled=false;button.textContent="Criar arquivo com IA";}
 });
 $("load-artifacts").addEventListener("click",loadArtifacts);
-function saveAdminToken(){adminToken=$("admin-token").value.trim();try{if(adminToken)sessionStorage.setItem("nexuscore_admin_token",adminToken);else sessionStorage.removeItem("nexuscore_admin_token");}catch(e){}$("token-status").textContent=adminToken?"Token disponível nesta sessão. Teste o acesso executando o diagnóstico.":"Token removido desta sessão.";}
-$("save-token").addEventListener("click",()=>{saveAdminToken();runDiagnostic();if(typeof loadDashboard==="function")loadDashboard();});$("toggle-token").addEventListener("click",()=>{$("admin-token").type=$("admin-token").type==="password"?"text":"password";$("toggle-token").textContent=$("admin-token").type==="password"?"Mostrar":"Ocultar";});
+async function saveAdminToken(){
+ const token=$("admin-token").value.trim(),button=$("save-token"),status=$("token-status");
+ if(!token){status.textContent="Informe o token administrativo.";return;}
+ button.disabled=true;status.textContent="Validando acesso...";
+ try{
+  const data=await api("/api/auth/login",{method:"POST",body:JSON.stringify({token})});
+  adminAuthenticated=!!data.authenticated;$("admin-token").value="";
+  status.textContent="Sessão ativa por 48 horas. Expira em "+new Date(data.expires_at*1000).toLocaleString("pt-BR")+".";
+  await runDiagnostic();await refreshProjectSelectors();await loadDashboard();
+ }catch(error){adminAuthenticated=false;status.textContent=error.message;}
+ finally{button.disabled=false;}
+}
+async function logoutAdminSession(){
+ const button=$("logout-token");button.disabled=true;
+ try{await api("/api/auth/logout",{method:"POST",body:JSON.stringify({})});adminAuthenticated=false;$("token-status").textContent="Sessão encerrada.";$("diagnostic-result").textContent="";await loadDashboard();}
+ catch(error){$("token-status").textContent=error.message;}
+ finally{button.disabled=false;}
+}
+async function checkAdminSession(){
+ try{const data=await api("/api/auth/status");adminAuthenticated=!!data.authenticated;
+  $("token-status").textContent=adminAuthenticated?"Sessão administrativa ativa até "+new Date(data.expires_at*1000).toLocaleString("pt-BR")+".":"Nenhuma sessão ativa. Informe o token para entrar.";
+ }catch(error){adminAuthenticated=false;$("token-status").textContent="Não foi possível verificar a sessão: "+error.message;}
+}
+$("save-token").addEventListener("click",saveAdminToken);
+$("logout-token").addEventListener("click",logoutAdminSession);
+$("toggle-token").addEventListener("click",()=>{$("admin-token").type=$("admin-token").type==="password"?"text":"password";$("toggle-token").textContent=$("admin-token").type==="password"?"Mostrar":"Ocultar";});
 async function health(){try{const d=await api("/api/saude");$("health-label").textContent="API online";$("health-dot").className="dot ok";$("api-state").textContent="Online · v"+(d.versao||"?");$("groq-state").textContent=d.provedores_configurados?.groq?"Ativa · provedor único":"Chave ausente";$("text-model-state").textContent=d.modelo_principal||"Padrão Groq";$("vision-model-state").textContent=d.modelo_vision||"Modelo visual Groq";}catch(e){$("health-label").textContent="API indisponível";$("health-dot").className="dot bad";$("api-state").textContent="Indisponível";$("diagnostic-result").textContent=e.message;}}
 function formatStorageDiagnostic(info){
  if(!info||typeof info!=="object")return "Banco: não informado pela API.";
@@ -1084,7 +1106,7 @@ $("save-memory").addEventListener("click",async()=>{
 });
 async function loadIdeas(){const box=$("ideas-result");box.innerHTML='<div class="empty">Carregando ideias...</div>';try{const d=await api("/api/ideias");renderItems(box,d.items||[],"ideas");}catch(e){box.innerHTML="";const n=document.createElement("div");n.className="notice error";n.textContent=e.message;box.appendChild(n);}}
 $("load-history").addEventListener("click",loadHistory);$("load-ideas").addEventListener("click",loadIdeas);
-async function saveIdea(title,summary,priority){if(!adminToken)throw new Error("Informe o token administrativo em Conexões antes de salvar.");return api("/api/ideias",{method:"POST",body:JSON.stringify({titulo:title,resumo:summary,prioridade:priority})});}
+async function saveIdea(title,summary,priority){if(!adminAuthenticated)throw new Error("Informe o token administrativo em Conexões antes de salvar.");return api("/api/ideias",{method:"POST",body:JSON.stringify({titulo:title,resumo:summary,prioridade:priority})});}
 $("save-idea").addEventListener("click",async()=>{const status=$("idea-status");try{await saveIdea($("idea-title").value.trim(),$("idea-summary").value.trim(),$("idea-priority").value);status.textContent="Ideia salva no banco do serviço.";status.style.color="var(--green)";$("idea-title").value="";$("idea-summary").value="";loadIdeas();}catch(e){status.textContent=e.message;status.style.color="var(--red)";}});
 async function loadProjects(){
  const box=$("projects-result");if(!box)return;
@@ -1184,11 +1206,11 @@ $("project-to-director").addEventListener("click",()=>{const title=$("project-ti
 $("send-email").addEventListener("click",async()=>{const s=$("email-status");s.textContent="Enviando...";try{const d=await api("/api/email/enviar",{method:"POST",body:JSON.stringify({destinatario:$("email-to").value,assunto:$("email-subject").value,texto:$("email-body").value})});s.textContent="E-mail enviado para "+d.destinatario;s.style.color="var(--green)";}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});
 $("analyze-email").addEventListener("click",async()=>{const s=$("email-status");s.textContent="Analisando...";try{const d=await api("/api/email/analisar",{method:"POST",body:JSON.stringify({assunto:$("email-subject").value,texto:$("email-body").value})});s.textContent="Análise concluída e registrada como ideia.";s.style.color="var(--green)";$("email-results").textContent=d.analise||"";}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});
 $("receive-email").addEventListener("click",async()=>{const s=$("email-status"),box=$("email-results");s.textContent="Consultando caixa de entrada...";try{const d=await api("/api/email/receber");s.textContent="Mensagens recebidas: "+(d.count||0);box.innerHTML="";(d.items||[]).forEach(item=>{const el=document.createElement("article");el.className="item";const t=document.createElement("strong");t.textContent=item.assunto||"(sem assunto)";const p=document.createElement("p");p.textContent="De: "+(item.de||"") +"\n"+(item.texto||"");el.append(t,p);box.appendChild(el);});if(!d.items?.length)box.innerHTML='<div class="empty">Nenhuma mensagem não lida encontrada.</div>';}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});
-addComposerTools();refreshProjectSelectors();health();loadDashboard();
+addComposerTools();health();checkAdminSession().then(async()=>{await refreshProjectSelectors();await loadDashboard();});
 async function loadDashboard(){
  $("dashboard-date").textContent=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
  try{const h=await api("/api/saude");$("metric-health").textContent="Online";$("metric-provider").textContent="Groq · "+(h.modelo_principal||"modelo principal");}catch(e){$("metric-health").textContent="Offline";$("metric-provider").textContent="API indisponível";}
- if(!adminToken){$("metric-messages").textContent="—";$("metric-projects").textContent="—";$("metric-ideas").textContent="—";$("dashboard-activity").innerHTML='<div class="empty">Informe o token administrativo em Conexões para ver seus dados.</div>';return;}
+ if(!adminAuthenticated){$("metric-messages").textContent="—";$("metric-projects").textContent="—";$("metric-ideas").textContent="—";$("dashboard-activity").innerHTML='<div class="empty">Informe o token administrativo em Conexões para ver seus dados.</div>';return;}
  try{const r=await Promise.all([api("/api/conversas?limit=100"),api("/api/projetos?limit=100"),api("/api/ideias?limit=100")]);const msgs=r[0].items||[],projects=r[1].items||[],ideas=r[2].items||[];$("metric-messages").textContent=msgs.length;$("metric-projects").textContent=projects.filter(x=>x.status!=="concluido").length;$("metric-ideas").textContent=ideas.length;const recent=[...projects.slice(0,3).map(x=>({title:x.title||"Projeto",meta:"Projeto · "+(x.status||"planejado")})),...ideas.slice(0,2).map(x=>({title:x.title||"Ideia",meta:"Banco de ideias"}))].slice(0,4);$("dashboard-activity").innerHTML=recent.length?recent.map(x=>'<article class="item"><strong>'+safe(x.title)+'</strong><small>'+safe(x.meta)+'</small></article>').join(""):'<div class="empty">Nenhuma atividade registrada.</div>';}catch(e){$("dashboard-activity").innerHTML='<div class="notice error">'+safe(e.message)+'</div>';}
 }
 $("refresh-dashboard").addEventListener("click",loadDashboard);

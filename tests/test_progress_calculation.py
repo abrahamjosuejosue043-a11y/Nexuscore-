@@ -10,9 +10,17 @@ class HybridProjectProgressTests(unittest.TestCase):
         self.assertEqual(result["total_tasks"], 0)
         self.assertEqual(result["departments"], [])
 
+    def test_completed_task_without_directorate_validation_does_not_count(self):
+        result = calculate_project_progress([
+            {"assigned_department": "programacao", "status": "concluida", "priority": "alta"}
+        ])
+        self.assertEqual(result["progress_percent"], 0.0)
+        self.assertEqual(result["completed_tasks"], 0)
+        self.assertEqual(result["departments"][0]["progress_percent"], 0.0)
+
     def test_completed_only_counts_after_directorate_validation(self):
         tasks = [
-            {"assigned_department": "programacao", "status": "concluida", "priority": "alta"},
+            {"assigned_department": "programacao", "status": "concluida", "priority": "alta", "directorate_validated": True},
             {"assigned_department": "programacao", "status": "em_revisao", "priority": "media"},
             {"assigned_department": "programacao", "status": "em_andamento", "priority": "baixa"},
         ]
@@ -23,7 +31,7 @@ class HybridProjectProgressTests(unittest.TestCase):
 
     def test_department_weights_control_hybrid_project_progress(self):
         tasks = [
-            {"assigned_department": "programacao", "status": "concluida"},
+            {"assigned_department": "programacao", "status": "concluida", "directorate_validated": True},
             {"assigned_department": "publicidade", "status": "pendente"},
         ]
         result = calculate_project_progress(
@@ -33,7 +41,7 @@ class HybridProjectProgressTests(unittest.TestCase):
 
     def test_planned_department_without_tasks_counts_as_zero(self):
         tasks = [
-            {"assigned_department": "programacao", "status": "concluida"},
+            {"assigned_department": "programacao", "status": "concluida", "directorate_validated": True},
         ]
         result = calculate_project_progress(
             tasks, department_weights={"programacao": 60, "publicidade": 40}
@@ -48,7 +56,7 @@ class HybridProjectProgressTests(unittest.TestCase):
 
     def test_cancelled_tasks_are_excluded_from_denominator(self):
         tasks = [
-            {"assigned_department": "programacao", "status": "concluida"},
+            {"assigned_department": "programacao", "status": "concluida", "directorate_validated": True},
             {"assigned_department": "programacao", "status": "cancelada"},
         ]
         result = calculate_project_progress(tasks)
@@ -60,7 +68,7 @@ class HybridProjectProgressTests(unittest.TestCase):
 
     def test_priority_is_used_as_default_task_weight(self):
         tasks = [
-            {"assigned_department": "programacao", "status": "concluida", "priority": "alta"},
+            {"assigned_department": "programacao", "status": "concluida", "priority": "alta", "directorate_validated": True},
             {"assigned_department": "programacao", "status": "pendente", "priority": "baixa"},
         ]
         result = calculate_project_progress(tasks)
@@ -68,7 +76,7 @@ class HybridProjectProgressTests(unittest.TestCase):
 
     def test_explicit_task_weight_overrides_priority(self):
         tasks = [
-            {"assigned_department": "programacao", "status": "concluida", "priority": "baixa", "weight": 9},
+            {"assigned_department": "programacao", "status": "concluida", "priority": "baixa", "weight": 9, "directorate_validated": True},
             {"assigned_department": "programacao", "status": "pendente", "priority": "alta", "weight": 1},
         ]
         result = calculate_project_progress(tasks)
@@ -104,7 +112,7 @@ class HybridProjectProgressTests(unittest.TestCase):
 
     def test_unconfigured_departments_receive_equal_weight(self):
         tasks = [
-            {"assigned_department": "programacao", "status": "concluida"},
+            {"assigned_department": "programacao", "status": "concluida", "directorate_validated": True},
             {"assigned_department": "publicidade", "status": "pendente"},
         ]
         result = calculate_project_progress(tasks)

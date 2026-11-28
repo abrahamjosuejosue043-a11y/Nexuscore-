@@ -129,7 +129,8 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
                     headers={"Origin": "http://testserver"},
                 )
                 second = client.post(
-                    "/api/chat", json=self._request(objective, conversation_id)
+                    "/api/chat", json=self._request(objective, conversation_id),
+                    headers={"Origin": "http://testserver"},
                 )
 
         self.assertEqual(first.status_code, 200, first.text)

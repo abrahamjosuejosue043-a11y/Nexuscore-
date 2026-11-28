@@ -42,6 +42,7 @@ from pydantic import BaseModel, Field
 from backend import storage
 from backend.progress import calculate_project_progress
 from backend.agent_tools import configured_groq_tools, agent_tools_status
+from backend.github_app import GitHubAppReadOnlyClient, GitHubIntegrationError
 
 
 # ---------------------------------------------------------------------------
@@ -1387,7 +1388,45 @@ async def saude():
             "escopo": "entregas textuais com revisão automática; código e ações externas ficam bloqueados",
             "limite_diario_tarefas": automatic_execution_daily_limit(),
         },
+        "integracao_github_engenharia": {
+            "configurada": GitHubAppReadOnlyClient().configured,
+            "modo": "somente leitura",
+        },
     }
+
+
+@app.get("/api/engenharia/github/status")
+async def engenharia_github_status(x_admin_token: Optional[str] = Header(default=None)):
+    """Status da integração GitHub, sem expor segredos."""
+    require_admin_token(x_admin_token)
+    client = GitHubAppReadOnlyClient()
+    if not client.configured:
+        return {
+            "configured": False,
+            "connected": False,
+            "mode": "read_only",
+            "message": "A GitHub App ainda precisa ser configurada no ambiente do serviço.",
+        }
+    try:
+        return await client.repository_status()
+    except GitHubIntegrationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/api/engenharia/github/arquivo")
+async def engenharia_github_read_file(
+    path: str = "",
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    """Leitura administrativa e restrita de arquivos de código/documentação."""
+    require_admin_token(x_admin_token)
+    client = GitHubAppReadOnlyClient()
+    if not client.configured:
+        raise HTTPException(status_code=503, detail="Integração GitHub ainda não configurada.")
+    try:
+        return await client.read_file(path)
+    except GitHubIntegrationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/auth/login")

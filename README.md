@@ -22,6 +22,17 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 - `MAX_INPUT_CHARS`: limite de texto de entrada (padrão 8000).
 - `NEXUSCORE_AUTO_EXECUTION`: habilita/desabilita o executor textual automático (padrão `true`, desde que `GROQ_API_KEY` esteja configurada).
 - `NEXUSCORE_MAX_TASKS_PER_DAY`: limite persistente de tentativas de execução automática por dia UTC (padrão 10; intervalo aceito de 1 a 100). Cada tarefa usa normalmente duas chamadas Groq e pode usar até quatro se precisar de uma correção e segunda revisão.
+- `GITHUB_APP_ID`, `GITHUB_INSTALLATION_ID`, `GITHUB_APP_PRIVATE_KEY` e `GITHUB_REPOSITORY`: configuração opcional da GitHub App usada pela Engenharia. A chave privada deve ficar somente como segredo no Render; nunca no repositório ou no chat.
+
+### GitHub da Engenharia — primeira fase (somente leitura)
+
+Para ativar a leitura controlada do repositório:
+1. Criar uma GitHub App e instalá-la somente no repositório Nexuscore pretendido.
+2. Conceder apenas **Contents: Read-only**; manter Pull requests e Actions sem permissões. Metadata permanece na permissão padrão de leitura.
+3. Guardar o App ID, o Installation ID, a chave privada PEM e o nome `owner/repository` nas quatro variáveis acima, no ambiente do serviço Render.
+4. Consultar **Execução → GitHub da Engenharia** para verificar a conexão.
+
+A API usa JWT da GitHub App para obter tokens temporários de instalação; o token não é persistido. A leitura é restrita a arquivos de código/documentação em pastas permitidas e a 128 KB por arquivo. Arquivos de segredo, credenciais, bancos locais e caminhos fora da lista são bloqueados. Nesta fase não há escrita, criação de branches/PRs, execução de código ou deploy. A integração de escrita só será habilitada depois de existir execução isolada e revisão de segurança.
 
 E-mail (opcional):
 - SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`.
@@ -38,6 +49,7 @@ Persistência:
 
 - `GET /api/saude`: estado público da API.
 - `GET /api/diagnostico`: diagnóstico protegido por `X-Admin-Token`.
+- `GET /api/engenharia/github/status` e `GET /api/engenharia/github/arquivo?path=...`: status e leitura restrita do repositório, protegidos por `X-Admin-Token`.
 - `POST /api/chat`: conversa e análise de até três imagens via Groq; possui limite básico de 20 solicitações por IP em janela móvel de 60 segundos por processo.
 - `GET /api/conversas`: lista de conversas protegida; `GET/PATCH /api/conversas/{id}` abre e renomeia uma conversa.
 - `GET/POST/DELETE /api/memoria`: memória compartilhada protegida; DELETE arquiva sem remover fisicamente.

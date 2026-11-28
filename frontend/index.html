@@ -998,6 +998,18 @@ async function loadExecutionSummary(){
   const budgetValue=document.createElement("strong");
   budgetValue.textContent=String(data.started_today||0)+" / "+String(data.daily_limit||0);
   budget.append(budgetLabel,budgetValue);box.appendChild(budget);
+  const github=document.createElement("div");github.className="status-card";github.style.gridColumn="1/-1";
+  const githubLabel=document.createElement("small");githubLabel.textContent="GitHub da Engenharia";
+  const githubValue=document.createElement("strong");githubValue.textContent="Verificando conexão...";
+  const githubNote=document.createElement("small");githubNote.style.display="block";githubNote.style.marginTop="5px";
+  github.append(githubLabel,githubValue,githubNote);box.appendChild(github);
+  try{
+   const integration=await api("/api/engenharia/github/status");
+   githubValue.textContent=integration.connected?"Conectado · somente leitura":"Aguardando configuração";
+   githubNote.textContent=integration.connected
+    ?(integration.repository+" · branch padrão: "+(integration.default_branch||"não informado")+". A Engenharia ainda não pode gravar código nem executar tarefas.")
+    :"A integração segura está preparada, mas a GitHub App ainda não foi configurada no servidor.";
+  }catch(error){githubValue.textContent="Não foi possível verificar";githubNote.textContent=error.message;}
  }catch(error){box.textContent="Não foi possível carregar o resumo da execução: "+error.message;}
 }
 async function loadTasks(){

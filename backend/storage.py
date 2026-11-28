@@ -906,6 +906,18 @@ def _insert_task_event(db, task_id, event_type, from_status, to_status, actor, d
     )
 
 
+def _utc_day_start(db):
+    """Returns the UTC midnight boundary in the active database dialect."""
+    if _database_url():
+        return db.execute(
+            """SELECT date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+                      AT TIME ZONE 'UTC' AS start"""
+        ).fetchone()["start"]
+    return db.execute(
+        "SELECT datetime('now', 'start of day') AS start"
+    ).fetchone()["start"]
+
+
 def claim_next_automated_task(daily_limit=10):
     """Atomically claims an automatic task while enforcing a persistent daily attempt budget."""
     limit = max(1, min(int(daily_limit), 100))
@@ -915,10 +927,11 @@ def claim_next_automated_task(daily_limit=10):
             db.execute("SELECT pg_advisory_xact_lock(7420192601)")
         else:
             db.execute("BEGIN IMMEDIATE")
+        day_start = _utc_day_start(db)
         started = db.execute(
             """SELECT COUNT(*) AS total FROM task_events
-               WHERE event_type='automated_execution_started'
-                 AND created_at >= CURRENT_DATE"""
+               WHERE event_type='automated_execution_started' AND created_at >= ?""",
+            (day_start,),
         ).fetchone()
         if int(started["total"] or 0) >= limit:
             return None
@@ -991,10 +1004,11 @@ def automated_execution_summary(daily_limit=10):
     """Returns queue counts and the persistent daily execution budget."""
     limit = max(1, min(int(daily_limit), 100))
     with connection() as db:
+        day_start = _utc_day_start(db)
         started = db.execute(
             """SELECT COUNT(*) AS total FROM task_events
-               WHERE event_type='automated_execution_started'
-                 AND created_at >= CURRENT_DATE"""
+               WHERE event_type='automated_execution_started' AND created_at >= ?""",
+            (day_start,),
         ).fetchone()
         rows = db.execute(
             """SELECT task.status, COUNT(*) AS total

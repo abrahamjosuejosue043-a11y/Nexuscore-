@@ -1024,7 +1024,7 @@ async function loadExecutionSummary(){
 $("run-engineering-diagnosis").addEventListener("click",async()=>{
  const button=$("run-engineering-diagnosis"),status=$("engineering-diagnosis-status"),result=$("engineering-diagnosis-result");
  const objetivo=$("engineering-objective").value.trim();
- const arquivos=$("engineering-files").value.split(/\\r?\\n/).map(value=>value.trim()).filter(Boolean);
+ const arquivos=$("engineering-files").value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
  result.style.display="none";result.textContent="";
  if(!adminAuthenticated){status.textContent="Entre na sessão administrativa em Conexões para usar a Engenharia.";return;}
  if(objetivo.length<20){status.textContent="Descreva o problema com pelo menos 20 caracteres.";return;}
@@ -1035,7 +1035,7 @@ $("run-engineering-diagnosis").addEventListener("click",async()=>{
  try{
   const data=await api("/api/engenharia/diagnosticar",{method:"POST",body:JSON.stringify({objetivo,arquivos})});
   const fontes=(data.fontes||[]).map(item=>item.path+" · SHA "+(item.sha||"não informado"));
-  result.textContent=String(data.analise||"A IA não retornou análise.")+"\\n\\nFontes consultadas:\\n"+fontes.join("\\n");
+  result.textContent=String(data.analise||"A IA não retornou análise.")+"\n\nFontes consultadas:\n"+fontes.join("\n");
   result.style.display="block";status.textContent="Diagnóstico concluído · somente leitura · modelo "+(data.modelo||"não informado")+".";
  }catch(error){status.textContent="Falha no diagnóstico: "+error.message;}
  finally{button.disabled=false;button.textContent="Analisar código do repositório";}

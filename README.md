@@ -32,7 +32,7 @@ Para ativar a leitura controlada do repositório:
 3. Guardar o App ID, o Installation ID, a chave privada PEM e o nome `owner/repository` nas quatro variáveis acima, no ambiente do serviço Render.
 4. Consultar **Execução → GitHub da Engenharia** para verificar a conexão.
 
-A API usa JWT da GitHub App para obter tokens temporários de instalação; o token não é persistido. A leitura é restrita a arquivos de código/documentação em pastas permitidas e a 128 KB por arquivo. Arquivos de segredo, credenciais, bancos locais e caminhos fora da lista são bloqueados. Nesta fase não há escrita, criação de branches/PRs, execução de código ou deploy. A integração de escrita só será habilitada depois de existir execução isolada e revisão de segurança.
+A API usa JWT da GitHub App para obter tokens temporários de instalação; o token não é persistido. A leitura é restrita a arquivos de código/documentação em pastas permitidas e a 128 KB por arquivo. Arquivos de segredo, credenciais, bancos locais e caminhos fora da lista são bloqueados. Nesta fase não há escrita, criação de branches/PRs, execução de código ou deploy. A proposta de alteração pode gerar um diff validado estruturalmente, limitado a `backend/`, `tests/`, `frontend/`, `main.py` e `README.md`. A prévia não é aplicada, não cria branch/PR e não executa código. A integração de escrita só será habilitada depois de existir execução isolada, revisão de segurança e aprovação específica das permissões adicionais.
 
 E-mail (opcional):
 - SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`.
@@ -50,7 +50,7 @@ Persistência:
 - `GET /api/saude`: estado público da API.
 - `GET /api/diagnostico`: diagnóstico protegido por `X-Admin-Token`.
 - `GET /api/engenharia/github/status` e `GET /api/engenharia/github/arquivo?path=...`: status e leitura restrita do repositório, protegidos por `X-Admin-Token`.
-- `POST /api/engenharia/diagnosticar`: diagnóstico técnico com até quatro arquivos autorizados do repositório, protegido por `X-Admin-Token`; somente leitura, sem executar testes ou alterar código.
+- `POST /api/engenharia/diagnosticar`: diagnóstico técnico com até quatro arquivos autorizados do repositório, protegido por `X-Admin-Token`; somente leitura, sem executar testes ou alterar código.\n- `POST /api/engenharia/propor-alteracao`: gera e valida uma prévia de diff com até quatro arquivos autorizados; não grava no GitHub, não cria branch/PR e não executa testes.
 - `POST /api/chat`: conversa e análise de até três imagens via Groq; possui limite básico de 20 solicitações por IP em janela móvel de 60 segundos por processo.
 - `GET /api/conversas`: lista de conversas protegida; `GET/PATCH /api/conversas/{id}` abre e renomeia uma conversa.
 - `GET/POST/DELETE /api/memoria`: memória compartilhada protegida; DELETE arquiva sem remover fisicamente.

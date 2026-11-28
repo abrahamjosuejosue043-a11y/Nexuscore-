@@ -129,6 +129,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .status-card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 13px}
 .status-card small{display:block;color:var(--muted);font-size:10px}
 .status-card strong{display:block;margin-top:5px;color:#34445a;font-size:12px;overflow-wrap:anywhere}
+.task-history{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#fbfcfe}
+.task-history[hidden]{display:none}
+.history-event{border-left:2px solid #d5deea;margin:0 0 0 4px;padding:0 0 13px 12px}
+.history-event:last-child{padding-bottom:0}
+.history-event strong{display:block;color:#34445a;font-size:11px}
+.history-event small{display:block;color:var(--muted);font-size:10px;margin-top:2px}
+.history-event p{margin:6px 0 0;color:#536278;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere}
 .token-row{display:flex;gap:8px;align-items:center}
 .token-row input{flex:1;min-width:0;min-height:38px;background:#fff;border:1px solid #dfe5ed;color:var(--text);border-radius:9px;padding:9px 11px}
 .footer{color:#98a3b2;text-align:center;font-size:10px;padding:18px 8px 0}
@@ -1049,6 +1056,35 @@ async function loadTasks(){
     });
     card.appendChild(validate);
    }
+   const historyButton=document.createElement("button");historyButton.type="button";historyButton.className="btn";historyButton.textContent="Ver histórico";historyButton.style.marginTop="8px";
+   const historyPanel=document.createElement("div");historyPanel.className="task-history";historyPanel.hidden=true;
+   let historyLoaded=false;
+   historyButton.addEventListener("click",async()=>{
+    if(!historyPanel.hidden){historyPanel.hidden=true;historyButton.textContent="Ver histórico";return;}
+    if(historyLoaded){historyPanel.hidden=false;historyButton.textContent="Ocultar histórico";return;}
+    historyButton.disabled=true;historyButton.textContent="Carregando histórico...";
+    try{
+     const history=await api("/api/tarefas/"+task.id+"/historico");
+     const events=history.items||[];historyPanel.replaceChildren();
+     if(!events.length){const empty=document.createElement("p");empty.className="empty";empty.textContent="Ainda não há eventos registrados para esta tarefa.";historyPanel.appendChild(empty);}
+     const eventLabels={created:"Tarefa criada",delegated:"Delegação registrada",delegated_auto:"Delegação automática",status_changed:"Alteração de status",execution_requeued:"Retomada após reinício",automated_execution_started:"Execução iniciada"};
+     const actorLabels={usuario:"Usuário",proprietario:"Proprietário",diretoria:"Diretoria",diretoria_ia:"Diretoria IA",executor_ia:"Executor IA",publicidade:"Marketing",programacao:"Engenharia",geral:"Nexuscore"};
+     events.forEach(event=>{
+      const entry=document.createElement("div");entry.className="history-event";
+      const heading=document.createElement("strong");heading.textContent=eventLabels[event.event_type]||event.event_type||"Evento";
+      const meta=document.createElement("small");
+      const transition=event.from_status||event.to_status?(taskStatusLabel(event.from_status||"")+(event.from_status&&event.to_status?" → ":"")+taskStatusLabel(event.to_status||"")):"";
+      meta.textContent=(actorLabels[event.actor]||event.actor||"Sistema")+(transition?" · "+transition:"")+(event.created_at?" · "+formatConversationDate(event.created_at):"");
+      entry.append(heading,meta);
+      if(event.details){const details=document.createElement("p");details.textContent=event.details;entry.appendChild(details);}
+      historyPanel.appendChild(entry);
+     });
+     historyLoaded=true;historyPanel.hidden=false;historyButton.textContent="Ocultar histórico";
+    }catch(error){
+     historyPanel.replaceChildren();const notice=document.createElement("p");notice.className="notice error";notice.textContent="Não foi possível carregar o histórico: "+error.message;historyPanel.appendChild(notice);historyPanel.hidden=false;
+    }finally{historyButton.disabled=false;if(!historyLoaded)historyButton.textContent="Tentar novamente";}
+   });
+   card.append(historyButton,historyPanel);
    box.appendChild(card);
   });
  }catch(error){

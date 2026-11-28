@@ -430,6 +430,13 @@ nav button[data-view="diretoria"],nav button[data-view="programacao"],nav button
   <div id="engineering-diagnosis-status" class="hint" aria-live="polite"></div>
   <div id="engineering-diagnosis-result" class="notice" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere"></div>
  </div>
+ <div class="panel" id="engineering-proposal-panel">
+  <h3>Proposta de correção da Engenharia</h3>
+  <p class="muted">A IA pode preparar um diff para revisão. Nesta fase, a proposta é apenas uma prévia: não cria branch, não grava no GitHub, não executa testes e não publica alterações.</p>
+  <div class="actions"><button class="btn primary" id="run-engineering-proposal">Gerar proposta de alteração</button></div>
+  <div id="engineering-proposal-status" class="hint" aria-live="polite"></div>
+  <pre id="engineering-proposal-result" class="notice" style="display:none;white-space:pre-wrap;overflow-wrap:anywhere;max-height:520px;overflow:auto"></pre>
+ </div>
  <div class="panel" id="manual-plan-panel">
   <h3>Gerar plano com a Diretoria</h3>
   <div class="field"><label for="plan-project">Projeto</label><select id="plan-project"><option value="">Carregando projetos...</option></select></div>
@@ -1039,6 +1046,34 @@ $("run-engineering-diagnosis").addEventListener("click",async()=>{
   result.style.display="block";status.textContent="Diagnóstico concluído · somente leitura · modelo "+(data.modelo||"não informado")+".";
  }catch(error){status.textContent="Falha no diagnóstico: "+error.message;}
  finally{button.disabled=false;button.textContent="Analisar código do repositório";}
+});
+$("run-engineering-proposal").addEventListener("click",async()=>{
+ const button=$("run-engineering-proposal"),status=$("engineering-proposal-status"),result=$("engineering-proposal-result");
+ const objetivo=$("engineering-objective").value.trim();
+ const arquivos=$("engineering-files").value.split(/\\r?\\n/).map(value=>value.trim()).filter(Boolean);
+ result.style.display="none";result.textContent="";
+ if(!adminAuthenticated){status.textContent="Entre na sessão administrativa em Conexões para usar a Engenharia.";return;}
+ if(objetivo.length<20){status.textContent="Descreva o problema com pelo menos 20 caracteres.";return;}
+ if(!arquivos.length||arquivos.length>4){status.textContent="Informe de 1 a 4 caminhos de arquivos.";return;}
+ if(new Set(arquivos).size!==arquivos.length){status.textContent="Remova caminhos repetidos.";return;}
+ button.disabled=true;button.textContent="Preparando proposta...";
+ status.textContent="Lendo as fontes e gerando um diff para validação. Nenhum arquivo será alterado.";
+ try{
+  const data=await api("/api/engenharia/propor-alteracao",{method:"POST",body:JSON.stringify({objetivo,arquivos})});
+  const fontes=(data.fontes||[]).map(item=>item.path+" · SHA "+(item.sha||"não informado"));
+  const testes=(data.testes_sugeridos||[]).map(item=>"- "+item).join("\\n");
+  const riscos=(data.riscos||[]).map(item=>"- "+item).join("\\n");
+  result.textContent="STATUS: "+data.status+"\\n\\nRESUMO\\n"+(data.resumo||"")+
+   "\\n\\nDIFF PROPOSTO\\n"+(data.diff||"Nenhuma alteração proposta.")+
+   "\\n\\nTESTES SUGERIDOS\\n"+(testes||"Não informados.")+
+   "\\n\\nRISCOS\\n"+(riscos||"Não informados.")+
+   "\\n\\nARQUIVOS-BASE\\n"+fontes.join("\\n");
+  result.style.display="block";
+  status.textContent=data.status==="proposta_validada_para_revisao"
+   ?"Proposta validada estruturalmente. Ainda não foi aplicada nem testada."
+   :"A Engenharia não propôs alterações. Nenhum arquivo foi modificado.";
+ }catch(error){status.textContent="Falha ao gerar proposta: "+error.message;}
+ finally{button.disabled=false;button.textContent="Gerar proposta de alteração";}
 });
 async function loadTasks(){
  const box=$("task-list");

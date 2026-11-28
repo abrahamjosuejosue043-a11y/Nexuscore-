@@ -98,7 +98,7 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
         with patch("main.chamar_groq", new=model):
             with TestClient(main.app) as client:
                 self._login(client)
-                response = client.post("/api/chat", json=self._request(objective))
+                response = client.post("/api/chat", json=self._request(objective), headers={"Origin": "http://testserver"})
 
         self.assertEqual(response.status_code, 200, response.text)
         body = response.json()
@@ -125,7 +125,8 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
             with TestClient(main.app) as client:
                 self._login(client)
                 first = client.post(
-                    "/api/chat", json=self._request(objective, conversation_id)
+                    "/api/chat", json=self._request(objective, conversation_id),
+                    headers={"Origin": "http://testserver"},
                 )
                 second = client.post(
                     "/api/chat", json=self._request(objective, conversation_id)
@@ -146,6 +147,7 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
                 response = client.post(
                     "/api/chat",
                     json=self._request("Execute o trabalho e organize as próximas entregas."),
+                    headers={"Origin": "http://testserver"},
                 )
 
         self.assertEqual(response.status_code, 200, response.text)

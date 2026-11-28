@@ -661,12 +661,13 @@ def set_project_department_weights(project_id, weights):
             raise ValueError("Projeto não encontrado.")
         if project["approval_status"] != "aprovado":
             raise ValueError("O projeto precisa estar aprovado pelo CEO.")
+        # A configuração recebida substitui integralmente a anterior.
+        # Isso impede que departamentos omitidos permaneçam somando no projeto.
+        db.execute("DELETE FROM project_department_weights WHERE project_id=?", (value,))
         for department, weight in normalized.items():
             db.execute(
                 """INSERT INTO project_department_weights(project_id, department, weight)
-                   VALUES(?,?,?)
-                   ON CONFLICT(project_id, department) DO UPDATE SET
-                     weight=excluded.weight, updated_at=CURRENT_TIMESTAMP""",
+                   VALUES(?,?,?)""",
                 (value, department, weight),
             )
         rows = db.execute(
@@ -714,6 +715,13 @@ def create_work_plan(title, objective, summary, project_id, items, conversation_
         )
         plan_id = cur.lastrowid
         for position, item in enumerate(items):
+            raw_weight = item.get("weight")
+            item_weight = (
+                float(raw_weight) if raw_weight is not None
+                else {"alta": 3.0, "media": 2.0, "baixa": 1.0}.get(str(item["priority"]).lower(), 2.0)
+            )
+            if not math.isfinite(item_weight) or item_weight <= 0 or item_weight > 10000:
+                raise ValueError("O peso do item do plano deve estar entre 0 e 10000.")
             db.execute(
                 """INSERT INTO work_plan_items(
                        plan_id, title, description, assigned_department, priority, position, weight
@@ -725,7 +733,7 @@ def create_work_plan(title, objective, summary, project_id, items, conversation_
                     str(item["department"]),
                     str(item["priority"]),
                     position,
-                    float(item.get("weight") or {"alta": 3.0, "media": 2.0, "baixa": 1.0}.get(str(item["priority"]).lower(), 2.0)),
+                    item_weight,
                 ),
             )
     return plan_id

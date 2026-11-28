@@ -43,6 +43,7 @@ from backend import storage
 from backend.progress import calculate_project_progress
 from backend.agent_tools import configured_groq_tools, agent_tools_status
 from backend.github_app import GitHubAppReadOnlyClient, GitHubIntegrationError
+from backend.engineering import build_engineering_diagnosis_prompt
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +219,11 @@ class EmailRequest(BaseModel):
 
 class AdminLoginRequest(BaseModel):
     token: str = Field(..., min_length=1, max_length=512)
+
+
+class EngineeringDiagnosisRequest(BaseModel):
+    objetivo: str = Field(..., min_length=20, max_length=8000)
+    arquivos: list[str] = Field(..., min_length=1, max_length=4)
 
 
 # ---------------------------------------------------------------------------
@@ -1427,6 +1433,50 @@ async def engenharia_github_read_file(
         return await client.read_file(path)
     except GitHubIntegrationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/engenharia/diagnosticar")
+async def engenharia_diagnosticar(
+    request: EngineeringDiagnosisRequest,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    """Produz diagnóstico técnico com contexto do repositório, sem executar ou alterar código."""
+    require_admin_token(x_admin_token)
+    paths = [str(path).strip() for path in request.arquivos]
+    if len(set(paths)) != len(paths):
+        raise HTTPException(status_code=422, detail="A lista de arquivos não pode conter caminhos repetidos.")
+    client = GitHubAppReadOnlyClient()
+    if not client.configured:
+        raise HTTPException(status_code=503, detail="Integração GitHub ainda não configurada.")
+    files = []
+    total_chars = 0
+    try:
+        for path in paths:
+            item = await client.read_file(path)
+            total_chars += len(item.get("content", ""))
+            if total_chars > 24000:
+                raise HTTPException(status_code=413, detail="O conjunto de arquivos excede o limite de contexto de 24 mil caracteres.")
+            files.append(item)
+    except GitHubIntegrationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    prompt = build_engineering_diagnosis_prompt(request.objetivo, files)
+    try:
+        analysis, model = await chamar_groq(prompt)
+    except ProviderError as exc:
+        logger.warning("Falha no diagnóstico de Engenharia: status=%s motivo=%s", exc.status_code, exc.message)
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return {
+        "status": "diagnostico_concluido",
+        "modo": "somente_leitura",
+        "execucao_de_codigo": False,
+        "alteracoes_no_repositorio": False,
+        "modelo": model,
+        "analise": analysis,
+        "fontes": [
+            {"path": item["path"], "sha": item.get("sha"), "html_url": item.get("html_url")}
+            for item in files
+        ],
+    }
 
 
 @app.post("/api/auth/login")

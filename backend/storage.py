@@ -939,6 +939,37 @@ def claim_next_automated_task():
         return task
 
 
+def requeue_interrupted_automated_tasks():
+    """Requeues automatic tasks left mid-flight by a service restart."""
+    requeued = []
+    with connection() as db:
+        rows = db.execute(
+            """SELECT task.id, task.status FROM department_tasks task
+               WHERE task.status IN ('em_andamento','em_revisao')
+                 AND EXISTS (
+                     SELECT 1 FROM task_events event
+                     WHERE event.task_id=task.id AND event.event_type='delegated_auto'
+                 )
+               ORDER BY task.id"""
+        ).fetchall()
+        for row in rows:
+            task_id = int(row["id"])
+            previous = str(row["status"])
+            cur = db.execute(
+                """UPDATE department_tasks SET status='pendente',
+                   completed_at=NULL, updated_at=CURRENT_TIMESTAMP
+                   WHERE id=? AND status=?""",
+                (task_id, previous),
+            )
+            if cur.rowcount == 1:
+                _insert_task_event(
+                    db, task_id, "execution_requeued", previous, "pendente",
+                    "executor_ia", "Tarefa reencaminhada após reinicialização do serviço.",
+                )
+                requeued.append(task_id)
+    return requeued
+
+
 def automated_execution_summary():
     """Returns status counts for tasks explicitly sent to the automatic executor."""
     with connection() as db:

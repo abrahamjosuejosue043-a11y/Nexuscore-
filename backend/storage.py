@@ -150,6 +150,7 @@ def initialize():
             "ALTER TABLE projects ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'aprovado'",
             "ALTER TABLE projects ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ",
             "ALTER TABLE projects ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMPTZ",
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS canceled_at TIMESTAMPTZ",
             "ALTER TABLE projects ADD COLUMN IF NOT EXISTS purge_after TIMESTAMPTZ",
             """CREATE TABLE IF NOT EXISTS project_decisions (
                 id BIGSERIAL PRIMARY KEY, project_id BIGINT NOT NULL,
@@ -261,6 +262,8 @@ def initialize():
             db.execute("ALTER TABLE projects ADD COLUMN approved_at TEXT")
         if "rejected_at" not in project_columns:
             db.execute("ALTER TABLE projects ADD COLUMN rejected_at TEXT")
+        if "canceled_at" not in project_columns:
+            db.execute("ALTER TABLE projects ADD COLUMN canceled_at TEXT")
         if "purge_after" not in project_columns:
             db.execute("ALTER TABLE projects ADD COLUMN purge_after TEXT")
         db.execute("""CREATE TABLE IF NOT EXISTS project_decisions (
@@ -963,7 +966,7 @@ def decide_project(project_id, decision, actor="ceo"):
         )
         updated = db.execute(
             """UPDATE projects
-               SET approval_status=?, approved_at=?, rejected_at=?, purge_after=?,
+               SET approval_status=?, approved_at=?, rejected_at=?, canceled_at=NULL, purge_after=?,
                    updated_at=CURRENT_TIMESTAMP
                WHERE id=? AND approval_status='aguardando_aprovacao'""",
             (
@@ -993,12 +996,46 @@ def decide_project(project_id, decision, actor="ceo"):
         }
 
 
-def restore_rejected_project(project_id, actor="ceo"):
-    """Retorna um projeto rejeitado à fila antes do vencimento de 24 horas."""
+def cancel_approved_project(project_id, actor="ceo"):
+    """Retira um projeto aprovado da operação e agenda exclusão recuperável em 24h."""
     with connection() as db:
         project = db.execute(
-            """SELECT id,title,summary FROM projects
-               WHERE id=? AND approval_status='rejeitado'
+            "SELECT id,title,summary FROM projects WHERE id=? AND approval_status='aprovado'",
+            (int(project_id),),
+        ).fetchone()
+        if not project:
+            exists = db.execute("SELECT 1 FROM projects WHERE id=?", (int(project_id),)).fetchone()
+            return False if exists else None
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        decided_at = now if _database_url() else now.strftime("%Y-%m-%d %H:%M:%S")
+        purge_time = now + timedelta(hours=24)
+        purge_after = purge_time if _database_url() else purge_time.strftime("%Y-%m-%d %H:%M:%S")
+        updated = db.execute(
+            """UPDATE projects SET approval_status='cancelado', canceled_at=?,
+                   purge_after=?, updated_at=CURRENT_TIMESTAMP
+               WHERE id=? AND approval_status='aprovado'""",
+            (decided_at, purge_after, int(project_id)),
+        )
+        if updated.rowcount != 1:
+            return False
+        db.execute(
+            """INSERT INTO project_decisions
+               (project_id,project_title,project_summary,decision,actor,decided_at,purge_after)
+               VALUES(?,?,?,?,?,?,?)""",
+            (int(project_id), project["title"], project["summary"],
+             "cancelado", actor, decided_at, purge_after),
+        )
+        return {"id": int(project_id), "status": "cancelado",
+                "decided_at": decided_at, "purge_after": purge_after}
+
+
+def restore_rejected_project(project_id, actor="ceo"):
+    """Restaura rejeitados à fila ou cancelados à operação antes do prazo de 24h."""
+    with connection() as db:
+        project = db.execute(
+            """SELECT id,title,summary,approval_status FROM projects
+               WHERE id=? AND approval_status IN ('rejeitado','cancelado')
                  AND purge_after IS NOT NULL AND purge_after > CURRENT_TIMESTAMP""",
             (int(project_id),),
         ).fetchone()
@@ -1007,12 +1044,14 @@ def restore_rejected_project(project_id, actor="ceo"):
         from datetime import datetime, timezone
         decided_at = datetime.now(timezone.utc).replace(microsecond=0)
         decided_value = decided_at if _database_url() else decided_at.strftime("%Y-%m-%d %H:%M:%S")
+        was_canceled = project["approval_status"] == "cancelado"
+        restored_status = "aprovado" if was_canceled else "aguardando_aprovacao"
         updated = db.execute(
-            """UPDATE projects SET approval_status='aguardando_aprovacao',
-                   rejected_at=NULL,purge_after=NULL,updated_at=CURRENT_TIMESTAMP
-               WHERE id=? AND approval_status='rejeitado'
+            """UPDATE projects SET approval_status=?, rejected_at=NULL,
+                   canceled_at=NULL,purge_after=NULL,updated_at=CURRENT_TIMESTAMP
+               WHERE id=? AND approval_status IN ('rejeitado','cancelado')
                  AND purge_after > CURRENT_TIMESTAMP""",
-            (int(project_id),),
+            (restored_status, int(project_id)),
         )
         if updated.rowcount != 1:
             return False
@@ -1020,32 +1059,36 @@ def restore_rejected_project(project_id, actor="ceo"):
             """INSERT INTO project_decisions
                (project_id,project_title,project_summary,decision,actor,decided_at)
                VALUES(?,?,?,?,?,?)""",
-            (
-                int(project_id), project["title"], project["summary"],
-                "rejeicao_revertida", actor, decided_value,
-            ),
+            (int(project_id), project["title"], project["summary"],
+             "cancelamento_revertido" if was_canceled else "rejeicao_revertida",
+             actor, decided_value),
         )
-        return {"id": int(project_id), "status": "aguardando_aprovacao"}
+        return {"id": int(project_id), "status": restored_status}
 
 
 def purge_expired_rejected_projects():
-    """Exclui projetos rejeitados após 24h e conserva o histórico da decisão."""
+    """Exclui projetos rejeitados/cancelados após 24h e conserva o histórico."""
     with connection() as db:
         expired = db.execute(
-            """SELECT id FROM projects
-               WHERE approval_status='rejeitado'
+            """SELECT id,approval_status FROM projects
+               WHERE approval_status IN ('rejeitado','cancelado')
                  AND purge_after IS NOT NULL
                  AND purge_after <= CURRENT_TIMESTAMP
                ORDER BY id"""
         ).fetchall()
         deleted_ids = [int(row["id"]) for row in expired]
-        for project_id in deleted_ids:
+        for row in expired:
+            project_id = int(row["id"])
+            decision = "cancelado" if row["approval_status"] == "cancelado" else "rejeitado"
             db.execute(
                 """UPDATE project_decisions SET deleted_at=CURRENT_TIMESTAMP
-                   WHERE project_id=? AND decision='rejeitado' AND deleted_at IS NULL""",
-                (project_id,),
+                   WHERE project_id=? AND decision=? AND deleted_at IS NULL""",
+                (project_id, decision),
             )
-            db.execute("DELETE FROM projects WHERE id=? AND approval_status='rejeitado'", (project_id,))
+            db.execute(
+                "DELETE FROM projects WHERE id=? AND approval_status=?",
+                (project_id, row["approval_status"]),
+            )
     return deleted_ids
 
 

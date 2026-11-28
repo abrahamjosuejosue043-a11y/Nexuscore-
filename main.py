@@ -1010,7 +1010,6 @@ async def admin_login(payload: AdminLoginRequest, request: Request, response: Re
         key=ADMIN_SESSION_COOKIE,
         value=session_token,
         max_age=ADMIN_SESSION_TTL_SECONDS,
-        expires=expires_at,
         **_admin_cookie_options(request),
     )
     return {"authenticated": True, "expires_at": expires_at, "expires_in_seconds": ADMIN_SESSION_TTL_SECONDS}

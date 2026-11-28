@@ -1330,10 +1330,12 @@ async def initialize_persistent_storage():
     storage.purge_expired_rejected_projects()
     if _project_cleanup_task is None or _project_cleanup_task.done():
         _project_cleanup_task = asyncio.create_task(_project_cleanup_loop())
-    if automatic_execution_enabled() and (
-        _department_execution_task is None or _department_execution_task.done()
-    ):
-        _department_execution_task = asyncio.create_task(_department_execution_loop())
+    if automatic_execution_enabled():
+        requeued = await asyncio.to_thread(storage.requeue_interrupted_automated_tasks)
+        if requeued:
+            logger.info("Automatic tasks requeued after restart: count=%s", len(requeued))
+        if _department_execution_task is None or _department_execution_task.done():
+            _department_execution_task = asyncio.create_task(_department_execution_loop())
 
 
 @app.on_event("shutdown")

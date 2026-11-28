@@ -45,6 +45,7 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
         self.old_path = storage.DB_PATH
         self.old_database_url = os.environ.pop("DATABASE_URL", None)
         self.old_admin_token = os.environ.get("ADMIN_TOKEN")
+        self.old_groq_key = os.environ.pop("GROQ_API_KEY", None)
         os.environ["ADMIN_TOKEN"] = "test-admin-token"
         storage.DB_PATH = os.path.join(self.temp_dir.name, "auto-dispatch.db")
         storage.initialize()
@@ -65,6 +66,10 @@ class AutomaticDirectorDispatchTests(unittest.TestCase):
             os.environ["ADMIN_TOKEN"] = self.old_admin_token
         else:
             os.environ.pop("ADMIN_TOKEN", None)
+        if self.old_groq_key is not None:
+            os.environ["GROQ_API_KEY"] = self.old_groq_key
+        else:
+            os.environ.pop("GROQ_API_KEY", None)
         self.temp_dir.cleanup()
 
     def _login(self, client):

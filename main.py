@@ -44,6 +44,7 @@ from backend.progress import calculate_project_progress
 from backend.agent_tools import configured_groq_tools, agent_tools_status
 from backend.github_app import GitHubAppReadOnlyClient, GitHubIntegrationError
 from backend.engineering import build_engineering_diagnosis_prompt
+from backend.engineering_patch import build_patch_proposal_prompt, validate_unified_diff
 
 
 # ---------------------------------------------------------------------------
@@ -1472,6 +1473,80 @@ async def engenharia_diagnosticar(
         "alteracoes_no_repositorio": False,
         "modelo": model,
         "analise": analysis,
+        "fontes": [
+            {"path": item["path"], "sha": item.get("sha"), "html_url": item.get("html_url")}
+            for item in files
+        ],
+    }
+
+
+@app.post("/api/engenharia/propor-alteracao")
+async def engenharia_propor_alteracao(
+    request: EngineeringDiagnosisRequest,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    """Gera e valida uma proposta de diff; nunca grava ou executa código."""
+    require_admin_token(x_admin_token)
+    paths = [str(path).strip() for path in request.arquivos]
+    if len(set(paths)) != len(paths):
+        raise HTTPException(status_code=422, detail="A lista de arquivos não pode conter caminhos repetidos.")
+    client = GitHubAppReadOnlyClient()
+    if not client.configured:
+        raise HTTPException(status_code=503, detail="Integração GitHub ainda não configurada.")
+    files = []
+    total_chars = 0
+    try:
+        for path in paths:
+            item = await client.read_file(path)
+            total_chars += len(item.get("content", ""))
+            if total_chars > 24000:
+                raise HTTPException(status_code=413, detail="O conjunto de arquivos excede o limite de contexto de 24 mil caracteres.")
+            files.append(item)
+        prompt = build_patch_proposal_prompt(request.objetivo, files)
+    except GitHubIntegrationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        raw, model = await chamar_groq(prompt, json_mode=True)
+        proposal = json.loads(raw)
+    except ProviderError as exc:
+        logger.warning("Falha ao gerar proposta de Engenharia: status=%s motivo=%s", exc.status_code, exc.message)
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=502, detail="A Engenharia não retornou uma proposta JSON válida.")
+    if not isinstance(proposal, dict):
+        raise HTTPException(status_code=502, detail="Formato de proposta inválido.")
+    summary = str(proposal.get("resumo") or "").strip()[:4000]
+    diff = proposal.get("diff")
+    tests = proposal.get("testes") if isinstance(proposal.get("testes"), list) else []
+    risks = proposal.get("riscos") if isinstance(proposal.get("riscos"), list) else []
+    if not summary or not isinstance(diff, str):
+        raise HTTPException(status_code=502, detail="A proposta não contém resumo e diff em formato válido.")
+    if diff.strip():
+        try:
+            validation = validate_unified_diff(diff, paths)
+        except (ValueError, GitHubIntegrationError) as exc:
+            logger.warning("Proposta de diff rejeitada pela validação local: %s", str(exc)[:200])
+            raise HTTPException(status_code=502, detail="A proposta gerada foi rejeitada pela validação de segurança: " + str(exc)) from exc
+        proposal_status = "proposta_validada_para_revisao"
+    else:
+        validation = {"files": [], "characters": 0}
+        proposal_status = "sem_alteracao_proposta"
+    return {
+        "status": proposal_status,
+        "modo": "proposta_sem_aplicacao",
+        "execucao_de_codigo": False,
+        "alteracoes_no_repositorio": False,
+        "branch_criada": False,
+        "pull_request_criado": False,
+        "modelo": model,
+        "resumo": summary,
+        "diff": diff,
+        "arquivos_validados": validation["files"],
+        "tamanho_diff": validation["characters"],
+        "testes_sugeridos": [str(item)[:500] for item in tests[:12]],
+        "riscos": [str(item)[:500] for item in risks[:12]],
         "fontes": [
             {"path": item["path"], "sha": item.get("sha"), "html_url": item.get("html_url")}
             for item in files

@@ -84,7 +84,7 @@ class HybridProjectProgressTests(unittest.TestCase):
 
     def test_unknown_priority_uses_neutral_medium_weight(self):
         tasks = [
-            {"assigned_department": "programacao", "status": "concluida", "priority": "urgente"},
+            {"assigned_department": "programacao", "status": "concluida", "priority": "urgente", "directorate_validated": True},
             {"assigned_department": "programacao", "status": "pendente", "priority": "media"},
         ]
         result = calculate_project_progress(tasks)

@@ -1,6 +1,6 @@
 # Nexuscore AI
 
-API central FastAPI com um agente central e três perfis especializados (Diretoria, Engenharia e Marketing), Groq como núcleo de linguagem e persistência PostgreSQL via `DATABASE_URL` (com fallback para SQLite no desenvolvimento local). Os perfis compartilham memória registrada, contexto da conversa e uma fila de tarefas; ainda não executam delegações autônomas nem ações externas sem revisão.
+API central FastAPI com um agente central e três perfis especializados (Diretoria, Engenharia e Marketing), Groq como núcleo de linguagem e persistência PostgreSQL via `DATABASE_URL` (com fallback para SQLite no desenvolvimento local). Os perfis compartilham memória registrada, contexto da conversa e uma fila auditável de tarefas. A delegação e a produção/revisão de entregas textuais elegíveis podem ocorrer automaticamente; alterações de código e ações externas continuam bloqueadas.
 
 ## Execução
 
@@ -20,6 +20,8 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 - `DATABASE_PATH`: caminho do SQLite quando `DATABASE_URL` não estiver configurada; padrão local `data/nexuscore.db`.
 - `AI_REQUEST_TIMEOUT`: timeout de chamadas à IA em segundos (padrão 45).
 - `MAX_INPUT_CHARS`: limite de texto de entrada (padrão 8000).
+- `NEXUSCORE_AUTO_EXECUTION`: habilita/desabilita o executor textual automático (padrão `true`, desde que `GROQ_API_KEY` esteja configurada).
+- `NEXUSCORE_MAX_TASKS_PER_DAY`: limite persistente de tentativas de execução automática por dia UTC (padrão 10; intervalo aceito de 1 a 100). Cada tarefa usa normalmente duas chamadas Groq e pode usar até quatro se precisar de uma correção e segunda revisão.
 
 E-mail (opcional):
 - SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`.
@@ -55,7 +57,10 @@ Persistência:
 - Tarefas canceladas são excluídas do denominador; tarefas em revisão não contam como concluídas.
 - Para tarefas vinculadas a projetos, o envio para revisão exige evidências no campo de resultado. A conclusão exige registro de validação da Diretoria no histórico auditável.
 - O percentual calculado não é duplicado em uma coluna de projeto; a API calcula o valor a partir dos registros atuais.
-- A ação de validação disponível nesta etapa é autenticada e registra a decisão como Diretoria após confirmação explícita. A revisão autônoma das evidências por IA e a execução autônoma das tarefas ainda não estão implementadas.
+- O executor interno do serviço Render pode produzir entregas textuais para Diretoria, Marketing e Nexuscore, com segunda revisão por IA e no máximo uma rodada de correção. O resultado é registrado no histórico da tarefa.
+- Tarefas de Engenharia que exigem alterar código/repositório e ações externas (envio, publicação, pagamento, deploy, credenciais etc.) são bloqueadas; não se deve interpretar uma tarefa bloqueada como executada.
+- O executor contabiliza tentativas em eventos persistentes e respeita um limite diário UTC configurável. O resumo protegido `GET /api/execucao/resumo` mostra fila, tentativas do dia, limite e capacidade restante.
+- O executor reutiliza a integração Groq já configurada; cada tentativa pode gerar consumo do provedor. O limite diário reduz, mas não elimina, esse consumo.
 
 ## Deploy no Render
 

@@ -413,7 +413,7 @@ nav button[data-view="diretoria"],nav button[data-view="programacao"],nav button
 </section>
 <section class="view" id="view-tarefas">
  <div class="view-head"><div><h2>Execução e acompanhamento</h2><p>Acompanhe o trabalho distribuído pela Diretoria e os resultados de cada departamento.</p></div><button class="btn" id="load-tasks">Atualizar</button></div>
- <div class="notice">Envie uma ordem pelo chat principal. A Diretoria distribui o trabalho automaticamente em projetos aprovados. Esta área serve para acompanhar tarefas, bloqueios e entregas. A execução e a validação só serão marcadas como concluídas quando houver evidência.</div>
+ <div class="notice">A Diretoria distribui tarefas automaticamente. O executor de IA produz entregas textuais e a Diretoria as revisa. Alterações de código, publicações, pagamentos e ações externas ficam bloqueadas até que as integrações e aprovações necessárias existam.</div><div id="execution-summary" class="status-grid" aria-live="polite"></div>
  <div class="panel" id="manual-plan-panel">
   <h3>Gerar plano com a Diretoria</h3>
   <div class="field"><label for="plan-project">Projeto</label><select id="plan-project"><option value="">Carregando projetos...</option></select></div>
@@ -910,7 +910,7 @@ function taskDepartmentLabel(value){
  return ({geral:"Nexuscore",diretoria:"Diretoria",programacao:"Engenharia",publicidade:"Marketing"})[value]||value||"Sem departamento";
 }
 function taskStatusLabel(value){
- return ({pendente:"Pendente",em_andamento:"Em andamento",bloqueada:"Bloqueada",concluida:"Concluída"})[value]||value||"Pendente";
+ return ({pendente:"Pendente",em_andamento:"Em andamento",em_revisao:"Em revisão",bloqueada:"Bloqueada",concluida:"Concluída",cancelada:"Cancelada"})[value]||value||"Pendente";
 }
 async function loadPlanProjects(){
  const select=$("plan-project"),taskSelect=$("task-project");if(!select)return;
@@ -971,6 +971,23 @@ $("generate-plan").addEventListener("click",async()=>{
  }catch(error){status.textContent=error.message;status.style.color="var(--red)";}
  finally{button.disabled=false;button.textContent="Gerar plano para revisão";}
 });
+async function loadExecutionSummary(){
+ const box=$("execution-summary");if(!box)return;
+ try{
+  const data=await api("/api/execucao/resumo");
+  box.replaceChildren();
+  const note=document.createElement("div");note.className="hint";note.style.gridColumn="1/-1";
+  note.textContent=data.enabled?"Executor automático ativo · entregas textuais são produzidas e revisadas sem atualização manual.":"Executor automático pausado · verifique a configuração do provedor no servidor.";
+  box.appendChild(note);
+  const labels=[["pendente","Na fila"],["em_andamento","Em andamento"],["em_revisao","Em revisão"],["concluida","Concluídas"],["bloqueada","Bloqueadas"]];
+  labels.forEach(([key,label])=>{
+   const card=document.createElement("div");card.className="status-card";
+   const small=document.createElement("small");small.textContent=label;
+   const strong=document.createElement("strong");strong.textContent=String(data.counts?.[key]||0);
+   card.append(small,strong);box.appendChild(card);
+  });
+ }catch(error){box.textContent="Não foi possível carregar o resumo da execução: "+error.message;}
+}
 async function loadTasks(){
  const box=$("task-list");
  if(!box)return;
@@ -978,6 +995,7 @@ async function loadTasks(){
  const department=$("task-filter")?.value||"";
  try{
   const data=await api("/api/tarefas?limit=100"+(department?"&departamento="+encodeURIComponent(department):""));
+  await loadExecutionSummary();
   const items=data.items||[];
   box.replaceChildren();
   if(!items.length){box.innerHTML='<div class="empty">Nenhuma tarefa encontrada. Encaminhe a primeira acima.</div>';return;}
@@ -1221,6 +1239,7 @@ $("send-email").addEventListener("click",async()=>{const s=$("email-status");s.t
 $("analyze-email").addEventListener("click",async()=>{const s=$("email-status");s.textContent="Analisando...";try{const d=await api("/api/email/analisar",{method:"POST",body:JSON.stringify({assunto:$("email-subject").value,texto:$("email-body").value})});s.textContent="Análise concluída e registrada como ideia.";s.style.color="var(--green)";$("email-results").textContent=d.analise||"";}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});
 $("receive-email").addEventListener("click",async()=>{const s=$("email-status"),box=$("email-results");s.textContent="Consultando caixa de entrada...";try{const d=await api("/api/email/receber");s.textContent="Mensagens recebidas: "+(d.count||0);box.innerHTML="";(d.items||[]).forEach(item=>{const el=document.createElement("article");el.className="item";const t=document.createElement("strong");t.textContent=item.assunto||"(sem assunto)";const p=document.createElement("p");p.textContent="De: "+(item.de||"") +"\n"+(item.texto||"");el.append(t,p);box.appendChild(el);});if(!d.items?.length)box.innerHTML='<div class="empty">Nenhuma mensagem não lida encontrada.</div>';}catch(e){s.textContent=e.message;s.style.color="var(--red)";}});
 addComposerTools();health();checkAdminSession().then(async()=>{await refreshProjectSelectors();await loadDashboard();});
+setInterval(()=>{if(adminAuthenticated&&$("view-tarefas")?.classList.contains("active"))loadTasks();},20000);
 async function loadDashboard(){
  $("dashboard-date").textContent=new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
  try{const h=await api("/api/saude");$("metric-health").textContent="Online";$("metric-provider").textContent="Groq · "+(h.modelo_principal||"modelo principal");}catch(e){$("metric-health").textContent="Offline";$("metric-provider").textContent="API indisponível";}

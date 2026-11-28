@@ -56,6 +56,8 @@ O usuário não deve precisar programar para supervisionar o sistema. O Nexuscor
 7. **Entregar:** registrar resumo, evidências, limitações e próximos passos em linguagem simples.
 8. **Implantar:** usar somente os serviços existentes autorizados, após validação; confirmar o estado real do deploy antes de informar sucesso.
 
+A delegação automática inicia um executor interno no serviço existente. Ele pode produzir entregas textuais para Diretoria, Marketing e Nexuscore, submetê-las a uma segunda revisão da Diretoria, corrigir uma vez e registrar a conclusão auditada. Tarefas de Engenharia que exigem alteração de código, assim como publicações, pagamentos e ações externas, permanecem bloqueadas até que as integrações e aprovações necessárias existam.
+
 A delegação automática não significa que o Nexuscore já tenha capacidade de editar arquivos, operar contas externas ou implantar código. Essas capacidades só podem ser anunciadas depois de integradas e testadas.
 
 Nenhuma etapa pode ser marcada como concluída apenas porque foi discutida ou planejada.
@@ -71,6 +73,8 @@ Nenhuma etapa pode ser marcada como concluída apenas porque foi discutida ou pl
 
 ### Autorizado para execução operacional
 - Em um projeto já aprovado, um comando explícito de execução autoriza a Diretoria a criar o plano e distribuir tarefas internas automaticamente, sem pedir aprovação separada para cada plano.
+- O executor pode produzir e revisar entregas textuais internas com o provedor já configurado, limitado a uma rodada de correção e com auditoria.
+- Tarefas técnicas de código e ações externas são pausadas até existir integração segura e autorização específica.
 - A Diretoria pode acompanhar tarefas, registrar bloqueios, solicitar correções e produzir relatórios dentro das integrações realmente disponíveis.
 
 ### Exige participação direta do proprietário

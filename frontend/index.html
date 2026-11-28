@@ -1118,7 +1118,7 @@ async function loadProjects(){
      el.appendChild(select);
      const cancel=document.createElement("button");cancel.type="button";cancel.className="btn";cancel.textContent="Encerrar projeto";cancel.style.marginTop="10px";
      cancel.addEventListener("click",async()=>{
-      if(!window.confirm("Encerrar o projeto \\""+project.title+"\\"? Ele ficará indisponível imediatamente e será excluído em 24 horas. Você poderá restaurá-lo nesse prazo."))return;
+      if(!window.confirm('Encerrar o projeto "'+project.title+'"? Ele ficará indisponível imediatamente e será excluído em 24 horas. Você poderá restaurá-lo nesse prazo.'))return;
       cancel.disabled=true;
       try{const result=await api("/api/projetos/"+project.id+"/cancelar",{method:"POST",body:JSON.stringify({})});alert("Projeto encerrado. Prazo para restauração até: "+result.purge_after);await loadProjects();await refreshProjectSelectors();}
       catch(error){alert(error.message);cancel.disabled=false;}
@@ -1129,7 +1129,7 @@ async function loadProjects(){
      meta.textContent=(isCanceled?"Encerrado em: "+project.canceled_at:"Rejeitado em: "+project.rejected_at)+" · Exclusão prevista: "+project.purge_after;
      const restore=document.createElement("button");restore.type="button";restore.className="btn";restore.textContent=isCanceled?"Restaurar projeto aprovado":"Restaurar para aprovação";
      restore.addEventListener("click",async()=>{
-      if(!window.confirm(isCanceled?"Restaurar \\""+project.title+"\\" como projeto aprovado?":"Restaurar \\""+project.title+"\\" para a fila de aprovação do CEO?"))return;
+      if(!window.confirm(isCanceled?'Restaurar "'+project.title+'" como projeto aprovado?':'Restaurar "'+project.title+'" para a fila de aprovação do CEO?'))return;
       restore.disabled=true;
       try{await api("/api/projetos/"+project.id+"/restaurar",{method:"POST",body:JSON.stringify({})});await loadProjects();await refreshProjectSelectors();}
       catch(error){alert(error.message);restore.disabled=false;}

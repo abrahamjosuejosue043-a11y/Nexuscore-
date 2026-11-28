@@ -639,6 +639,51 @@ def list_department_tasks(
 
 
 
+
+def set_project_department_weights(project_id, weights):
+    """Define pesos departamentais do projeto em uma única transação."""
+    value = int(project_id)
+    normalized = {}
+    for department, weight in weights.items():
+        name = str(department).strip().lower()
+        number = float(weight)
+        if not name or not 0 < number <= 10000:
+            raise ValueError("Departamento ou peso inválido.")
+        normalized[name] = number
+    if not normalized or abs(sum(normalized.values()) - 100.0) > 0.01:
+        raise ValueError("Os pesos dos departamentos devem somar 100.")
+    with connection() as db:
+        project = db.execute(
+            "SELECT id, approval_status FROM projects WHERE id=?", (value,)
+        ).fetchone()
+        if not project:
+            raise ValueError("Projeto não encontrado.")
+        if project["approval_status"] != "aprovado":
+            raise ValueError("O projeto precisa estar aprovado pelo CEO.")
+        for department, weight in normalized.items():
+            db.execute(
+                """INSERT INTO project_department_weights(project_id, department, weight)
+                   VALUES(?,?,?)
+                   ON CONFLICT(project_id, department) DO UPDATE SET
+                     weight=excluded.weight, updated_at=CURRENT_TIMESTAMP""",
+                (value, department, weight),
+            )
+        rows = db.execute(
+            """SELECT department, weight FROM project_department_weights
+               WHERE project_id=? ORDER BY department""", (value,)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_project_department_weights(project_id):
+    with connection() as db:
+        rows = db.execute(
+            """SELECT department, weight, updated_at FROM project_department_weights
+               WHERE project_id=? ORDER BY department""", (int(project_id),)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def project_exists(project_id):
     with connection() as db:
         return db.execute("SELECT id FROM projects WHERE id=?", (int(project_id),)).fetchone() is not None

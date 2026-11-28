@@ -190,6 +190,7 @@ class DepartmentTaskRequest(BaseModel):
     descricao: str = Field(..., min_length=5, max_length=8000)
     departamento: str = Field(..., max_length=30)
     prioridade: str = Field(default="media", max_length=10)
+    peso: Optional[float] = Field(default=None, gt=0, le=10000)
     conversa_id: Optional[str] = Field(default=None, max_length=36)
     projeto_id: Optional[int] = Field(default=None, ge=1)
 
@@ -1188,6 +1189,7 @@ async def criar_tarefa(
             created_by="geral",
             conversation_id=request.conversa_id,
             project_id=request.projeto_id,
+            weight=request.peso,
         )
     except ValueError as exc:
         status_code = 409 if "aprovado pelo CEO" in str(exc) else 404
@@ -1317,6 +1319,36 @@ async def criar_projeto(request: dict, x_admin_token: Optional[str] = Header(def
         raise HTTPException(status_code=422, detail="Informe nome e descrição do projeto.")
     project_id = storage.save_project(titulo[:200], resumo[:10000])
     return {"id": project_id, "status": "aguardando_aprovacao"}
+
+
+
+@app.get("/api/projetos/{project_id}/pesos-departamentos")
+async def listar_pesos_departamentos(
+    project_id: int, x_admin_token: Optional[str] = Header(default=None)
+):
+    require_admin_token(x_admin_token)
+    if not storage.project_exists(project_id):
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    return {"project_id": project_id, "items": storage.get_project_department_weights(project_id)}
+
+
+@app.put("/api/projetos/{project_id}/pesos-departamentos")
+async def definir_pesos_departamentos(
+    project_id: int, request: dict, x_admin_token: Optional[str] = Header(default=None)
+):
+    require_admin_token(x_admin_token)
+    weights = request.get("pesos")
+    if not isinstance(weights, dict) or not weights:
+        raise HTTPException(status_code=422, detail="Informe um mapa de pesos por departamento.")
+    allowed = {"geral", "diretoria", "programacao", "publicidade"}
+    if any(str(name).strip().lower() not in allowed for name in weights):
+        raise HTTPException(status_code=422, detail="Departamento inválido.")
+    try:
+        items = storage.set_project_department_weights(project_id, weights)
+    except ValueError as exc:
+        code = 404 if "não encontrado" in str(exc) else 409
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    return {"project_id": project_id, "items": items, "total_peso": sum(float(x["weight"]) for x in items)}
 
 
 @app.post("/api/projetos/{project_id}/aprovar")

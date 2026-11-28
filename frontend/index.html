@@ -715,6 +715,11 @@ async function sendChat(type,form){
   renderAssistantText(pending,data.resposta||"O provedor respondeu sem conteúdo. Tente novamente.");
   const meta=[data.cerebro,data.modelo||"",data.origem,data.tempo_ms?data.tempo_ms+" ms":""].filter(Boolean).join(" · ");
   if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;pending.appendChild(m);}
+  if(data.delegado_automaticamente){
+   const follow=document.createElement("button");follow.type="button";follow.className="btn primary";follow.style.marginTop="10px";follow.textContent="Acompanhar execução";
+   follow.addEventListener("click",()=>showView("tarefas"));pending.appendChild(follow);
+   loadTasks();loadPlans();
+  }
   addSpeakButton(pending,data.resposta||"",type,form._mediaInputs?.voice?.dataset.enabled==="1");
  }catch(error){
   pending.className="bubble error";

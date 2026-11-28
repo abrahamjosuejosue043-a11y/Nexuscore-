@@ -21,7 +21,7 @@ def validate_patch_path(path: str) -> str:
 
 
 def validate_unified_diff(diff: str, source_paths: list[str]) -> dict:
-    """Accept modifications to existing, requested files only; never apply the diff."""
+    """Accept modifications to requested existing files; never apply the diff."""
     if not isinstance(diff, str) or not diff.strip():
         raise ValueError("A IA não retornou um diff.")
     if len(diff) > MAX_PATCH_CHARS:
@@ -32,14 +32,13 @@ def validate_unified_diff(diff: str, source_paths: list[str]) -> dict:
     lines = diff.splitlines()
     files = []
     index = 0
+    hunk_pattern = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
     while index < len(lines):
-        if not lines[index].startswith("--- "):
-            if lines[index].strip():
-                raise ValueError("O diff contém conteúdo fora dos cabeçalhos e blocos de alteração.")
+        if not lines[index].strip():
             index += 1
             continue
-        if index + 1 >= len(lines) or not lines[index + 1].startswith("+++ "):
-            raise ValueError("Cabeçalho unified diff incompleto.")
+        if not lines[index].startswith("--- ") or index + 1 >= len(lines) or not lines[index + 1].startswith("+++ "):
+            raise ValueError("O diff contém conteúdo fora dos cabeçalhos e blocos de alteração.")
         old_path = lines[index][4:].split("\t", 1)[0].strip()
         new_path = lines[index + 1][4:].split("\t", 1)[0].strip()
         if old_path.startswith("a/"):
@@ -58,15 +57,37 @@ def validate_unified_diff(diff: str, source_paths: list[str]) -> dict:
             raise ValueError("O diff contém cabeçalhos repetidos para o mesmo arquivo.")
         files.append(old_safe)
         index += 2
-        hunk_found = False
-        while index < len(lines) and not lines[index].startswith("--- "):
-            if lines[index].startswith("@@ "):
-                hunk_found = True
-            elif lines[index].startswith(("+++ ", "diff --git ")):
-                raise ValueError("Estrutura de diff inválida.")
+        hunk_count = 0
+        while index < len(lines) and lines[index].startswith("@@ "):
+            match = hunk_pattern.match(lines[index])
+            if not match:
+                raise ValueError("Cabeçalho de bloco unified diff inválido.")
+            old_remaining = int(match.group(2) or 1)
+            new_remaining = int(match.group(4) or 1)
             index += 1
-        if not hunk_found:
+            while old_remaining > 0 or new_remaining > 0:
+                if index >= len(lines):
+                    raise ValueError("Bloco unified diff incompleto.")
+                line = lines[index]
+                if line.startswith(" "):
+                    old_remaining -= 1
+                    new_remaining -= 1
+                elif line.startswith("-"):
+                    old_remaining -= 1
+                elif line.startswith("+"):
+                    new_remaining -= 1
+                elif line.startswith("\\"):
+                    pass
+                else:
+                    raise ValueError("Linha de alteração unified diff inválida.")
+                if old_remaining < 0 or new_remaining < 0:
+                    raise ValueError("Contagem de linhas do bloco unified diff inválida.")
+                index += 1
+            hunk_count += 1
+        if not hunk_count:
             raise ValueError("O diff não contém um bloco de alteração válido.")
+        if index < len(lines) and lines[index].strip() and not lines[index].startswith("--- "):
+            raise ValueError("O diff contém conteúdo inesperado entre os arquivos.")
     if not files:
         raise ValueError("Nenhum arquivo foi incluído na proposta.")
     if len(files) > MAX_PATCH_FILES:

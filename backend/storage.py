@@ -698,11 +698,11 @@ def project_progress_inputs(project_id):
         tasks = db.execute(
             """SELECT task.*,
                       CASE WHEN EXISTS (
-                          SELECT 1 FROM task_events event
-                          WHERE event.task_id=task.id
-                            AND event.event_type='status_changed'
-                            AND event.to_status='concluida'
-                            AND event.actor='diretoria'
+                          SELECT 1 FROM task_events audit_event
+                          WHERE audit_event.task_id=task.id
+                            AND audit_event.event_type='status_changed'
+                            AND audit_event.to_status='concluida'
+                            AND audit_event.actor='diretoria'
                       ) THEN 1 ELSE 0 END AS directorate_validated
                FROM department_tasks task
                WHERE task.project_id=?
@@ -931,10 +931,6 @@ def update_department_task(task_id, status, result=None, actor="usuario"):
                 raise ValueError("Tarefas de projeto só podem ser concluídas após validação da Diretoria.")
             if previous != "em_revisao":
                 raise ValueError("A tarefa precisa estar em revisão para validação da Diretoria.")
-        if actor == "diretoria" and status == "concluida" and not project_linked:
-            # Tarefas sem projeto preservam o fluxo histórico, mas não podem
-            # ser usadas como validação de progresso de um projeto.
-            pass
         if status != previous and status not in transitions.get(previous, set()):
             raise ValueError(f"Transição não permitida: {previous} -> {status}.")
         cur = db.execute(

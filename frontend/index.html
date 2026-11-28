@@ -339,12 +339,21 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 }
 
 form.composer[data-chat="diretoria"] .project-context-select{display:none!important}
+/* Nexuscore identity: unified command surface and restrained teal accent. */
+:root{--accent:#0f766e;--accent-hover:#115e59;--accent-soft:#e8f5f3;--teal:#0f766e}
+.nav button.active{background:#e8f5f3;border-color:#cfe8e4;color:#0f766e}
+.nav button.active .ico{color:#0f766e}
+.btn.primary,.send{background:#0f766e;border-color:#0f766e}
+.btn.primary:hover,.send:hover{background:#115e59;border-color:#115e59}
+.bubble.user{background:#0f766e;border-color:#0f766e}
+#manual-plan-panel,#manual-task-panel{display:none!important}
+nav button[data-view="diretoria"],nav button[data-view="programacao"],nav button[data-view="publicidade"]{display:none!important}
 </style>
 </head>
 <body>
 <div class="shell">
 <header class="topbar">
- <div class="brand"><div class="mark" aria-label="Nexuscore"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 29V11h4.5l13 13V11H31v18h-4.5l-13-13v13Z" fill="currentColor"/><path d="M30 8h2v2h-2z" fill="#8dd6d0"/></svg></div><div><strong>NEXUSCORE AI</strong><span>Central de inteligência e operações</span></div></div>
+ <div class="brand"><div class="mark" aria-label="Nexuscore"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M9 29V11h4.5l13 13V11H31v18h-4.5l-13-13v13Z" fill="currentColor"/><path d="M30 8h2v2h-2z" fill="#8dd6d0"/></svg></div><div><strong>NEXUSCORE AI</strong><span>Inteligência central · execução coordenada</span></div></div>
  <div class="top-actions"><div class="status-pill"><span class="dot" id="health-dot"></span><span id="health-label">Verificando sistema</span></div><button class="btn" id="refresh-health" type="button">Atualizar</button></div>
 </header>
 
@@ -352,12 +361,12 @@ form.composer[data-chat="diretoria"] .project-context-select{display:none!import
 <aside class="sidebar">
  <div class="nav-label">Espaço de trabalho</div>
  <nav class="nav" aria-label="Navegação principal">
-  <button class="active" data-view="dashboard"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.8"/><rect x="13" y="3" width="8" height="5" rx="1.8"/><rect x="13" y="10" width="8" height="11" rx="1.8"/><rect x="3" y="13" width="8" height="8" rx="1.8"/></svg></span>Dashboard</button><button data-view="geral"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg></span>Chat do time</button>
+  <button data-view="dashboard"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.8"/><rect x="13" y="3" width="8" height="5" rx="1.8"/><rect x="13" y="10" width="8" height="11" rx="1.8"/><rect x="3" y="13" width="8" height="8" rx="1.8"/></svg></span>Visão geral</button><button class="active" data-view="geral"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2v-6.5A7.5 7.5 0 1 1 20 11.5Z"/><path d="M8 11h8M8 14h5"/></svg></span>Nexuscore</button>
   <button data-view="diretoria"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.5"/></svg></span>Diretoria</button>
   <button data-view="programacao"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-5 4 5 4M16 8l5 4-5 4M14 4l-4 16"/></svg></span>Engenharia</button><button data-view="arquivos"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10Z"/><path d="M13 3v7h7M8 14h8M8 17h6"/></svg></span>Arquivos</button>
   <button data-view="publicidade"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14V9a2 2 0 0 1 2-2h3l9-4v17l-9-4H6a2 2 0 0 1-2-2Z"/><path d="m8 16 2 5h4l-3-5M21 9v5"/></svg></span>Marketing</button>
   <button data-view="projeto"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4V2h8v2M7 9h10M7 13h6M7 17h4"/></svg></span>Projetos</button>
-  <button data-view="tarefas"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/></svg></span>Tarefas dos departamentos</button>
+  <button data-view="tarefas"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/></svg></span>Execução</button>
   <button data-view="historico"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2M4 5l2 2"/></svg></span>Conversas</button>
   <button data-view="memoria"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Memória compartilhada</button>
   <button data-view="ideias"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 22h4M8.5 14.5A7 7 0 1 1 15.5 14.5c-.9.7-1.5 1.6-1.5 2.5h-4c0-.9-.6-1.8-1.5-2.5Z"/><path d="M12 3v2M4.9 5.9l1.4 1.4M19.1 5.9l-1.4 1.4"/></svg></span>Banco de ideias</button>
@@ -367,11 +376,11 @@ form.composer[data-chat="diretoria"] .project-context-select{display:none!import
  <div class="side-foot">Nexuscore AI · Ambiente de produção<br>Os recursos externos dependem das credenciais configuradas.</div>
 </aside>
 <main class="workspace">
-<section class="view active" id="view-dashboard"><div class="dashboard-head"><div><div class="eyebrow">Visão geral</div><h2>Centro de comando</h2><p id="dashboard-date">Operações do Nexuscore</p></div><button class="btn" id="refresh-dashboard">Atualizar painel</button></div><div class="dashboard-grid"><div class="metric-card"><small>Conversas</small><strong id="metric-messages">—</strong><span>Assuntos organizados</span></div><div class="metric-card"><small>Projetos ativos</small><strong id="metric-projects">—</strong><span>Em acompanhamento</span></div><div class="metric-card"><small>Ideias</small><strong id="metric-ideas">—</strong><span>Banco de ideias</span></div><div class="metric-card"><small>Plataforma</small><strong id="metric-health">—</strong><span id="metric-provider">Verificando</span></div></div><div class="panel"><h3>Seus agentes</h3><p class="muted">Acesse cada área de trabalho.</p><div class="agent-cards"><div class="agent-card" data-open-view="diretoria"><strong>Diretoria</strong><p>Estratégia, prioridades e decisões.</p><span>Abrir agente →</span></div><div class="agent-card" data-open-view="programacao"><strong>Engenharia</strong><p>Programação e validação técnica.</p><span>Abrir agente →</span></div><div class="agent-card" data-open-view="publicidade"><strong>Marketing</strong><p>Marca, campanhas e crescimento.</p><span>Abrir agente →</span></div></div></div><div class="dashboard-columns"><div class="panel"><h3>Acesso rápido</h3><div class="quick-actions"><button data-open-view="geral">Conversar com Nexuscore</button><button data-open-view="projeto">Projetos</button><button data-open-view="ideias">Registrar ideia</button><button data-open-view="historico">Histórico</button></div></div><div class="panel"><h3>Atividade recente</h3><div id="dashboard-activity" class="list"><div class="empty">Carregando...</div></div></div></div></section><section class="view" id="view-geral">
- <div class="view-head"><div><h2>Chat do time</h2><p>Converse com o núcleo central do Nexuscore.</p></div><span class="tag">Agente central</span></div>
- <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">N</div><div><strong>Nexuscore · Assistente central</strong><small>Respostas via provedores de IA conectados</small></div></div><button class="btn" data-new-chat="geral" type="button">Nova conversa</button></div>
- <div class="chat" id="chat-geral"><div class="welcome"><div class="welcome-icon">◈</div><h3>Vamos trabalhar.</h3><div>Envie uma pergunta, uma ideia ou uma tarefa. Se o serviço de IA estiver indisponível, o sistema mostrará o motivo em vez de deixar uma resposta vazia.</div></div></div>
- <form class="composer" data-chat="geral"><textarea id="texto-geral" rows="1" placeholder="Escreva sua mensagem..." aria-label="Mensagem para o Nexuscore"></textarea><button class="send" type="submit">Enviar ↗</button></form><div class="hint">Enter envia · Shift + Enter cria uma nova linha</div></div>
+<section class="view" id="view-dashboard"><div class="dashboard-head"><div><div class="eyebrow">Visão geral</div><h2>Centro de comando</h2><p id="dashboard-date">Operações do Nexuscore</p></div><button class="btn" id="refresh-dashboard">Atualizar painel</button></div><div class="dashboard-grid"><div class="metric-card"><small>Conversas</small><strong id="metric-messages">—</strong><span>Assuntos organizados</span></div><div class="metric-card"><small>Projetos ativos</small><strong id="metric-projects">—</strong><span>Em acompanhamento</span></div><div class="metric-card"><small>Ideias</small><strong id="metric-ideas">—</strong><span>Banco de ideias</span></div><div class="metric-card"><small>Plataforma</small><strong id="metric-health">—</strong><span id="metric-provider">Verificando</span></div></div><div class="panel"><h3>Seus agentes</h3><p class="muted">Acesse cada área de trabalho.</p><div class="agent-cards"><div class="agent-card" data-open-view="diretoria"><strong>Diretoria</strong><p>Estratégia, prioridades e decisões.</p><span>Abrir agente →</span></div><div class="agent-card" data-open-view="programacao"><strong>Engenharia</strong><p>Programação e validação técnica.</p><span>Abrir agente →</span></div><div class="agent-card" data-open-view="publicidade"><strong>Marketing</strong><p>Marca, campanhas e crescimento.</p><span>Abrir agente →</span></div></div></div><div class="dashboard-columns"><div class="panel"><h3>Acesso rápido</h3><div class="quick-actions"><button data-open-view="geral">Conversar com Nexuscore</button><button data-open-view="projeto">Projetos</button><button data-open-view="ideias">Registrar ideia</button><button data-open-view="historico">Histórico</button></div></div><div class="panel"><h3>Atividade recente</h3><div id="dashboard-activity" class="list"><div class="empty">Carregando...</div></div></div></div></section><section class="view active" id="view-geral">
+ <div class="view-head"><div><h2>Converse com o Nexuscore</h2><p>Descreva o resultado que deseja. A Diretoria organiza o trabalho e encaminha as próximas etapas.</p></div><span class="tag">Agente central</span></div>
+ <div class="chat-shell"><div class="chat-toolbar"><div class="agent-meta"><div class="agent-avatar">N</div><div><strong>Nexuscore · Assistente central</strong><small>Um único ponto de entrada para todos os departamentos</small></div></div><button class="btn" data-new-chat="geral" type="button">Nova conversa</button></div>
+ <div class="chat" id="chat-geral"><div class="welcome"><div class="welcome-icon">◈</div><h3>O que precisamos realizar?</h3><div>Explique seu objetivo em linguagem natural. Quando disser para executar, a Diretoria cria o plano e encaminha as tarefas automaticamente para o projeto aprovado.</div></div></div>
+ <form class="composer" data-chat="geral"><textarea id="texto-geral" rows="1" placeholder="Descreva o resultado que você quer alcançar..." aria-label="Mensagem para o Nexuscore"></textarea><button class="send" type="submit">Enviar ↗</button></form><div class="hint">Enter envia · Shift + Enter cria uma nova linha</div></div>
 </section>
 <section class="view" id="view-diretoria">
  <div class="view-head"><div><h2>Diretoria</h2><p>Estratégia, prioridades, riscos e decisões.</p></div><span class="tag">Agente executivo</span></div>
@@ -403,18 +412,18 @@ form.composer[data-chat="diretoria"] .project-context-select{display:none!import
  <div class="panel"><h3>Submeter projeto para aprovação</h3><div class="field"><label for="project-title">Nome do projeto</label><input id="project-title" placeholder="Ex.: Lançamento do novo produto"></div><div class="field"><label for="project-summary">Objetivo e descrição</label><textarea id="project-summary" placeholder="Descreva o resultado esperado, etapas e observações..."></textarea></div><div class="actions"><button class="btn primary" id="save-project">Enviar para aprovação do CEO</button><button class="btn" id="project-to-director">Pedir análise da Diretoria</button></div><div id="project-status" class="hint"></div></div><div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Fila de aprovação e projetos</h2><p>Aprove ou rejeite propostas e acompanhe projetos ativos.</p></div><button class="btn" id="load-projects">Atualizar</button></div><div id="projects-result" class="list"><div class="empty">Carregando projetos...</div></div>
 </section>
 <section class="view" id="view-tarefas">
- <div class="view-head"><div><h2>Coordenação de tarefas</h2><p>A Diretoria encaminha atividades; cada departamento consulta sua fila e registra o resultado.</p></div><button class="btn" id="load-tasks">Atualizar</button></div>
- <div class="notice">A Diretoria pode transformar um objetivo em um plano dividido por departamento. O plano fica em rascunho e nenhuma tarefa é encaminhada até sua aprovação. Em tarefas vinculadas a projetos, registre evidências antes de enviar para revisão; somente a validação registrada pela Diretoria conta no progresso automático.</div>
- <div class="panel">
+ <div class="view-head"><div><h2>Execução e acompanhamento</h2><p>Acompanhe o trabalho distribuído pela Diretoria e os resultados de cada departamento.</p></div><button class="btn" id="load-tasks">Atualizar</button></div>
+ <div class="notice">Envie uma ordem pelo chat principal. A Diretoria distribui o trabalho automaticamente em projetos aprovados. Esta área serve para acompanhar tarefas, bloqueios e entregas. A execução e a validação só serão marcadas como concluídas quando houver evidência.</div>
+ <div class="panel" id="manual-plan-panel">
   <h3>Gerar plano com a Diretoria</h3>
   <div class="field"><label for="plan-project">Projeto</label><select id="plan-project"><option value="">Carregando projetos...</option></select></div>
   <div class="field"><label for="plan-objective">Objetivo e contexto</label><textarea id="plan-objective" maxlength="8000" placeholder="Descreva o que deseja alcançar, restrições, prazo e resultado esperado..."></textarea></div>
   <div class="actions"><button class="btn primary" id="generate-plan">Gerar plano para revisão</button></div>
   <div id="plan-generate-status" class="hint" aria-live="polite"></div>
  </div>
- <div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Planos da Diretoria</h2><p>Revise os itens antes de aprovar a distribuição das tarefas.</p></div><button class="btn" id="load-plans">Atualizar planos</button></div>
+ <div class="view-head" style="margin-top:22px"><div><h2 style="font-size:17px">Planos e delegações</h2><p>Registro das distribuições realizadas pela Diretoria.</p></div><button class="btn" id="load-plans">Atualizar planos</button></div>
  <div id="plan-list" class="list"><div class="empty">Carregando planos...</div></div>
- <div class="panel">
+ <div class="panel" id="manual-task-panel">
   <h3>Encaminhar tarefa manualmente</h3>
   <div class="field"><label for="task-title">Título da tarefa</label><input id="task-title" maxlength="160" placeholder="Ex.: Revisar fluxo de cadastro"></div>
   <div class="field"><label for="task-description">Descrição e resultado esperado</label><textarea id="task-description" maxlength="8000" placeholder="Explique o que precisa ser feito, contexto, critérios de aceitação e restrições..."></textarea></div>
@@ -706,6 +715,11 @@ async function sendChat(type,form){
   renderAssistantText(pending,data.resposta||"O provedor respondeu sem conteúdo. Tente novamente.");
   const meta=[data.cerebro,data.modelo||"",data.origem,data.tempo_ms?data.tempo_ms+" ms":""].filter(Boolean).join(" · ");
   if(meta){const m=document.createElement("small");m.className="meta";m.textContent=meta;pending.appendChild(m);}
+  if(data.delegado_automaticamente){
+   const follow=document.createElement("button");follow.type="button";follow.className="btn primary";follow.style.marginTop="10px";follow.textContent="Acompanhar execução";
+   follow.addEventListener("click",()=>showView("tarefas"));pending.appendChild(follow);
+   loadTasks();loadPlans();
+  }
   addSpeakButton(pending,data.resposta||"",type,form._mediaInputs?.voice?.dataset.enabled==="1");
  }catch(error){
   pending.className="bubble error";

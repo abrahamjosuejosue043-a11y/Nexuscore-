@@ -49,12 +49,14 @@ O usuário não deve precisar programar para supervisionar o sistema. O Nexuscor
 
 1. **Entender:** registrar o pedido, identificar o projeto e confirmar o escopo.
 2. **Planejar:** Diretoria cria etapas pequenas, critérios de aceitação, riscos e dependências.
-3. **Delegar:** atribuir tarefas específicas à Engenharia ou ao departamento apropriado.
-4. **Executar:** Engenharia altera somente os arquivos e recursos necessários.
+3. **Delegar automaticamente:** quando o proprietário emitir uma ordem explícita de execução para um projeto aprovado, a Diretoria pode gerar e encaminhar o plano operacional sem exigir uma segunda aprovação de cada plano.
+4. **Executar:** os departamentos devem trabalhar nas tarefas atribuídas, registrar evidências e nunca declarar conclusão sem entrega verificável. A execução por IA só pode ser considerada real quando a ferramenta necessária estiver integrada e o resultado for persistido.
 5. **Testar:** executar testes automatizados e verificações adequadas à mudança.
-6. **Revisar:** Diretoria compara o resultado com os critérios, verifica regressões e exige correções quando necessário.
+6. **Revisar:** Diretoria compara o resultado com os critérios, verifica evidências e regressões e solicita correções quando necessário.
 7. **Entregar:** registrar resumo, evidências, limitações e próximos passos em linguagem simples.
 8. **Implantar:** usar somente os serviços existentes autorizados, após validação; confirmar o estado real do deploy antes de informar sucesso.
+
+A delegação automática não significa que o Nexuscore já tenha capacidade de editar arquivos, operar contas externas ou implantar código. Essas capacidades só podem ser anunciadas depois de integradas e testadas.
 
 Nenhuma etapa pode ser marcada como concluída apenas porque foi discutida ou planejada.
 
@@ -66,6 +68,10 @@ Nenhuma etapa pode ser marcada como concluída apenas porque foi discutida ou pl
 - Executar verificações e testes.
 - Abrir pull requests, revisar alterações e preparar correções.
 - Implantar no serviço Render existente após testes e revisão, sem criar recursos pagos.
+
+### Autorizado para execução operacional
+- Em um projeto já aprovado, um comando explícito de execução autoriza a Diretoria a criar o plano e distribuir tarefas internas automaticamente, sem pedir aprovação separada para cada plano.
+- A Diretoria pode acompanhar tarefas, registrar bloqueios, solicitar correções e produzir relatórios dentro das integrações realmente disponíveis.
 
 ### Exige participação direta do proprietário
 - Inserir, revelar, trocar ou revogar chaves e credenciais de conta.

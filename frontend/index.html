@@ -1050,7 +1050,7 @@ $("run-engineering-diagnosis").addEventListener("click",async()=>{
 $("run-engineering-proposal").addEventListener("click",async()=>{
  const button=$("run-engineering-proposal"),status=$("engineering-proposal-status"),result=$("engineering-proposal-result");
  const objetivo=$("engineering-objective").value.trim();
- const arquivos=$("engineering-files").value.split(/\\r?\\n/).map(value=>value.trim()).filter(Boolean);
+ const arquivos=$("engineering-files").value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
  result.style.display="none";result.textContent="";
  if(!adminAuthenticated){status.textContent="Entre na sessão administrativa em Conexões para usar a Engenharia.";return;}
  if(objetivo.length<20){status.textContent="Descreva o problema com pelo menos 20 caracteres.";return;}
@@ -1061,13 +1061,13 @@ $("run-engineering-proposal").addEventListener("click",async()=>{
  try{
   const data=await api("/api/engenharia/propor-alteracao",{method:"POST",body:JSON.stringify({objetivo,arquivos})});
   const fontes=(data.fontes||[]).map(item=>item.path+" · SHA "+(item.sha||"não informado"));
-  const testes=(data.testes_sugeridos||[]).map(item=>"- "+item).join("\\n");
-  const riscos=(data.riscos||[]).map(item=>"- "+item).join("\\n");
-  result.textContent="STATUS: "+data.status+"\\n\\nRESUMO\\n"+(data.resumo||"")+
-   "\\n\\nDIFF PROPOSTO\\n"+(data.diff||"Nenhuma alteração proposta.")+
-   "\\n\\nTESTES SUGERIDOS\\n"+(testes||"Não informados.")+
-   "\\n\\nRISCOS\\n"+(riscos||"Não informados.")+
-   "\\n\\nARQUIVOS-BASE\\n"+fontes.join("\\n");
+  const testes=(data.testes_sugeridos||[]).map(item=>"- "+item).join("\n");
+  const riscos=(data.riscos||[]).map(item=>"- "+item).join("\n");
+  result.textContent="STATUS: "+data.status+"\n\nRESUMO\n"+(data.resumo||"")+
+   "\n\nDIFF PROPOSTO\n"+(data.diff||"Nenhuma alteração proposta.")+
+   "\n\nTESTES SUGERIDOS\n"+(testes||"Não informados.")+
+   "\n\nRISCOS\n"+(riscos||"Não informados.")+
+   "\n\nARQUIVOS-BASE\n"+fontes.join("\n");
   result.style.display="block";
   status.textContent=data.status==="proposta_validada_para_revisao"
    ?"Proposta validada estruturalmente. Ainda não foi aplicada nem testada."

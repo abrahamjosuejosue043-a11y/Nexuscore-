@@ -190,6 +190,13 @@ def initialize():
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMPTZ)""",
             "ALTER TABLE department_tasks ADD COLUMN IF NOT EXISTS plan_id BIGINT",
+            "ALTER TABLE department_tasks ADD COLUMN IF NOT EXISTS weight DOUBLE PRECISION NOT NULL DEFAULT 2",
+            "ALTER TABLE work_plan_items ADD COLUMN IF NOT EXISTS weight DOUBLE PRECISION NOT NULL DEFAULT 2",
+            """CREATE TABLE IF NOT EXISTS project_department_weights (
+                project_id BIGINT NOT NULL REFERENCES projects(id),
+                department TEXT NOT NULL, weight DOUBLE PRECISION NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(project_id, department))""",
             """CREATE TABLE IF NOT EXISTS task_events (
                 id BIGSERIAL PRIMARY KEY, task_id BIGINT NOT NULL REFERENCES department_tasks(id),
                 event_type TEXT NOT NULL, from_status TEXT, to_status TEXT,
@@ -308,6 +315,8 @@ def initialize():
         task_columns = {row["name"] for row in db.execute("PRAGMA table_info(department_tasks)").fetchall()}
         if "plan_id" not in task_columns:
             db.execute("ALTER TABLE department_tasks ADD COLUMN plan_id INTEGER")
+        if "weight" not in task_columns:
+            db.execute("ALTER TABLE department_tasks ADD COLUMN weight REAL NOT NULL DEFAULT 2
         db.execute("""CREATE TABLE IF NOT EXISTS task_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL,
             event_type TEXT NOT NULL, from_status TEXT, to_status TEXT,
@@ -329,6 +338,14 @@ def initialize():
             assigned_department TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'media',
             position INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(plan_id) REFERENCES work_plans(id))""")
+        plan_item_columns = {row["name"] for row in db.execute("PRAGMA table_info(work_plan_items)").fetchall()}
+        if "weight" not in plan_item_columns:
+            db.execute("ALTER TABLE work_plan_items ADD COLUMN weight REAL NOT NULL DEFAULT 2")
+        db.execute("""CREATE TABLE IF NOT EXISTS project_department_weights (
+            project_id INTEGER NOT NULL, department TEXT NOT NULL,
+            weight REAL NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(project_id, department),
+            FOREIGN KEY(project_id) REFERENCES projects(id))""")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)")
@@ -545,9 +562,12 @@ def rename_conversation(conversation_id, title):
 
 def create_department_task(
     title, description, assigned_department, priority="media",
-    created_by="diretoria", conversation_id=None, project_id=None, plan_id=None
+    created_by="diretoria", conversation_id=None, project_id=None, plan_id=None, weight=None
 ):
     """Cria uma tarefa encaminhada a um departamento."""
+    task_weight = float(weight) if weight is not None else {"alta": 3.0, "media": 2.0, "baixa": 1.0}.get(str(priority).lower(), 2.0)
+    if task_weight <= 0 or task_weight > 10000:
+        raise ValueError("O peso da tarefa deve estar entre 0 e 10000.")
     with connection() as db:
         if project_id is not None:
             project = db.execute(
@@ -560,8 +580,8 @@ def create_department_task(
         cur = db.execute(
             """INSERT INTO department_tasks(
                    title, description, assigned_department, created_by, priority,
-                   conversation_id, project_id, plan_id
-               ) VALUES(?,?,?,?,?,?,?,?)""",
+                   conversation_id, project_id, plan_id, weight
+               ) VALUES(?,?,?,?,?,?,?,?,?)""",
             (
                 str(title).strip()[:160],
                 str(description).strip()[:8000],
@@ -571,6 +591,7 @@ def create_department_task(
                 str(conversation_id) if conversation_id else None,
                 int(project_id) if project_id is not None else None,
                 int(plan_id) if plan_id is not None else None,
+                task_weight,
             ),
         )
         task_id = cur.lastrowid
@@ -649,8 +670,8 @@ def create_work_plan(title, objective, summary, project_id, items, conversation_
         for position, item in enumerate(items):
             db.execute(
                 """INSERT INTO work_plan_items(
-                       plan_id, title, description, assigned_department, priority, position
-                   ) VALUES(?,?,?,?,?,?)""",
+                       plan_id, title, description, assigned_department, priority, position, weight
+                   ) VALUES(?,?,?,?,?,?,?)""",
                 (
                     plan_id,
                     str(item["title"]).strip()[:160],
@@ -658,6 +679,7 @@ def create_work_plan(title, objective, summary, project_id, items, conversation_
                     str(item["department"]),
                     str(item["priority"]),
                     position,
+                    float(item.get("weight") or {"alta": 3.0, "media": 2.0, "baixa": 1.0}.get(str(item["priority"]).lower(), 2.0)),
                 ),
             )
     return plan_id
@@ -738,12 +760,12 @@ def approve_work_plan(plan_id):
             cur = db.execute(
                 """INSERT INTO department_tasks(
                        title, description, assigned_department, created_by, priority,
-                       conversation_id, project_id, plan_id, status, result
-                   ) VALUES(?,?,?,?,?,?,?,?, 'pendente', '')""",
+                       conversation_id, project_id, plan_id, status, result, weight
+                   ) VALUES(?,?,?,?,?,?,?,?, 'pendente', '', ?)""",
                 (
                     item["title"], item["description"], item["assigned_department"],
                     "diretoria", item["priority"], plan.get("conversation_id"),
-                    plan["project_id"], int(plan_id),
+                    plan["project_id"], int(plan_id), item["weight"],
                 ),
             )
             task_ids.append(cur.lastrowid)

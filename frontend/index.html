@@ -967,6 +967,10 @@ async function loadTasks(){
    const saved=document.createElement("div");saved.className="hint";
    if(task.completed_at)saved.textContent="Concluída em "+formatConversationDate(task.completed_at);
    const save=document.createElement("button");save.type="button";save.className="btn primary";save.textContent="Salvar atualização";
+   if(task.status==="concluida"){
+    status.disabled=true;save.disabled=true;save.textContent="Tarefa concluída";
+    saved.textContent="Estado terminal: consulte o histórico para verificar a validação registrada.";
+   }
    save.addEventListener("click",async()=>{
     save.disabled=true;save.textContent="Salvando...";
     try{

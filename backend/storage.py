@@ -906,9 +906,22 @@ def _insert_task_event(db, task_id, event_type, from_status, to_status, actor, d
     )
 
 
-def claim_next_automated_task():
-    """Atomically claims one pending task explicitly delegated for automatic execution."""
+def claim_next_automated_task(daily_limit=10):
+    """Atomically claims an automatic task while enforcing a persistent daily attempt budget."""
+    limit = max(1, min(int(daily_limit), 100))
     with connection() as db:
+        # Serializa a verificação do orçamento entre instâncias, sem tabela ou migração nova.
+        if _database_url():
+            db.execute("SELECT pg_advisory_xact_lock(7420192601)")
+        else:
+            db.execute("BEGIN IMMEDIATE")
+        started = db.execute(
+            """SELECT COUNT(*) AS total FROM task_events
+               WHERE event_type='automated_execution_started'
+                 AND created_at >= CURRENT_DATE"""
+        ).fetchone()
+        if int(started["total"] or 0) >= limit:
+            return None
         row = db.execute(
             """SELECT task.* FROM department_tasks task
                WHERE task.status='pendente'
@@ -933,6 +946,10 @@ def claim_next_automated_task():
         _insert_task_event(
             db, int(row["id"]), "status_changed", previous, "em_andamento",
             "executor_ia", "Execução automática iniciada pelo departamento responsável.",
+        )
+        _insert_task_event(
+            db, int(row["id"]), "automated_execution_started", previous, "em_andamento",
+            "executor_ia", "Tentativa contabilizada no limite diário de execução automática.",
         )
         task = dict(row)
         task["status"] = "em_andamento"
@@ -970,9 +987,15 @@ def requeue_interrupted_automated_tasks():
     return requeued
 
 
-def automated_execution_summary():
-    """Returns status counts for tasks explicitly sent to the automatic executor."""
+def automated_execution_summary(daily_limit=10):
+    """Returns queue counts and the persistent daily execution budget."""
+    limit = max(1, min(int(daily_limit), 100))
     with connection() as db:
+        started = db.execute(
+            """SELECT COUNT(*) AS total FROM task_events
+               WHERE event_type='automated_execution_started'
+                 AND created_at >= CURRENT_DATE"""
+        ).fetchone()
         rows = db.execute(
             """SELECT task.status, COUNT(*) AS total
                FROM department_tasks task
@@ -984,9 +1007,13 @@ def automated_execution_summary():
         ).fetchall()
     counts = {str(row["status"]): int(row["total"]) for row in rows}
     statuses = ("pendente", "em_andamento", "em_revisao", "bloqueada", "concluida", "cancelada")
+    started_today = int(started["total"] or 0)
     return {
         "total": sum(counts.values()),
         "counts": {status: counts.get(status, 0) for status in statuses},
+        "daily_limit": limit,
+        "started_today": started_today,
+        "remaining_today": max(0, limit - started_today),
     }
 
 

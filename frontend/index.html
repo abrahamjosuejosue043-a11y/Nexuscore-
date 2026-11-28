@@ -986,6 +986,11 @@ async function loadExecutionSummary(){
    const strong=document.createElement("strong");strong.textContent=String(data.counts?.[key]||0);
    card.append(small,strong);box.appendChild(card);
   });
+  const budget=document.createElement("div");budget.className="status-card";
+  const budgetLabel=document.createElement("small");budgetLabel.textContent="Uso diário";
+  const budgetValue=document.createElement("strong");
+  budgetValue.textContent=String(data.started_today||0)+" / "+String(data.daily_limit||0);
+  budget.append(budgetLabel,budgetValue);box.appendChild(budget);
  }catch(error){box.textContent="Não foi possível carregar o resumo da execução: "+error.message;}
 }
 async function loadTasks(){

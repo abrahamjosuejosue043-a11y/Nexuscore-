@@ -164,12 +164,29 @@ class AutomaticDepartmentExecutionTests(unittest.TestCase):
         events = storage.list_task_events(task_id)
         self.assertTrue(any(event["event_type"] == "execution_requeued" for event in events))
 
+    def test_daily_budget_stops_claiming_and_reports_remaining_capacity(self):
+        first_id = self._create_auto_task(title="Primeira tarefa do limite")
+        self._create_auto_task(title="Segunda tarefa do limite")
+
+        claimed = storage.claim_next_automated_task(daily_limit=1)
+        self.assertEqual(claimed["id"], first_id)
+        self.assertIsNone(storage.claim_next_automated_task(daily_limit=1))
+
+        summary = storage.automated_execution_summary(daily_limit=1)
+        self.assertEqual(summary["started_today"], 1)
+        self.assertEqual(summary["daily_limit"], 1)
+        self.assertEqual(summary["remaining_today"], 0)
+        self.assertEqual(summary["counts"]["pendente"], 1)
+
     def test_summary_counts_only_automatically_dispatched_tasks(self):
         self._create_auto_task()
         summary = storage.automated_execution_summary()
         self.assertEqual(summary["total"], 1)
         self.assertEqual(summary["counts"]["pendente"], 1)
         self.assertEqual(summary["counts"]["concluida"], 0)
+        self.assertEqual(summary["started_today"], 0)
+        self.assertEqual(summary["daily_limit"], 10)
+        self.assertEqual(summary["remaining_today"], 10)
 
 
 if __name__ == "__main__":

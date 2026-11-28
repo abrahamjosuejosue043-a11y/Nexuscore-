@@ -478,9 +478,10 @@ def automated_task_block_reason(task: dict) -> Optional[str]:
         str(task.get("title") or "") + " " + str(task.get("description") or "")
     )
     restricted = re.search(
-        r"\b(?:enviar|mandar|publicar|postar|implantar|deploy|comprar|pagar|transferir|"
-        r"assinar|contratar|acessar conta|alterar conta|cancelar assinatura|revogar acesso|"
-        r"excluir conta|credencial|senha|token|chave api|registrar dominio|"
+        r"\b(?:enviar|envie|mandar|mande|publicar|publique|postar|poste|implantar|deploy|"
+        r"comprar|compre|pagar|pague|transferir|transfira|assinar|assine|contratar|contrate|"
+        r"agendar|reservar|acessar conta|abrir conta|criar conta|alterar conta|cancelar assinatura|"
+        r"revogar acesso|excluir conta|credencial|senha|token|chave api|registrar dominio|"
         r"github|repositorio|commit|pull request|merge|editar codigo|alterar codigo)\b",
         normalized,
     )

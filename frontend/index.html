@@ -404,7 +404,7 @@ form.composer[data-chat="diretoria"] .project-context-select{display:none!import
 </section>
 <section class="view" id="view-tarefas">
  <div class="view-head"><div><h2>Coordenação de tarefas</h2><p>A Diretoria encaminha atividades; cada departamento consulta sua fila e registra o resultado.</p></div><button class="btn" id="load-tasks">Atualizar</button></div>
- <div class="notice">A Diretoria pode transformar um objetivo em um plano dividido por departamento. O plano fica em rascunho e nenhuma tarefa é encaminhada até sua aprovação. A fila manual continua disponível abaixo.</div>
+ <div class="notice">A Diretoria pode transformar um objetivo em um plano dividido por departamento. O plano fica em rascunho e nenhuma tarefa é encaminhada até sua aprovação. Em tarefas vinculadas a projetos, registre evidências antes de enviar para revisão; somente a validação registrada pela Diretoria conta no progresso automático.</div>
  <div class="panel">
   <h3>Gerar plano com a Diretoria</h3>
   <div class="field"><label for="plan-project">Projeto</label><select id="plan-project"><option value="">Carregando projetos...</option></select></div>
@@ -955,7 +955,10 @@ async function loadTasks(){
    const statusWrap=document.createElement("div");statusWrap.className="field";
    const statusLabel=document.createElement("label");statusLabel.textContent="Andamento";
    const status=document.createElement("select");
-   [["pendente","Pendente"],["em_andamento","Em andamento"],["bloqueada","Bloqueada"],["concluida","Concluída"]].forEach(([v,l])=>{const option=document.createElement("option");option.value=v;option.textContent=l;status.appendChild(option);});
+   const statusOptions=[["pendente","Pendente"],["em_andamento","Em andamento"],["em_revisao","Em revisão"],["bloqueada","Bloqueada"]];
+   if(!task.project_id)statusOptions.push(["concluida","Concluída"]);
+   else if(task.status==="concluida")statusOptions.push(["concluida","Concluída (registro anterior)"]);
+   statusOptions.forEach(([v,l])=>{const option=document.createElement("option");option.value=v;option.textContent=l;if(task.project_id&&v==="concluida")option.disabled=true;status.appendChild(option);});
    status.value=task.status||"pendente";statusWrap.append(statusLabel,status);
    const resultWrap=document.createElement("div");resultWrap.className="field";
    const resultLabel=document.createElement("label");resultLabel.textContent="Resultado / observações";
@@ -964,6 +967,10 @@ async function loadTasks(){
    const saved=document.createElement("div");saved.className="hint";
    if(task.completed_at)saved.textContent="Concluída em "+formatConversationDate(task.completed_at);
    const save=document.createElement("button");save.type="button";save.className="btn primary";save.textContent="Salvar atualização";
+   if(task.status==="concluida"){
+    status.disabled=true;save.disabled=true;save.textContent="Tarefa concluída";
+    saved.textContent="Estado terminal: consulte o histórico para verificar a validação registrada.";
+   }
    save.addEventListener("click",async()=>{
     save.disabled=true;save.textContent="Salvando...";
     try{
@@ -972,7 +979,18 @@ async function loadTasks(){
      await loadTasks();
     }catch(error){alert(error.message);save.disabled=false;save.textContent="Salvar atualização";}
    });
-   card.append(title,description,meta,controls,saved,save);box.appendChild(card);
+   card.append(title,description,meta,controls,saved,save);
+   if(task.project_id&&task.status==="em_revisao"){
+    const validate=document.createElement("button");validate.type="button";validate.className="btn primary";validate.textContent="Registrar validação da Diretoria";validate.style.marginTop="8px";
+    validate.addEventListener("click",async()=>{
+     if(!window.confirm("Confirma que a Diretoria revisou as evidências e aprovou esta entrega?"))return;
+     validate.disabled=true;validate.textContent="Registrando validação...";
+     try{await api("/api/tarefas/"+task.id+"/validar",{method:"POST",body:JSON.stringify({})});await loadTasks();}
+     catch(error){alert(error.message);validate.disabled=false;validate.textContent="Registrar validação da Diretoria";}
+    });
+    card.appendChild(validate);
+   }
+   box.appendChild(card);
   });
  }catch(error){
   box.replaceChildren();const notice=document.createElement("div");notice.className="notice error";notice.textContent=error.message;box.appendChild(notice);
@@ -1124,6 +1142,25 @@ async function loadProjects(){
       catch(error){alert(error.message);cancel.disabled=false;}
      });
      el.appendChild(cancel);
+     const progressButton=document.createElement("button");progressButton.type="button";progressButton.className="btn";progressButton.textContent="Calcular progresso automático";progressButton.style.marginTop="10px";
+     const progressPanel=document.createElement("div");progressPanel.className="hint";progressPanel.style.marginTop="8px";progressPanel.textContent="O cálculo considera pesos das tarefas e departamentos e somente entregas validadas pela Diretoria.";
+     progressButton.addEventListener("click",async()=>{
+      progressButton.disabled=true;progressButton.textContent="Calculando...";
+      try{
+       const progress=await api("/api/projetos/"+project.id+"/progresso");
+       progressPanel.replaceChildren();
+       const heading=document.createElement("strong");heading.textContent="Progresso geral: "+progress.progress_percent.toFixed(2)+"%";
+       const bar=document.createElement("progress");bar.max=100;bar.value=progress.progress_percent;bar.style.width="100%";bar.style.display="block";bar.style.margin="8px 0";
+       const counts=document.createElement("small");counts.textContent=progress.completed_tasks+" de "+progress.active_tasks+" tarefas ativas validadas · "+progress.cancelled_tasks+" canceladas";
+       progressPanel.append(heading,bar,counts);
+       progress.departments.forEach(department=>{
+        const line=document.createElement("div");line.textContent=taskDepartmentLabel(department.department)+": "+department.progress_percent.toFixed(2)+"% · peso "+department.weight+"% · "+department.completed_tasks+"/"+department.total_tasks+" tarefas";
+        progressPanel.appendChild(line);
+       });
+      }catch(error){progressPanel.textContent="Não foi possível calcular: "+error.message;}
+      finally{progressButton.disabled=false;progressButton.textContent="Atualizar progresso";}
+     });
+     el.append(progressButton,progressPanel);
     }else{
      const isCanceled=status==="cancelado";
      meta.textContent=(isCanceled?"Encerrado em: "+project.canceled_at:"Rejeitado em: "+project.rejected_at)+" · Exclusão prevista: "+project.purge_after;

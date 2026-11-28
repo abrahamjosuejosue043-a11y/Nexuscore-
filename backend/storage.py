@@ -686,6 +686,43 @@ def get_project_department_weights(project_id):
     return [dict(row) for row in rows]
 
 
+def project_progress_inputs(project_id):
+    """Retorna projeto, tarefas e pesos com validação derivada do histórico auditável."""
+    value = int(project_id)
+    with connection() as db:
+        project = db.execute(
+            "SELECT id, title, approval_status FROM projects WHERE id=?", (value,)
+        ).fetchone()
+        if not project:
+            return None
+        tasks = db.execute(
+            """SELECT task.*,
+                      CASE WHEN EXISTS (
+                          SELECT 1 FROM task_events audit_event
+                          WHERE audit_event.task_id=task.id
+                            AND audit_event.event_type='status_changed'
+                            AND audit_event.to_status='concluida'
+                            AND audit_event.actor='diretoria'
+                      ) THEN 1 ELSE 0 END AS directorate_validated
+               FROM department_tasks task
+               WHERE task.project_id=?
+               ORDER BY task.id""",
+            (value,),
+        ).fetchall()
+        weights = db.execute(
+            """SELECT department, weight FROM project_department_weights
+               WHERE project_id=? ORDER BY department""",
+            (value,),
+        ).fetchall()
+    return {
+        "project": dict(project),
+        "tasks": [dict(row) for row in tasks],
+        "department_weights": {
+            str(row["department"]): float(row["weight"]) for row in weights
+        },
+    }
+
+
 def project_exists(project_id):
     with connection() as db:
         return db.execute("SELECT id FROM projects WHERE id=?", (int(project_id),)).fetchone() is not None
@@ -878,13 +915,29 @@ def update_department_task(task_id, status, result=None, actor="usuario"):
     if status not in allowed:
         raise ValueError("Status de tarefa inválido.")
     with connection() as db:
-        row = db.execute("SELECT status, result FROM department_tasks WHERE id=?", (int(task_id),)).fetchone()
+        row = db.execute(
+            "SELECT status, result, project_id FROM department_tasks WHERE id=?",
+            (int(task_id),),
+        ).fetchone()
         if not row:
             return False
         previous = row["status"]
+        project_linked = row["project_id"] is not None
+        next_result = result if result is not None else row["result"]
+        if (
+            project_linked
+            and status == "em_revisao"
+            and status != previous
+            and not str(result or "").strip()
+        ):
+            raise ValueError("Registre as evidências da entrega nesta atualização antes de enviá-la para revisão.")
+        if project_linked and status == "concluida":
+            if actor != "diretoria":
+                raise ValueError("Tarefas de projeto só podem ser concluídas após validação da Diretoria.")
+            if previous != "em_revisao":
+                raise ValueError("A tarefa precisa estar em revisão para validação da Diretoria.")
         if status != previous and status not in transitions.get(previous, set()):
             raise ValueError(f"Transição não permitida: {previous} -> {status}.")
-        next_result = result if result is not None else row["result"]
         cur = db.execute(
             """UPDATE department_tasks SET status=?, result=?, updated_at=CURRENT_TIMESTAMP,
                completed_at=CASE WHEN ?='concluida'

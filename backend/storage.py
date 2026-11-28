@@ -317,7 +317,7 @@ def initialize():
         if "plan_id" not in task_columns:
             db.execute("ALTER TABLE department_tasks ADD COLUMN plan_id INTEGER")
         if "weight" not in task_columns:
-            db.execute("ALTER TABLE department_tasks ADD COLUMN weight REAL NOT NULL DEFAULT 2
+            db.execute("ALTER TABLE department_tasks ADD COLUMN weight REAL NOT NULL DEFAULT 2")
         db.execute("""CREATE TABLE IF NOT EXISTS task_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL,
             event_type TEXT NOT NULL, from_status TEXT, to_status TEXT,

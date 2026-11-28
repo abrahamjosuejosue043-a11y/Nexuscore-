@@ -939,6 +939,26 @@ def claim_next_automated_task():
         return task
 
 
+def automated_execution_summary():
+    """Returns status counts for tasks explicitly sent to the automatic executor."""
+    with connection() as db:
+        rows = db.execute(
+            """SELECT task.status, COUNT(*) AS total
+               FROM department_tasks task
+               WHERE EXISTS (
+                   SELECT 1 FROM task_events event
+                   WHERE event.task_id=task.id AND event.event_type='delegated_auto'
+               )
+               GROUP BY task.status"""
+        ).fetchall()
+    counts = {str(row["status"]): int(row["total"]) for row in rows}
+    statuses = ("pendente", "em_andamento", "em_revisao", "bloqueada", "concluida", "cancelada")
+    return {
+        "total": sum(counts.values()),
+        "counts": {status: counts.get(status, 0) for status in statuses},
+    }
+
+
 def list_task_events(task_id, limit=100):
     with connection() as db:
         exists = db.execute("SELECT id FROM department_tasks WHERE id=?", (int(task_id),)).fetchone()

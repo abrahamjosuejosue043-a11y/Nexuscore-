@@ -5,6 +5,7 @@ dados existentes é uma operação separada e explícita: configurar DATABASE_UR
 não copia nem apaga automaticamente o arquivo SQLite.
 """
 import os
+import math
 import re
 import sqlite3
 from pathlib import Path
@@ -191,7 +192,6 @@ def initialize():
                 completed_at TIMESTAMPTZ)""",
             "ALTER TABLE department_tasks ADD COLUMN IF NOT EXISTS plan_id BIGINT",
             "ALTER TABLE department_tasks ADD COLUMN IF NOT EXISTS weight DOUBLE PRECISION NOT NULL DEFAULT 2",
-            "ALTER TABLE work_plan_items ADD COLUMN IF NOT EXISTS weight DOUBLE PRECISION NOT NULL DEFAULT 2",
             """CREATE TABLE IF NOT EXISTS project_department_weights (
                 project_id BIGINT NOT NULL REFERENCES projects(id),
                 department TEXT NOT NULL, weight DOUBLE PRECISION NOT NULL,
@@ -215,6 +215,7 @@ def initialize():
                 title TEXT NOT NULL, description TEXT NOT NULL,
                 assigned_department TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'media',
                 position INTEGER NOT NULL DEFAULT 0)""",
+            "ALTER TABLE work_plan_items ADD COLUMN IF NOT EXISTS weight DOUBLE PRECISION NOT NULL DEFAULT 2",
             "CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)",
             "CREATE INDEX IF NOT EXISTS idx_conversations_thread ON conversations(conversation_id)",
             "CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated_at ON chat_sessions(updated_at)",
@@ -566,7 +567,7 @@ def create_department_task(
 ):
     """Cria uma tarefa encaminhada a um departamento."""
     task_weight = float(weight) if weight is not None else {"alta": 3.0, "media": 2.0, "baixa": 1.0}.get(str(priority).lower(), 2.0)
-    if task_weight <= 0 or task_weight > 10000:
+    if not math.isfinite(task_weight) or task_weight <= 0 or task_weight > 10000:
         raise ValueError("O peso da tarefa deve estar entre 0 e 10000.")
     with connection() as db:
         if project_id is not None:
@@ -647,7 +648,7 @@ def set_project_department_weights(project_id, weights):
     for department, weight in weights.items():
         name = str(department).strip().lower()
         number = float(weight)
-        if not name or not 0 < number <= 10000:
+        if not name or not math.isfinite(number) or not 0 < number <= 10000:
             raise ValueError("Departamento ou peso inválido.")
         normalized[name] = number
     if not normalized or abs(sum(normalized.values()) - 100.0) > 0.01:

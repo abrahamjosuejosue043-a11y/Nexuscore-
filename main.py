@@ -1288,6 +1288,7 @@ async def authenticate_admin_cookie(request: Request, call_next):
 
 
 _project_cleanup_task = None
+_department_execution_task = None
 
 
 async def _project_cleanup_loop():
@@ -1301,25 +1302,52 @@ async def _project_cleanup_loop():
         await asyncio.sleep(60)
 
 
+async def _department_execution_loop():
+    """Single in-process worker; it only claims tasks marked delegated_auto."""
+    while True:
+        try:
+            task = await asyncio.to_thread(storage.claim_next_automated_task)
+            if task:
+                result = await execute_claimed_automated_task(task)
+                logger.info(
+                    "Automatic department task processed: task_id=%s status=%s",
+                    result.get("task_id"), result.get("status"),
+                )
+                await asyncio.sleep(2)
+            else:
+                await asyncio.sleep(12)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Falha no ciclo de execução automática dos departamentos.")
+            await asyncio.sleep(30)
+
+
 @app.on_event("startup")
 async def initialize_persistent_storage():
-    global _project_cleanup_task
+    global _project_cleanup_task, _department_execution_task
     storage.initialize()
     storage.purge_expired_rejected_projects()
     if _project_cleanup_task is None or _project_cleanup_task.done():
         _project_cleanup_task = asyncio.create_task(_project_cleanup_loop())
+    if automatic_execution_enabled() and (
+        _department_execution_task is None or _department_execution_task.done()
+    ):
+        _department_execution_task = asyncio.create_task(_department_execution_loop())
 
 
 @app.on_event("shutdown")
 async def stop_project_cleanup_loop():
-    global _project_cleanup_task
-    if _project_cleanup_task is not None:
-        _project_cleanup_task.cancel()
-        try:
-            await _project_cleanup_task
-        except asyncio.CancelledError:
-            pass
-        _project_cleanup_task = None
+    global _project_cleanup_task, _department_execution_task
+    for task in (_project_cleanup_task, _department_execution_task):
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+    _project_cleanup_task = None
+    _department_execution_task = None
 
 @app.get("/api/saude")
 async def saude():
@@ -1338,6 +1366,10 @@ async def saude():
         "modelo_principal": GROQ_MODEL,
         "modelo_vision": GROQ_VISION_MODEL,
         "modelo_groq_confirmado_por_resposta": False,
+        "execucao_automatica": {
+            "ativa": automatic_execution_enabled(),
+            "escopo": "entregas textuais com revisão automática; código e ações externas ficam bloqueados",
+        },
     }
 
 
@@ -1615,6 +1647,17 @@ async def listar_tarefas(
         "items": storage.list_department_tasks(
             limit=limit, department=departamento, status=status
         )
+    }
+
+
+@app.get("/api/execucao/resumo")
+async def resumo_execucao_automatica(
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin_token(x_admin_token)
+    return {
+        "enabled": automatic_execution_enabled(),
+        **storage.automated_execution_summary(),
     }
 
 

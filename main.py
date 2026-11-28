@@ -1135,10 +1135,10 @@ async def orquestrador(
             f"A Diretoria {action_word} **#{plan['id']}** para o projeto "
             f"**{plan.get('title') or 'selecionado'}**. Foram encaminhadas "
             f"**{len(task_ids)} tarefas** ({breakdown}).\n\n"
-            "O plano não precisa de uma segunda aprovação operacional. As tarefas agora "
-            "estão na fila dos departamentos. A execução real, a alteração de arquivos e "
-            "a validação de entregas serão registradas separadamente; nada será declarado "
-            "concluído sem evidência."
+            "O plano não precisa de uma segunda aprovação operacional. Entregas textuais "
+            "elegíveis começam a ser produzidas e revisadas automaticamente. Tarefas de código, "
+            "publicações, pagamentos e ações externas ficam bloqueadas até que as integrações "
+            "ou aprovações necessárias existam. Nada será declarado concluído sem evidência."
         )
         storage.save_message("user", agent_type, text, conversation_id=conversation_id)
         storage.save_message("assistant", agent_type, answer, "Nexuscore", conversation_id=conversation_id)

@@ -78,6 +78,40 @@ class PersistentProgressWeightTests(unittest.TestCase):
                 self.project_id, {"programacao": float("nan"), "publicidade": 40}
             )
 
+    def test_department_weight_update_replaces_previous_configuration(self):
+        storage.set_project_department_weights(
+            self.project_id, {"programacao": 60, "publicidade": 40}
+        )
+        updated = storage.set_project_department_weights(
+            self.project_id, {"programacao": 70, "geral": 30}
+        )
+        self.assertEqual(
+            {item["department"]: float(item["weight"]) for item in updated},
+            {"programacao": 70.0, "geral": 30.0},
+        )
+        self.assertAlmostEqual(sum(float(item["weight"]) for item in updated), 100.0)
+
+    def test_work_plan_rejects_non_finite_item_weight(self):
+        with self.assertRaises(ValueError):
+            storage.create_work_plan(
+                "Plano inválido",
+                "Plano com peso não finito.",
+                "Teste de validação.",
+                self.project_id,
+                [{
+                    "title": "Item inválido",
+                    "description": "Não deve ser persistido.",
+                    "department": "programacao",
+                    "priority": "media",
+                    "weight": float("nan"),
+                }],
+            )
+        with storage.connection() as db:
+            count = db.execute(
+                "SELECT COUNT(*) AS total FROM work_plans"
+            ).fetchone()["total"]
+        self.assertEqual(count, 0)
+
     def test_work_plan_item_weight_copies_to_delegated_task(self):
         plan_id = storage.create_work_plan(
             "Plano ponderado",

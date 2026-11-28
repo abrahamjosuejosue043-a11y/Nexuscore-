@@ -1302,7 +1302,7 @@ async def listar_projetos(
     x_admin_token: Optional[str] = Header(default=None),
 ):
     require_admin_token(x_admin_token)
-    allowed = {"aguardando_aprovacao", "aprovado", "rejeitado"}
+    allowed = {"aguardando_aprovacao", "aprovado", "rejeitado", "cancelado"}
     if approval_status and approval_status not in allowed:
         raise HTTPException(status_code=422, detail="Filtro de aprovação inválido.")
     return {"items": storage.projects(limit, approval_status=approval_status)}
@@ -1341,6 +1341,17 @@ async def rejeitar_projeto(project_id: int, x_admin_token: Optional[str] = Heade
     return {**result, "exclusao_automatica_em_horas": 24}
 
 
+@app.post("/api/projetos/{project_id}/cancelar")
+async def cancelar_projeto_aprovado(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
+    require_admin_token(x_admin_token)
+    result = storage.cancel_approved_project(project_id, actor="ceo")
+    if result is None:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if result is False:
+        raise HTTPException(status_code=409, detail="Somente projetos aprovados podem ser encerrados.")
+    return {**result, "exclusao_automatica_em_horas": 24}
+
+
 @app.post("/api/projetos/{project_id}/restaurar")
 async def restaurar_projeto(project_id: int, x_admin_token: Optional[str] = Header(default=None)):
     require_admin_token(x_admin_token)
@@ -1348,7 +1359,7 @@ async def restaurar_projeto(project_id: int, x_admin_token: Optional[str] = Head
     if result is False:
         if not storage.project_exists(project_id):
             raise HTTPException(status_code=404, detail="Projeto não encontrado ou já excluído.")
-        raise HTTPException(status_code=409, detail="O prazo de recuperação expirou ou o projeto não está rejeitado.")
+        raise HTTPException(status_code=409, detail="O prazo de recuperação expirou ou o projeto não está em estado recuperável.")
     return result
 
 

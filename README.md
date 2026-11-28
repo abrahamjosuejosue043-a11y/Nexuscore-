@@ -42,10 +42,20 @@ Persistência:
 - `GET/POST/PATCH /api/tarefas`: fila de tarefas por departamento, protegida.
 - `GET/POST /api/ideias`: banco de ideias.
 - `GET/POST/PATCH /api/projetos`: registros e status de projetos.
+- `GET /api/projetos/{id}/progresso`: cálculo ponderado do progresso de um projeto aprovado, protegido por `X-Admin-Token`.
+- `POST /api/tarefas/{id}/validar`: registra a validação da Diretoria para uma tarefa em revisão.
 - `GET /api/arquivos`: lista de arquivos gerados.
 - `POST /api/arquivos/gerar`: cria DOCX, PDF, Markdown, TXT, CSV ou JSON via Groq.
 - `GET /api/arquivos/{id}/download`: baixa um arquivo gerado.
 - `POST /api/email/enviar`, `POST /api/email/analisar`, `GET /api/email/receber`: operações de e-mail protegidas por token.
+
+## Progresso híbrido de projetos
+
+- O progresso é calculado sob demanda a partir das tarefas vinculadas ao projeto, dos pesos persistidos das tarefas e dos pesos departamentais (quando configurados).
+- Tarefas canceladas são excluídas do denominador; tarefas em revisão não contam como concluídas.
+- Para tarefas vinculadas a projetos, o envio para revisão exige evidências no campo de resultado. A conclusão exige registro de validação da Diretoria no histórico auditável.
+- O percentual calculado não é duplicado em uma coluna de projeto; a API calcula o valor a partir dos registros atuais.
+- A ação de validação disponível nesta etapa é autenticada e registra a decisão como Diretoria após confirmação explícita. A revisão autônoma das evidências por IA e a execução autônoma das tarefas ainda não estão implementadas.
 
 ## Deploy no Render
 
